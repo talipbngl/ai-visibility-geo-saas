@@ -27,7 +27,9 @@ export default async function BrandsPage() {
           </p>
         </div>
 
-        <Button disabled>Yeni Marka Ekle</Button>
+        <Button asChild>
+        <Link href="/dashboard/brands/new">Yeni Marka Ekle</Link>
+        </Button>
       </section>
 
       <Card>
