@@ -1,7 +1,5 @@
-import { redirect } from "next/navigation";
-import { logoutAction } from "@/features/auth/actions/logout.action";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -14,91 +12,107 @@ import {
 export default async function DashboardPage() {
   const supabase = await createClient();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    redirect("/login");
-  }
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("full_name, email")
-    .eq("user_id", user.id)
-    .maybeSingle();
-
-  const { data: workspaces } = await supabase
-    .from("workspaces")
-    .select("id, name, plan")
-    .limit(5);
-
   const { count: brandCount } = await supabase
     .from("brands")
     .select("id", { count: "exact", head: true });
 
-  const activeWorkspace = workspaces?.[0];
+  const { count: auditCount } = await supabase
+    .from("audits")
+    .select("id", { count: "exact", head: true });
+
+  const { data: latestBrands } = await supabase
+    .from("brands")
+    .select("id, name, industry, created_at")
+    .order("created_at", { ascending: false })
+    .limit(5);
 
   return (
-    <main className="min-h-screen bg-muted/30">
-      <div className="mx-auto flex max-w-6xl flex-col gap-6 px-6 py-8">
-        <header className="flex flex-col justify-between gap-4 rounded-xl border bg-background p-6 md:flex-row md:items-center">
+    <div className="space-y-6">
+      <section className="rounded-xl border bg-background p-6">
+        <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
           <div>
-            <p className="text-sm text-muted-foreground">Hoş geldin</p>
             <h1 className="text-2xl font-semibold tracking-tight">
-              {profile?.full_name || profile?.email || user.email}
+              Genel Bakış
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              AI görünürlük audit panelinin ilk auth testi başarılı.
+              Markalarının AI cevaplarındaki görünürlüğünü buradan takip edeceksin.
             </p>
           </div>
 
-          <form action={logoutAction}>
-            <Button type="submit" variant="outline">
-              Çıkış yap
-            </Button>
-          </form>
-        </header>
+          <Button asChild>
+            <Link href="/dashboard/brands">Markaları görüntüle</Link>
+          </Button>
+        </div>
+      </section>
 
-        <section className="grid gap-4 md:grid-cols-3">
-          <Card>
-            <CardHeader>
-              <CardTitle>Workspace</CardTitle>
-              <CardDescription>Aktif çalışma alanı</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-xl font-semibold">
-                {activeWorkspace?.name ?? "Workspace yok"}
-              </p>
-              <Badge className="mt-3" variant="secondary">
-                {activeWorkspace?.plan ?? "free"}
-              </Badge>
-            </CardContent>
-          </Card>
+      <section className="grid gap-4 md:grid-cols-3">
+        <Card>
+          <CardHeader>
+            <CardTitle>Toplam Marka</CardTitle>
+            <CardDescription>Takip edilen marka sayısı</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-3xl font-semibold">{brandCount ?? 0}</p>
+          </CardContent>
+        </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Markalar</CardTitle>
-              <CardDescription>Takip edilen marka sayısı</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-3xl font-semibold">{brandCount ?? 0}</p>
-            </CardContent>
-          </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>Toplam Audit</CardTitle>
+            <CardDescription>Çalıştırılan görünürlük analizi</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-3xl font-semibold">{auditCount ?? 0}</p>
+          </CardContent>
+        </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Sonraki adım</CardTitle>
-              <CardDescription>Marka ekleme modülü</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">
-                Sıradaki modülde kullanıcı ilk markasını ekleyebilecek.
-              </p>
-            </CardContent>
-          </Card>
-        </section>
-      </div>
-    </main>
+        <Card>
+          <CardHeader>
+            <CardTitle>Ortalama Skor</CardTitle>
+            <CardDescription>Audit sonuçlarından hesaplanacak</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-3xl font-semibold">-</p>
+          </CardContent>
+        </Card>
+      </section>
+
+      <section>
+        <Card>
+          <CardHeader>
+            <CardTitle>Son Eklenen Markalar</CardTitle>
+            <CardDescription>
+              Henüz marka yoksa sıradaki modülde ilk markanı ekleyeceğiz.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {latestBrands && latestBrands.length > 0 ? (
+              <div className="space-y-3">
+                {latestBrands.map((brand) => (
+                  <div
+                    key={brand.id}
+                    className="flex items-center justify-between rounded-lg border p-3"
+                  >
+                    <div>
+                      <p className="font-medium">{brand.name}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {brand.industry || "Sektör belirtilmedi"}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="rounded-lg border border-dashed p-6 text-center">
+                <p className="font-medium">Henüz marka eklenmedi</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  İlk AI görünürlük audit’inizi başlatmak için marka ekleme modülünü hazırlayacağız.
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </section>
+    </div>
   );
 }
