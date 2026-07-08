@@ -2,6 +2,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/server";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -10,9 +12,11 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 
-type BrandDetailPageProps = {
+type CompetitorsPageProps = {
   params: Promise<{
     brandId: string;
   }>;
@@ -21,10 +25,10 @@ type BrandDetailPageProps = {
   }>;
 };
 
-export default async function BrandDetailPage({
+export default async function CompetitorsPage({
   params,
   searchParams,
-}: BrandDetailPageProps) {
+}: CompetitorsPageProps) {
   const { brandId } = await params;
   const query = await searchParams;
 
@@ -32,9 +36,7 @@ export default async function BrandDetailPage({
 
   const { data: brand } = await supabase
     .from("brands")
-    .select(
-      "id, name, website_url, industry, country, language, description, target_audience, primary_offer, created_at"
-    )
+    .select("id, name, industry")
     .eq("id", brandId)
     .maybeSingle();
 
@@ -42,156 +44,171 @@ export default async function BrandDetailPage({
     notFound();
   }
 
-  const { data: aliases } = await supabase
-    .from("brand_aliases")
-    .select("id, alias")
-    .eq("brand_id", brand.id)
-    .order("created_at", { ascending: true });
-
-  const { count: competitorCount } = await supabase
+  const { data: competitors } = await supabase
     .from("competitors")
-    .select("id", { count: "exact", head: true })
-    .eq("brand_id", brand.id);
-
-  const { count: promptCount } = await supabase
-    .from("prompts")
-    .select("id", { count: "exact", head: true })
-    .eq("brand_id", brand.id);
-
-  const { count: auditCount } = await supabase
-    .from("audits")
-    .select("id", { count: "exact", head: true })
-    .eq("brand_id", brand.id);
+    .select(
+      `
+      id,
+      name,
+      website_url,
+      description,
+      created_at,
+      competitor_aliases (
+        id,
+        alias
+      )
+    `
+    )
+    .eq("brand_id", brand.id)
+    .order("created_at", { ascending: false });
 
   return (
     <div className="space-y-6">
       <section className="flex flex-col justify-between gap-4 rounded-xl border bg-background p-6 md:flex-row md:items-center">
         <div>
-          <div className="mb-2 flex flex-wrap items-center gap-2">
-            <h1 className="text-2xl font-semibold tracking-tight">
-              {brand.name}
-            </h1>
-            <Badge variant="secondary">{brand.country || "TR"}</Badge>
-            <Badge variant="outline">{brand.language || "tr"}</Badge>
-          </div>
-
-          <p className="text-sm text-muted-foreground">
-            {brand.industry || "Sektör belirtilmedi"}
+          <p className="text-sm text-muted-foreground">Rakip yönetimi</p>
+          <h1 className="text-2xl font-semibold tracking-tight">
+            {brand.name} rakipleri
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            AI cevaplarında markanı hangi rakiplerle karşılaştıracağımızı burada belirliyoruz.
           </p>
         </div>
 
-        <div className="flex gap-2">
-          <Button asChild variant="outline">
-            <Link href="/dashboard/brands">Markalara dön</Link>
-          </Button>
-
-          <Button disabled>Rakip ekle</Button>
-        </div>
+        <Button asChild variant="outline">
+          <Link href={`/dashboard/brands/${brand.id}`}>Marka detayına dön</Link>
+        </Button>
       </section>
 
       {query.error ? (
-        <Card className="border-destructive">
-          <CardContent className="pt-6 text-sm text-destructive">
-            {query.error}
-          </CardContent>
-        </Card>
+        <Alert variant="destructive">
+          <AlertDescription>{query.error}</AlertDescription>
+        </Alert>
       ) : null}
 
-      <section className="grid gap-4 md:grid-cols-3">
+      <section className="grid gap-6 lg:grid-cols-[420px_1fr]">
         <Card>
           <CardHeader>
-            <CardTitle>Rakipler</CardTitle>
-            <CardDescription>Eklenen rakip sayısı</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-semibold">{competitorCount ?? 0}</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Promptlar</CardTitle>
-            <CardDescription>Test edilecek prompt sayısı</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-semibold">{promptCount ?? 0}</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Auditler</CardTitle>
-            <CardDescription>Çalıştırılan analiz sayısı</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-semibold">{auditCount ?? 0}</p>
-          </CardContent>
-        </Card>
-      </section>
-
-      <section className="grid gap-4 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Marka Bilgileri</CardTitle>
+            <CardTitle>Yeni Rakip Ekle</CardTitle>
             <CardDescription>
-              Audit ve prompt üretiminde kullanılacak temel bilgiler.
-            </CardDescription>
-          </CardHeader>
-
-          <CardContent className="space-y-4">
-            <div>
-              <p className="text-sm text-muted-foreground">Website</p>
-              {brand.website_url ? (
-                <Link
-                  href={brand.website_url}
-                  target="_blank"
-                  className="font-medium underline"
-                >
-                  {brand.website_url}
-                </Link>
-              ) : (
-                <p className="font-medium">-</p>
-              )}
-            </div>
-
-            <div>
-              <p className="text-sm text-muted-foreground">Açıklama</p>
-              <p className="font-medium">{brand.description || "-"}</p>
-            </div>
-
-            <div>
-              <p className="text-sm text-muted-foreground">Hedef kitle</p>
-              <p className="font-medium">{brand.target_audience || "-"}</p>
-            </div>
-
-            <div>
-              <p className="text-sm text-muted-foreground">Ana teklif</p>
-              <p className="font-medium">{brand.primary_offer || "-"}</p>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Aliaslar</CardTitle>
-            <CardDescription>
-              AI cevaplarında markayı yakalamak için farklı yazımlar.
+              Her marka için en az 3 rakip eklemek iyi bir başlangıçtır.
             </CardDescription>
           </CardHeader>
 
           <CardContent>
-            {aliases && aliases.length > 0 ? (
-              <div className="flex flex-wrap gap-2">
-                {aliases.map((item) => (
-                  <Badge key={item.id} variant="secondary">
-                    {item.alias}
-                  </Badge>
+            <form
+              action={`/api/brands/${brand.id}/competitors`}
+              method="post"
+              className="space-y-5"
+            >
+              <div className="space-y-2">
+                <Label htmlFor="name">Rakip adı *</Label>
+                <Input
+                  id="name"
+                  name="name"
+                  placeholder="Kronotrop"
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="websiteUrl">Website URL</Label>
+                <Input
+                  id="websiteUrl"
+                  name="websiteUrl"
+                  placeholder="https://kronotrop.com.tr"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="description">Kısa açıklama</Label>
+                <Textarea
+                  id="description"
+                  name="description"
+                  placeholder="Rakip ne satıyor, hangi konuda güçlü?"
+                  rows={3}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="aliases">Rakip aliasları</Label>
+                <Textarea
+                  id="aliases"
+                  name="aliases"
+                  placeholder={"Kronotrop\nkronotrop.com.tr\nKronotrop Coffee"}
+                  rows={4}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Her satıra bir farklı yazım gir.
+                </p>
+              </div>
+
+              <Button type="submit" className="w-full">
+                Rakibi kaydet
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Rakip Listesi</CardTitle>
+            <CardDescription>
+              Audit sırasında bu rakiplerin AI cevaplarında geçip geçmediği ölçülecek.
+            </CardDescription>
+          </CardHeader>
+
+          <CardContent>
+            {competitors && competitors.length > 0 ? (
+              <div className="space-y-4">
+                {competitors.map((competitor) => (
+                  <div key={competitor.id} className="rounded-lg border p-4">
+                    <div className="flex flex-col justify-between gap-3 md:flex-row md:items-start">
+                      <div>
+                        <p className="font-medium">{competitor.name}</p>
+
+                        {competitor.website_url ? (
+                          <Link
+                            href={competitor.website_url}
+                            target="_blank"
+                            className="text-sm text-muted-foreground underline"
+                          >
+                            {competitor.website_url}
+                          </Link>
+                        ) : null}
+
+                        {competitor.description ? (
+                          <p className="mt-2 text-sm text-muted-foreground">
+                            {competitor.description}
+                          </p>
+                        ) : null}
+                      </div>
+                    </div>
+
+                    {competitor.competitor_aliases &&
+                    competitor.competitor_aliases.length > 0 ? (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {competitor.competitor_aliases.map((alias) => (
+                          <Badge key={alias.id} variant="secondary">
+                            {alias.alias}
+                          </Badge>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="mt-3 text-xs text-muted-foreground">
+                        Alias eklenmedi.
+                      </p>
+                    )}
+                  </div>
                 ))}
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground">
-                Henüz alias eklenmedi.
-              </p>
+              <div className="rounded-lg border border-dashed p-8 text-center">
+                <p className="font-medium">Henüz rakip yok</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  İlk audit raporunun anlamlı olması için 3-5 rakip ekle.
+                </p>
+              </div>
             )}
           </CardContent>
         </Card>

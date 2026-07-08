@@ -28,7 +28,7 @@ export default async function BrandsPage() {
         </div>
 
         <Button asChild>
-        <Link href="/dashboard/brands/new">Yeni Marka Ekle</Link>
+          <Link href="/dashboard/brands/new">Yeni Marka Ekle</Link>
         </Button>
       </section>
 
@@ -36,7 +36,7 @@ export default async function BrandsPage() {
         <CardHeader>
           <CardTitle>Marka Listesi</CardTitle>
           <CardDescription>
-            Marka ekleme formu bir sonraki modülde aktif olacak.
+            Eklediğin markaların detayına gidebilir veya rakiplerini yönetebilirsin.
           </CardDescription>
         </CardHeader>
 
@@ -50,9 +50,11 @@ export default async function BrandsPage() {
                 >
                   <div>
                     <p className="font-medium">{brand.name}</p>
+
                     <p className="text-sm text-muted-foreground">
                       {brand.industry || "Sektör belirtilmedi"}
                     </p>
+
                     {brand.website_url ? (
                       <Link
                         href={brand.website_url}
@@ -64,8 +66,24 @@ export default async function BrandsPage() {
                     ) : null}
                   </div>
 
-                  <div className="text-sm text-muted-foreground">
-                    {brand.country || "TR"} / {brand.language || "tr"}
+                  <div className="flex flex-col gap-2 md:items-end">
+                    <div className="text-sm text-muted-foreground">
+                      {brand.country || "TR"} / {brand.language || "tr"}
+                    </div>
+
+                    <div className="flex gap-2">
+                      <Button asChild variant="outline" size="sm">
+                        <Link href={`/dashboard/brands/${brand.id}`}>
+                          Detaya git
+                        </Link>
+                      </Button>
+
+                      <Button asChild size="sm">
+                        <Link href={`/dashboard/brands/${brand.id}/competitors`}>
+                          Rakipler
+                        </Link>
+                      </Button>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -74,8 +92,12 @@ export default async function BrandsPage() {
             <div className="rounded-lg border border-dashed p-8 text-center">
               <p className="font-medium">Henüz marka yok</p>
               <p className="mt-1 text-sm text-muted-foreground">
-                Sonraki adımda “Yeni Marka Ekle” formunu yazacağız.
+                İlk AI görünürlük audit’inizi başlatmak için marka ekleyin.
               </p>
+
+              <Button asChild className="mt-4">
+                <Link href="/dashboard/brands/new">Yeni Marka Ekle</Link>
+              </Button>
             </div>
           )}
         </CardContent>
