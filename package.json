@@ -1,5 +1,5 @@
 {
-  "name": "ai-visibility-geo-saas-temp",
+  "name": "ai-visibility-geo-saas",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -18,7 +18,6 @@
     "date-fns": "^4.4.0",
     "lucide-react": "^1.23.0",
     "next": "16.2.10",
-    "openai": "^6.45.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "react-hook-form": "^7.81.0",
