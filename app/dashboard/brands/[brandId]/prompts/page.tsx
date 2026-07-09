@@ -147,6 +147,41 @@ export default async function PromptsPage({
               </form>
             </CardContent>
           </Card>
+          <Card>
+  <CardHeader>
+    <CardTitle>AI ile Prompt Üret</CardTitle>
+    <CardDescription>
+      Marka ve rakip bilgilerine göre otomatik prompt önerileri oluştur.
+    </CardDescription>
+  </CardHeader>
+
+  <CardContent>
+    <form
+      action={`/api/brands/${brand.id}/prompts/generate`}
+      method="post"
+      className="space-y-4"
+    >
+      <div className="space-y-2">
+        <Label htmlFor="promptCount">Prompt sayısı</Label>
+        <Input
+          id="promptCount"
+          name="promptCount"
+          type="number"
+          min="5"
+          max="30"
+          defaultValue="10"
+        />
+        <p className="text-xs text-muted-foreground">
+          İlk test için 10 prompt yeterli. Maliyet kontrolü için üst limit 30.
+        </p>
+      </div>
+
+      <Button type="submit" className="w-full">
+        AI ile prompt üret
+      </Button>
+    </form>
+  </CardContent>
+</Card>
 
           <Card>
             <CardHeader>
