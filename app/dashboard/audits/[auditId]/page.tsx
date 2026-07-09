@@ -113,18 +113,24 @@ export default async function AuditDetailPage({
         </div>
 
         <div className="flex flex-wrap gap-2">
-          <Button asChild variant="outline">
-            <Link href="/dashboard/audits">Auditlere dön</Link>
-          </Button>
+  <Button asChild variant="outline">
+    <Link href="/dashboard/audits">Auditlere dön</Link>
+  </Button>
 
-          {brand ? (
-            <Button asChild variant="outline">
-              <Link href={`/dashboard/brands/${brand.id}/prompts`}>
-                Promptlara dön
-              </Link>
-            </Button>
-          ) : null}
-        </div>
+  {brand ? (
+    <Button asChild variant="outline">
+      <Link href={`/dashboard/brands/${brand.id}/prompts`}>
+        Promptlara dön
+      </Link>
+    </Button>
+  ) : null}
+
+  {audit.status === "pending" || audit.status === "running" ? (
+    <form action={`/api/audits/${audit.id}/run`} method="post">
+      <Button type="submit">Audit&apos;i çalıştır</Button>
+    </form>
+  ) : null}
+</div>
       </section>
 
       {query.error ? (
