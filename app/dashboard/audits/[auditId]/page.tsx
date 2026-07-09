@@ -65,6 +65,20 @@ export default async function AuditDetailPage({
     .eq("id", audit.brand_id)
     .maybeSingle();
 
+  const { data: score } = await supabase
+    .from("audit_scores")
+    .select(
+      "visibility_score, share_of_voice, average_rank, positive_sentiment_rate, citation_score, competitor_gap_score, opportunity_score"
+    )
+    .eq("audit_id", audit.id)
+    .maybeSingle();
+
+  const { data: recommendations } = await supabase
+    .from("recommendations")
+    .select("id, category, title, description, priority, effort, impact, status")
+    .eq("audit_id", audit.id)
+    .order("created_at", { ascending: true });
+
   const { data: runs } = await supabase
     .from("audit_runs")
     .select(
@@ -113,24 +127,30 @@ export default async function AuditDetailPage({
         </div>
 
         <div className="flex flex-wrap gap-2">
-  <Button asChild variant="outline">
-    <Link href="/dashboard/audits">Auditlere dön</Link>
-  </Button>
+          <Button asChild variant="outline">
+            <Link href="/dashboard/audits">Auditlere dön</Link>
+          </Button>
 
-  {brand ? (
-    <Button asChild variant="outline">
-      <Link href={`/dashboard/brands/${brand.id}/prompts`}>
-        Promptlara dön
-      </Link>
-    </Button>
-  ) : null}
+          {brand ? (
+            <Button asChild variant="outline">
+              <Link href={`/dashboard/brands/${brand.id}/prompts`}>
+                Promptlara dön
+              </Link>
+            </Button>
+          ) : null}
 
-  {audit.status === "pending" || audit.status === "running" ? (
-    <form action={`/api/audits/${audit.id}/run`} method="post">
-      <Button type="submit">Audit&apos;i çalıştır</Button>
-    </form>
-  ) : null}
-</div>
+          {audit.status !== "completed" ? (
+            <form action={`/api/audits/${audit.id}/run`} method="post">
+              <Button type="submit" variant="outline">
+                Audit&apos;i çalıştır
+              </Button>
+            </form>
+          ) : null}
+
+          <form action={`/api/audits/${audit.id}/analyze`} method="post">
+            <Button type="submit">Analiz et</Button>
+          </form>
+        </div>
       </section>
 
       {query.error ? (
@@ -178,10 +198,66 @@ export default async function AuditDetailPage({
         </Card>
       </section>
 
+      {score ? (
+        <section className="grid gap-4 md:grid-cols-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Visibility Score</CardTitle>
+              <CardDescription>Markanın cevaplarda görünme oranı</CardDescription>
+            </CardHeader>
+
+            <CardContent>
+              <p className="text-3xl font-semibold">
+                {Math.round(score.visibility_score)}/100
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Share of Voice</CardTitle>
+              <CardDescription>Rakiplere göre görünürlük payı</CardDescription>
+            </CardHeader>
+
+            <CardContent>
+              <p className="text-3xl font-semibold">
+                {Math.round(score.share_of_voice)}%
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Ortalama Sıra</CardTitle>
+              <CardDescription>Marka geçtiğinde yaklaşık sıra</CardDescription>
+            </CardHeader>
+
+            <CardContent>
+              <p className="text-3xl font-semibold">
+                {score.average_rank ? score.average_rank : "-"}
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Olumlu Ton</CardTitle>
+              <CardDescription>Olumlu mention oranı</CardDescription>
+            </CardHeader>
+
+            <CardContent>
+              <p className="text-3xl font-semibold">
+                {Math.round(score.positive_sentiment_rate)}%
+              </p>
+            </CardContent>
+          </Card>
+        </section>
+      ) : null}
+
       {audit.error_message ? (
         <Card className="border-destructive">
           <CardHeader>
-            <CardTitle>Audit Hatası</CardTitle>
+            <CardTitle>Audit Notu</CardTitle>
           </CardHeader>
 
           <CardContent className="text-sm text-destructive">
@@ -190,12 +266,48 @@ export default async function AuditDetailPage({
         </Card>
       ) : null}
 
+      {recommendations && recommendations.length > 0 ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Aksiyon Önerileri</CardTitle>
+            <CardDescription>
+              Skora göre uygulanabilir GEO / AI visibility önerileri.
+            </CardDescription>
+          </CardHeader>
+
+          <CardContent>
+            <div className="space-y-3">
+              {recommendations.map((recommendation) => (
+                <div key={recommendation.id} className="rounded-lg border p-4">
+                  <div className="mb-2 flex flex-wrap gap-2">
+                    <Badge variant="secondary">{recommendation.category}</Badge>
+                    <Badge variant="outline">
+                      Priority: {recommendation.priority}
+                    </Badge>
+                    <Badge variant="outline">
+                      Impact: {recommendation.impact}
+                    </Badge>
+                    <Badge variant="outline">
+                      Effort: {recommendation.effort}
+                    </Badge>
+                  </div>
+
+                  <p className="font-medium">{recommendation.title}</p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {recommendation.description}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
+
       <Card>
         <CardHeader>
           <CardTitle>Prompt Çalıştırmaları</CardTitle>
           <CardDescription>
-            Şimdilik kayıtlar pending. Bir sonraki adımda bu promptları Gemini’ye
-            sorduracağız.
+            Gemini cevapları ve hata durumları burada listelenir.
           </CardDescription>
         </CardHeader>
 
