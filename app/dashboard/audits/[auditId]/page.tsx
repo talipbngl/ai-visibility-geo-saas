@@ -80,28 +80,39 @@ export default async function AuditDetailPage({
     .order("created_at", { ascending: true });
 
   const { data: runs } = await supabase
-    .from("audit_runs")
-    .select(
-      `
-      id,
-      status,
-      engine,
-      model,
-      raw_answer,
-      error_message,
-      started_at,
-      completed_at,
-      created_at,
-      prompts (
-        id,
-        text,
-        intent,
-        priority
-      )
+  .from("audit_runs")
+  .select(
     `
+    id,
+    status,
+    engine,
+    model,
+    raw_answer,
+    error_message,
+    started_at,
+    completed_at,
+    created_at,
+    prompts (
+      id,
+      text,
+      intent,
+      priority
+    ),
+    analyses (
+      id,
+      brand_mentioned,
+      brand_rank,
+      brand_sentiment,
+      competitors_json,
+      summary,
+      risk_notes_json,
+      opportunity_notes_json,
+      confidence_score
     )
-    .eq("audit_id", audit.id)
-    .order("created_at", { ascending: true });
+  `
+  )
+  .eq("audit_id", audit.id)
+  .order("created_at", { ascending: true });
 
   return (
     <div className="space-y-6">
@@ -316,11 +327,27 @@ export default async function AuditDetailPage({
             <div className="space-y-3">
               {runs.map((run) => {
                 const prompt = Array.isArray(run.prompts)
-                  ? run.prompts[0]
-                  : run.prompts;
+  ? run.prompts[0]
+  : run.prompts;
 
-                return (
-                  <div key={run.id} className="rounded-lg border p-4">
+const analysis = Array.isArray(run.analyses)
+  ? run.analyses[0]
+  : run.analyses;
+
+const competitors = Array.isArray(analysis?.competitors_json)
+  ? analysis.competitors_json
+  : [];
+
+const risks = Array.isArray(analysis?.risk_notes_json)
+  ? analysis.risk_notes_json
+  : [];
+
+const opportunities = Array.isArray(analysis?.opportunity_notes_json)
+  ? analysis.opportunity_notes_json
+  : [];
+
+return (
+  <div key={run.id} className="rounded-lg border p-4">
                     <div className="mb-2 flex flex-wrap gap-2">
                       <Badge variant={getStatusVariant(run.status)}>
                         {run.status}
@@ -342,6 +369,93 @@ export default async function AuditDetailPage({
                         Intent: {prompt.intent} / Priority: {prompt.priority}
                       </p>
                     ) : null}
+                    {analysis ? (
+  <div className="mt-4 rounded-lg border bg-background p-4">
+    <div className="mb-3 flex flex-wrap gap-2">
+      <Badge variant={analysis.brand_mentioned ? "default" : "outline"}>
+        {analysis.brand_mentioned ? "Marka geçti" : "Marka geçmedi"}
+      </Badge>
+
+      <Badge variant="secondary">
+        Sıra: {analysis.brand_rank ?? "-"}
+      </Badge>
+
+      <Badge variant="outline">
+        Sentiment: {analysis.brand_sentiment ?? "-"}
+      </Badge>
+
+      <Badge variant="outline">
+        Confidence:{" "}
+        {analysis.confidence_score
+          ? Math.round(analysis.confidence_score * 100)
+          : "-"}
+        %
+      </Badge>
+    </div>
+
+    <p className="text-sm font-medium">Analiz özeti</p>
+    <p className="mt-1 text-sm text-muted-foreground">
+      {analysis.summary}
+    </p>
+
+    {competitors.length > 0 ? (
+      <div className="mt-3">
+        <p className="text-sm font-medium">Rakip görünürlüğü</p>
+
+        <div className="mt-2 flex flex-wrap gap-2">
+          {competitors.map(
+  (
+    competitor: {
+      name: string;
+      mentioned: boolean;
+      rank: number | null;
+    },
+    index: number
+  ) => (
+    <Badge
+      key={`${competitor.name}-${index}`}
+      variant={competitor.mentioned ? "secondary" : "outline"}
+    >
+      {competitor.name}
+      {competitor.mentioned
+        ? ` geçti${competitor.rank ? ` / sıra ${competitor.rank}` : ""}`
+        : " geçmedi"}
+    </Badge>
+  )
+)}
+        </div>
+      </div>
+    ) : null}
+
+    {risks.length > 0 ? (
+      <div className="mt-3 rounded-lg border border-destructive/40 p-3">
+        <p className="text-sm font-medium text-destructive">Riskler</p>
+
+        <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-muted-foreground">
+          {risks.map((risk: string, index: number) => (
+  <li key={`${risk}-${index}`}>{risk}</li>
+))}
+        </ul>
+      </div>
+    ) : null}
+
+    {opportunities.length > 0 ? (
+      <div className="mt-3 rounded-lg border p-3">
+        <p className="text-sm font-medium">Fırsatlar</p>
+
+        <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-muted-foreground">
+          {opportunities.map((opportunity: string, index: number) => (
+  <li key={`${opportunity}-${index}`}>{opportunity}</li>
+))}
+        </ul>
+      </div>
+    ) : null}
+  </div>
+) : (
+  <div className="mt-4 rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
+    Bu prompt için henüz analiz yok. Üstteki “Analiz et” butonuna bas.
+  </div>
+)}
 
                     {run.raw_answer ? (
                       <p className="mt-3 whitespace-pre-wrap rounded-lg bg-muted p-3 text-sm">

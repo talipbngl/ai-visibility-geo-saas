@@ -18,6 +18,15 @@ type GeminiGenerateContentResponse = {
   };
 };
 
+type GeminiBatchAnswer = {
+  runId: string;
+  answer: string;
+};
+
+type GeminiBatchResponse = {
+  answers: GeminiBatchAnswer[];
+};
+
 type RouteContext = {
   params: Promise<{
     auditId: string;
@@ -30,8 +39,77 @@ function redirectTo(path: string, requestUrl: string) {
   });
 }
 
-async function askGemini(promptText: string) {
-  const model = process.env.GEMINI_MODEL ?? "gemini-3.5-flash";
+function buildBatchPrompt(args: {
+  brandName: string;
+  brandAliases: string[];
+  competitors: string[];
+  prompts: Array<{
+    runId: string;
+    text: string;
+  }>;
+}) {
+  const aliases =
+    args.brandAliases.length > 0 ? args.brandAliases.join(", ") : "Yok";
+
+  const competitors =
+    args.competitors.length > 0 ? args.competitors.join(", ") : "Yok";
+
+  const promptList = args.prompts
+    .map(
+      (prompt, index) => `
+${index + 1}. runId: ${prompt.runId}
+Soru: ${prompt.text}`
+    )
+    .join("\n");
+
+  return `
+Sen normal bir AI arama/asistan kullanıcısına cevap veren asistansın.
+
+Aşağıdaki kullanıcı sorularına ayrı ayrı cevap ver.
+
+Kurallar:
+- Cevaplar Türkçe olsun.
+- Her cevap en fazla 4 cümle olsun.
+- Markayı zorla öne çıkarma.
+- Eğer takip edilen marka gerçekten alakalıysa cevaba dahil et.
+- Rakipler alakalıysa onları da dahil edebilirsin.
+- Sadece JSON döndür. Açıklama yazma.
+
+Takip edilen marka:
+${args.brandName}
+
+Marka aliasları:
+${aliases}
+
+Bilinen rakipler:
+${competitors}
+
+Sorular:
+${promptList}
+
+Cevap formatı kesinlikle şöyle olmalı:
+
+{
+  "answers": [
+    {
+      "runId": "audit_run_id",
+      "answer": "Bu soruya verilen cevap"
+    }
+  ]
+}
+`;
+}
+
+async function askGeminiBatch(args: {
+  brandName: string;
+  brandAliases: string[];
+  competitors: string[];
+  prompts: Array<{
+    runId: string;
+    text: string;
+  }>;
+}) {
+  const model = process.env.GEMINI_MODEL ?? "gemini-3.1-flash-lite";
 
   const response = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`,
@@ -45,14 +123,38 @@ async function askGemini(promptText: string) {
           {
             parts: [
               {
-                text: promptText,
+                text: buildBatchPrompt(args),
               },
             ],
           },
         ],
         generationConfig: {
-          temperature: 0.4,
-          maxOutputTokens: 500,
+          temperature: 0.3,
+          maxOutputTokens: 1400,
+          response_mime_type: "application/json",
+          response_schema: {
+            type: "OBJECT",
+            properties: {
+              answers: {
+                type: "ARRAY",
+                items: {
+                  type: "OBJECT",
+                  properties: {
+                    runId: {
+                      type: "STRING",
+                    },
+                    answer: {
+                      type: "STRING",
+                    },
+                  },
+                  required: ["runId", "answer"],
+                  propertyOrdering: ["runId", "answer"],
+                },
+              },
+            },
+            required: ["answers"],
+            propertyOrdering: ["answers"],
+          },
         },
       }),
     }
@@ -77,45 +179,13 @@ async function askGemini(promptText: string) {
     );
   }
 
-  return outputText;
-}
+  const parsed = JSON.parse(outputText) as GeminiBatchResponse;
 
-function buildAuditPrompt(args: {
-  userPrompt: string;
-  brandName: string;
-  brandAliases: string[];
-  competitors: string[];
-}) {
-  const brandAliasesText =
-    args.brandAliases.length > 0 ? args.brandAliases.join(", ") : "Yok";
+  if (!parsed.answers || !Array.isArray(parsed.answers)) {
+    throw new Error("Gemini cevabı beklenen answers formatında değil.");
+  }
 
-  const competitorsText =
-    args.competitors.length > 0 ? args.competitors.join(", ") : "Yok";
-
-  return `
-Sen normal bir AI arama/asistan kullanıcısına cevap veren asistansın.
-
-Kullanıcının sorusuna doğal, tarafsız ve faydalı cevap ver.
-
-Önemli:
-- Cevabı özellikle markayı öne çıkarmak için manipüle etme.
-- Eğer marka gerçekten alakalıysa cevaba dahil edebilirsin.
-- Eğer rakipler alakalıysa onları da dahil edebilirsin.
-- Cevap Türkçe olsun.
-- Çok uzun yazma; net, kullanışlı ve gerçekçi cevap ver.
-
-Takip edilen marka:
-${args.brandName}
-
-Marka aliasları:
-${brandAliasesText}
-
-Bilinen rakipler:
-${competitorsText}
-
-Kullanıcı sorusu:
-${args.userPrompt}
-`;
+  return parsed.answers;
 }
 
 export async function POST(request: Request, context: RouteContext) {
@@ -180,11 +250,20 @@ export async function POST(request: Request, context: RouteContext) {
     .select("name")
     .eq("brand_id", brand.id);
 
-  const { data: pendingRuns, error: runsError } = await supabase
+  const { data: runs, error: runsError } = await supabase
     .from("audit_runs")
-    .select("id, prompt_id")
+    .select(
+      `
+      id,
+      prompt_id,
+      prompts (
+        id,
+        text
+      )
+    `
+    )
     .eq("audit_id", audit.id)
-    .in("status", ["pending", "running"])
+    .in("status", ["pending", "running", "failed"])
     .order("created_at", { ascending: true })
     .limit(3);
 
@@ -197,27 +276,42 @@ export async function POST(request: Request, context: RouteContext) {
     );
   }
 
-  if (!pendingRuns || pendingRuns.length === 0) {
+  if (!runs || runs.length === 0) {
     return redirectTo(`/dashboard/audits/${audit.id}`, request.url);
   }
 
-  const promptIds = pendingRuns.map((run) => run.prompt_id);
+  const promptsToRun = runs
+    .map((run) => {
+      const prompt = Array.isArray(run.prompts)
+        ? run.prompts[0]
+        : run.prompts;
 
-  const { data: prompts, error: promptsError } = await supabase
-    .from("prompts")
-    .select("id, text")
-    .in("id", promptIds);
+      if (!prompt?.text) {
+        return null;
+      }
 
-  if (promptsError || !prompts) {
+      return {
+        runId: run.id,
+        text: prompt.text,
+      };
+    })
+    .filter(
+      (
+        item
+      ): item is {
+        runId: string;
+        text: string;
+      } => item !== null
+    );
+
+  if (promptsToRun.length === 0) {
     return redirectTo(
       `/dashboard/audits/${audit.id}?error=${encodeURIComponent(
-        promptsError?.message ?? "Promptlar okunamadı."
+        "Çalıştırılacak prompt metni bulunamadı."
       )}`,
       request.url
     );
   }
-
-  const promptById = new Map(prompts.map((prompt) => [prompt.id, prompt]));
 
   await supabase
     .from("audits")
@@ -228,47 +322,44 @@ export async function POST(request: Request, context: RouteContext) {
     })
     .eq("id", audit.id);
 
-  let completedCount = 0;
-  let failedCount = 0;
+  await supabase
+    .from("audit_runs")
+    .update({
+      status: "running",
+      started_at: new Date().toISOString(),
+      error_message: null,
+    })
+    .in(
+      "id",
+      promptsToRun.map((prompt) => prompt.runId)
+    );
 
-  for (const run of pendingRuns) {
-    const prompt = promptById.get(run.prompt_id);
+  try {
+    const answers = await askGeminiBatch({
+      brandName: brand.name,
+      brandAliases: (aliases ?? []).map((item) => item.alias),
+      competitors: (competitors ?? []).map((item) => item.name),
+      prompts: promptsToRun,
+    });
 
-    if (!prompt) {
-      failedCount += 1;
+    const answerByRunId = new Map(
+      answers.map((answer) => [answer.runId, answer.answer])
+    );
 
-      await supabase
-        .from("audit_runs")
-        .update({
-          status: "failed",
-          error_message: "Prompt bulunamadı.",
-          completed_at: new Date().toISOString(),
-        })
-        .eq("id", run.id);
+    for (const prompt of promptsToRun) {
+      const answer = answerByRunId.get(prompt.runId);
 
-      continue;
-    }
+      if (!answer) {
+        await supabase
+          .from("audit_runs")
+          .update({
+            status: "pending",
+            error_message: "Gemini bu prompt için cevap döndürmedi.",
+          })
+          .eq("id", prompt.runId);
 
-    await supabase
-      .from("audit_runs")
-      .update({
-        status: "running",
-        started_at: new Date().toISOString(),
-        error_message: null,
-      })
-      .eq("id", run.id);
-
-    try {
-      const answer = await askGemini(
-        buildAuditPrompt({
-          userPrompt: prompt.text,
-          brandName: brand.name,
-          brandAliases: (aliases ?? []).map((item) => item.alias),
-          competitors: (competitors ?? []).map((item) => item.name),
-        })
-      );
-
-      completedCount += 1;
+        continue;
+      }
 
       await supabase
         .from("audit_runs")
@@ -278,24 +369,35 @@ export async function POST(request: Request, context: RouteContext) {
           completed_at: new Date().toISOString(),
           error_message: null,
         })
-        .eq("id", run.id);
-    } catch (error) {
-      failedCount += 1;
-
-      const message =
-        error instanceof Error
-          ? error.message
-          : "Gemini cevabı alınamadı.";
-
-      await supabase
-        .from("audit_runs")
-        .update({
-          status: "failed",
-          error_message: message,
-          completed_at: new Date().toISOString(),
-        })
-        .eq("id", run.id);
+        .eq("id", prompt.runId);
     }
+  } catch (error) {
+    const message =
+      error instanceof Error
+        ? error.message
+        : "Gemini cevabı alınamadı.";
+
+    await supabase
+      .from("audit_runs")
+      .update({
+        status: "pending",
+        error_message: message,
+        completed_at: null,
+      })
+      .in(
+        "id",
+        promptsToRun.map((prompt) => prompt.runId)
+      );
+
+    await supabase
+      .from("audits")
+      .update({
+        status: "running",
+        error_message: `Gemini cevap veremedi: ${message}`,
+      })
+      .eq("id", audit.id);
+
+    return redirectTo(`/dashboard/audits/${audit.id}`, request.url);
   }
 
   const { count: totalCompleted } = await supabase
@@ -304,37 +406,22 @@ export async function POST(request: Request, context: RouteContext) {
     .eq("audit_id", audit.id)
     .eq("status", "completed");
 
-  const { count: totalFailed } = await supabase
+  const { count: totalRemaining } = await supabase
     .from("audit_runs")
     .select("id", { count: "exact", head: true })
     .eq("audit_id", audit.id)
-    .eq("status", "failed");
-
-  const { count: totalPending } = await supabase
-    .from("audit_runs")
-    .select("id", { count: "exact", head: true })
-    .eq("audit_id", audit.id)
-    .eq("status", "pending");
-
-  const nextStatus =
-    totalPending && totalPending > 0
-      ? "running"
-      : totalFailed && totalFailed > 0
-        ? "failed"
-        : "completed";
+    .in("status", ["pending", "running", "failed"]);
 
   await supabase
     .from("audits")
     .update({
-      status: nextStatus,
-      completed_prompts: totalCompleted ?? completedCount,
+      status: totalRemaining && totalRemaining > 0 ? "running" : "completed",
+      completed_prompts: totalCompleted ?? 0,
       completed_at:
-        nextStatus === "completed" || nextStatus === "failed"
-          ? new Date().toISOString()
-          : null,
+        totalRemaining && totalRemaining > 0 ? null : new Date().toISOString(),
       error_message:
-        failedCount > 0
-          ? `${failedCount} prompt çalıştırılamadı. Detaylar run kayıtlarında.`
+        totalRemaining && totalRemaining > 0
+          ? `${totalRemaining} prompt henüz çalıştırılmadı. Audit'i tekrar çalıştır.`
           : null,
     })
     .eq("id", audit.id);
