@@ -36,7 +36,7 @@ export default async function CompetitorsPage({
 
   const { data: brand } = await supabase
     .from("brands")
-    .select("id, name, industry")
+    .select("id, name, industry, country, language")
     .eq("id", brandId)
     .maybeSingle();
 
@@ -67,17 +67,38 @@ export default async function CompetitorsPage({
       <section className="flex flex-col justify-between gap-4 rounded-xl border bg-background p-6 md:flex-row md:items-center">
         <div>
           <p className="text-sm text-muted-foreground">Rakip yönetimi</p>
-          <h1 className="text-2xl font-semibold tracking-tight">
-            {brand.name} rakipleri
-          </h1>
+
+          <div className="mt-1 flex flex-wrap items-center gap-2">
+            <h1 className="text-2xl font-semibold tracking-tight">
+              {brand.name} rakipleri
+            </h1>
+
+            <Badge variant="secondary">{brand.country || "TR"}</Badge>
+            <Badge variant="outline">{brand.language || "tr"}</Badge>
+          </div>
+
+          <p className="mt-2 text-sm text-muted-foreground">
+            {brand.industry || "Sektör belirtilmedi"}
+          </p>
+
           <p className="mt-1 text-sm text-muted-foreground">
             AI cevaplarında markanı hangi rakiplerle karşılaştıracağımızı burada belirliyoruz.
           </p>
         </div>
 
-        <Button asChild variant="outline">
-          <Link href={`/dashboard/brands/${brand.id}`}>Marka detayına dön</Link>
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button asChild variant="outline">
+            <Link href={`/dashboard/brands/${brand.id}`}>
+              Marka detayına dön
+            </Link>
+          </Button>
+
+          <Button asChild>
+            <Link href={`/dashboard/brands/${brand.id}/prompts`}>
+              Promptlar
+            </Link>
+          </Button>
+        </div>
       </section>
 
       {query.error ? (
@@ -91,7 +112,7 @@ export default async function CompetitorsPage({
           <CardHeader>
             <CardTitle>Yeni Rakip Ekle</CardTitle>
             <CardDescription>
-              Her marka için en az 3 rakip eklemek iyi bir başlangıçtır.
+              İlk audit için en az 3 rakip eklemek iyi bir başlangıçtır.
             </CardDescription>
           </CardHeader>
 
@@ -139,7 +160,7 @@ export default async function CompetitorsPage({
                   rows={4}
                 />
                 <p className="text-xs text-muted-foreground">
-                  Her satıra bir farklı yazım gir.
+                  Her satıra bir farklı yazım gir. AI cevabında bu yazımlar yakalanacak.
                 </p>
               </div>
 
@@ -163,24 +184,30 @@ export default async function CompetitorsPage({
               <div className="space-y-4">
                 {competitors.map((competitor) => (
                   <div key={competitor.id} className="rounded-lg border p-4">
-                    <div>
-                      <p className="font-medium">{competitor.name}</p>
+                    <div className="flex flex-col justify-between gap-3 md:flex-row md:items-start">
+                      <div>
+                        <p className="font-medium">{competitor.name}</p>
 
-                      {competitor.website_url ? (
-                        <Link
-                          href={competitor.website_url}
-                          target="_blank"
-                          className="text-sm text-muted-foreground underline"
-                        >
-                          {competitor.website_url}
-                        </Link>
-                      ) : null}
+                        {competitor.website_url ? (
+                          <Link
+                            href={competitor.website_url}
+                            target="_blank"
+                            className="text-sm text-muted-foreground underline"
+                          >
+                            {competitor.website_url}
+                          </Link>
+                        ) : (
+                          <p className="text-sm text-muted-foreground">
+                            Website eklenmedi
+                          </p>
+                        )}
 
-                      {competitor.description ? (
-                        <p className="mt-2 text-sm text-muted-foreground">
-                          {competitor.description}
-                        </p>
-                      ) : null}
+                        {competitor.description ? (
+                          <p className="mt-2 text-sm text-muted-foreground">
+                            {competitor.description}
+                          </p>
+                        ) : null}
+                      </div>
                     </div>
 
                     {competitor.competitor_aliases &&
