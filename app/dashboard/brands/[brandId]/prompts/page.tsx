@@ -94,9 +94,15 @@ export default async function PromptsPage({
           </p>
         </div>
 
-        <Button asChild variant="outline">
-          <Link href={`/dashboard/brands/${brand.id}`}>Marka detayına dön</Link>
-        </Button>
+        <div className="flex flex-wrap gap-2">
+  <Button asChild variant="outline">
+    <Link href={`/dashboard/brands/${brand.id}`}>Marka detayına dön</Link>
+  </Button>
+
+  <form action={`/api/brands/${brand.id}/audits`} method="post">
+    <Button type="submit">Audit başlat</Button>
+  </form>
+</div>
       </section>
 
       {query.error ? (
