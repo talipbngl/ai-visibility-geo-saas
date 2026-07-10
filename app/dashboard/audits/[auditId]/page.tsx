@@ -12,6 +12,13 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 
+import {
+  getIntentLabel,
+  getPriorityLabel,
+  getSentimentLabel,
+  getStatusLabel,
+} from "@/lib/ui/labels";
+
 type AuditDetailPageProps = {
   params: Promise<{
     auditId: string;
@@ -124,8 +131,8 @@ export default async function AuditDetailPage({
             </h1>
 
             <Badge variant={getStatusVariant(audit.status)}>
-              {audit.status}
-            </Badge>
+                {getStatusLabel(audit.status)}     
+                       </Badge>
           </div>
 
           <p className="mt-1 text-sm text-muted-foreground">
@@ -293,13 +300,13 @@ export default async function AuditDetailPage({
                   <div className="mb-2 flex flex-wrap gap-2">
                     <Badge variant="secondary">{recommendation.category}</Badge>
                     <Badge variant="outline">
-                      Priority: {recommendation.priority}
+                      Öncelik: {recommendation.priority}
                     </Badge>
                     <Badge variant="outline">
-                      Impact: {recommendation.impact}
+                      Etki: {recommendation.impact}
                     </Badge>
                     <Badge variant="outline">
-                      Effort: {recommendation.effort}
+                      Efor: {recommendation.effort}
                     </Badge>
                   </div>
 
@@ -350,7 +357,7 @@ return (
   <div key={run.id} className="rounded-lg border p-4">
                     <div className="mb-2 flex flex-wrap gap-2">
                       <Badge variant={getStatusVariant(run.status)}>
-                        {run.status}
+                       {getStatusLabel(run.status)}
                       </Badge>
 
                       <Badge variant="secondary">{run.engine}</Badge>
@@ -366,7 +373,8 @@ return (
 
                     {prompt ? (
                       <p className="mt-1 text-xs text-muted-foreground">
-                        Intent: {prompt.intent} / Priority: {prompt.priority}
+                        Niyet: {getIntentLabel(prompt.intent)} / Öncelik:{" "}
+                          {getPriorityLabel(prompt.priority)}
                       </p>
                     ) : null}
                     {analysis ? (
@@ -381,11 +389,11 @@ return (
       </Badge>
 
       <Badge variant="outline">
-        Sentiment: {analysis.brand_sentiment ?? "-"}
+        Ton: {getSentimentLabel(analysis.brand_sentiment)}
       </Badge>
 
       <Badge variant="outline">
-        Confidence:{" "}
+        Güven:{" "}
         {analysis.confidence_score
           ? Math.round(analysis.confidence_score * 100)
           : "-"}

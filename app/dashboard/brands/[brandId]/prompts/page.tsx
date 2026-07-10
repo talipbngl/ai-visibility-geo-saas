@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-
+import { getIntentLabel } from "@/lib/ui/labels";
 import { createClient } from "@/lib/supabase/server";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -242,7 +242,7 @@ export default async function PromptsPage({
                       >
                         {intentOptions.map((intent) => (
                           <option key={intent} value={intent}>
-                            {intent}
+                            {getIntentLabel(intent)}
                           </option>
                         ))}
                       </select>

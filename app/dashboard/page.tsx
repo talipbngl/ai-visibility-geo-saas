@@ -156,7 +156,7 @@ export default async function DashboardPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Ortalama Visibility</CardTitle>
+            <CardTitle>Ortalama Görünürlük</CardTitle>
             <CardDescription>Marka görünürlük skoru</CardDescription>
           </CardHeader>
 
@@ -169,7 +169,7 @@ export default async function DashboardPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Share of Voice</CardTitle>
+            <CardTitle>Görünürlük Payı</CardTitle>
             <CardDescription>Rakiplere göre ortalama pay</CardDescription>
           </CardHeader>
 
@@ -219,9 +219,9 @@ export default async function DashboardPage() {
 
                         {auditScore ? (
                           <p className="mt-1 text-sm text-muted-foreground">
-                            Visibility:{" "}
+                            Görünürlük:{" "}
                             {Math.round(auditScore.visibility_score)}/100 ·
-                            Share of Voice:{" "}
+                            Pay:{" "}
                             {Math.round(auditScore.share_of_voice)}%
                           </p>
                         ) : (
