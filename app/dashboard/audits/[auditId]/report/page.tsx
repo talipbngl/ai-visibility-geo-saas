@@ -17,6 +17,11 @@ type AuditReportPageProps = {
     auditId: string;
   }>;
 };
+type CompetitorVisibility = {
+  name: string;
+  mentioned: boolean;
+  rank: number | null;
+};
 
 function formatDate(value: string | null) {
   if (!value) return "-";
@@ -85,35 +90,83 @@ export default async function AuditReportPage({ params }: AuditReportPageProps) 
     .order("created_at", { ascending: true });
 
   const { data: analyses } = await supabase
-    .from("analyses")
-    .select(
-      `
-      id,
-      brand_mentioned,
-      brand_rank,
-      brand_sentiment,
-      summary,
-      risk_notes_json,
-      opportunity_notes_json,
-      audit_runs (
-        id,
-        prompts (
-          id,
-          text,
-          intent,
-          priority
-        )
-      )
+  .from("analyses")
+  .select(
     `
+    id,
+    brand_mentioned,
+    brand_rank,
+    brand_sentiment,
+    competitors_json,
+    summary,
+    risk_notes_json,
+    opportunity_notes_json,
+    audit_runs (
+      id,
+      prompts (
+        id,
+        text,
+        intent,
+        priority
+      )
     )
-    .eq("audit_runs.audit_id", audit.id);
+  `
+  )
+  .eq("audit_runs.audit_id", audit.id);
 
   const visibilityScore = score?.visibility_score ?? 0;
 
-  const visibleAnalyses = analyses?.filter((analysis) => analysis.brand_mentioned) ?? [];
-  const invisibleAnalyses =
-    analyses?.filter((analysis) => !analysis.brand_mentioned) ?? [];
+const visibleAnalyses =
+  analyses?.filter((analysis) => analysis.brand_mentioned) ?? [];
 
+const invisibleAnalyses =
+  analyses?.filter((analysis) => !analysis.brand_mentioned) ?? [];
+
+const competitorStatsMap = new Map<
+  string,
+  {
+    name: string;
+    mentionCount: number;
+    rankSum: number;
+    rankCount: number;
+  }
+>();
+
+(analyses ?? []).forEach((analysis) => {
+  const competitors = Array.isArray(analysis.competitors_json)
+    ? (analysis.competitors_json as CompetitorVisibility[])
+    : [];
+
+  competitors.forEach((competitor) => {
+    if (!competitor.mentioned) return;
+
+    const current = competitorStatsMap.get(competitor.name) ?? {
+      name: competitor.name,
+      mentionCount: 0,
+      rankSum: 0,
+      rankCount: 0,
+    };
+
+    current.mentionCount += 1;
+
+    if (competitor.rank) {
+      current.rankSum += competitor.rank;
+      current.rankCount += 1;
+    }
+
+    competitorStatsMap.set(competitor.name, current);
+  });
+});
+
+const competitorStats = Array.from(competitorStatsMap.values())
+  .map((competitor) => ({
+    ...competitor,
+    averageRank:
+      competitor.rankCount > 0
+        ? Math.round((competitor.rankSum / competitor.rankCount) * 10) / 10
+        : null,
+  }))
+  .sort((a, b) => b.mentionCount - a.mentionCount);
   return (
     <div className="space-y-6">
       <section className="rounded-xl border bg-background p-8">
@@ -260,7 +313,51 @@ export default async function AuditReportPage({ params }: AuditReportPageProps) 
               </div>
             </CardContent>
           </Card>
+           {competitorStats.length > 0 ? (
+  <Card>
+    <CardHeader>
+      <CardTitle>Rakip Görünürlüğü</CardTitle>
+      <CardDescription>
+        AI cevaplarında en çok görünen rakipler ve yaklaşık sıralamaları.
+      </CardDescription>
+    </CardHeader>
 
+    <CardContent>
+      <div className="space-y-3">
+        {competitorStats.map((competitor) => (
+          <div
+            key={competitor.name}
+            className="flex flex-col justify-between gap-3 rounded-lg border p-4 md:flex-row md:items-center"
+          >
+            <div>
+              <p className="font-medium">{competitor.name}</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {competitor.mentionCount} cevapta göründü.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <Badge variant="secondary">
+                Görünme: {competitor.mentionCount} /{" "}
+                {audit.completed_prompts}
+              </Badge>
+
+              <Badge variant="outline">
+                Ortalama sıra: {competitor.averageRank ?? "-"}
+              </Badge>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <p className="mt-4 text-sm text-muted-foreground">
+        Rakiplerin sık görünmesi, markanın ilgili AI cevaplarında daha güçlü
+        içerik, otorite ve karşılaştırma sinyallerine ihtiyaç duyduğunu
+        gösterebilir.
+      </p>
+    </CardContent>
+  </Card>
+) : null}
           {recommendations && recommendations.length > 0 ? (
             <Card>
               <CardHeader>
