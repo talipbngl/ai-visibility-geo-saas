@@ -49,3 +49,54 @@ export function getPriorityLabel(priority: number | null | undefined) {
 
   return labels[priority] ?? String(priority);
 }
+
+export function getRecommendationPriorityLabel(priority: string | null) {
+  if (!priority) return "-";
+
+  const labels: Record<string, string> = {
+    low: "Düşük",
+    medium: "Orta",
+    high: "Yüksek",
+  };
+
+  return labels[priority] ?? priority;
+}
+
+export function getImpactLabel(impact: string | null) {
+  if (!impact) return "-";
+
+  const labels: Record<string, string> = {
+    low: "Düşük",
+    medium: "Orta",
+    high: "Yüksek",
+  };
+
+  return labels[impact] ?? impact;
+}
+
+export function getEffortLabel(effort: string | null) {
+  if (!effort) return "-";
+
+  const labels: Record<string, string> = {
+    low: "Düşük",
+    medium: "Orta",
+    high: "Yüksek",
+  };
+
+  return labels[effort] ?? effort;
+}
+
+export function getCategoryLabel(category: string | null) {
+  if (!category) return "-";
+
+  const labels: Record<string, string> = {
+    content: "İçerik",
+    competitor: "Rakip",
+    authority: "Otorite",
+    brand: "Marka",
+    geo: "AI Görünürlük",
+    monitoring: "Takip",
+  };
+
+  return labels[category] ?? category;
+}

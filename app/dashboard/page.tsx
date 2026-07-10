@@ -10,6 +10,12 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  getCategoryLabel,
+  getImpactLabel,
+  getRecommendationPriorityLabel,
+  getStatusLabel,
+} from "@/lib/ui/labels";
 
 function formatDate(value: string | null) {
   if (!value) return "-";
@@ -121,13 +127,13 @@ export default async function DashboardPage() {
   return (
     <div className="space-y-6">
       <section className="rounded-xl border bg-background p-6">
-        <p className="text-sm text-muted-foreground">Dashboard</p>
+        <p className="text-sm text-muted-foreground">Genel Bakış</p>
         <h1 className="mt-1 text-2xl font-semibold tracking-tight">
           AI Görünürlük Paneli
         </h1>
         <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-          Markalarının AI cevaplarında ne kadar göründüğünü, rakiplere göre ses
-          payını ve aksiyon önerilerini buradan takip edebilirsin.
+          Markalarının AI cevaplarında ne kadar göründüğünü, rakiplere göre
+          görünürlük payını ve aksiyon önerilerini buradan takip edebilirsin.
         </p>
       </section>
 
@@ -145,8 +151,8 @@ export default async function DashboardPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Auditler</CardTitle>
-            <CardDescription>Başlatılan toplam audit</CardDescription>
+            <CardTitle>Ölçümler</CardTitle>
+            <CardDescription>Başlatılan toplam audit sayısı</CardDescription>
           </CardHeader>
 
           <CardContent>
@@ -184,7 +190,7 @@ export default async function DashboardPage() {
       <section className="grid gap-6 lg:grid-cols-[1.4fr_1fr]">
         <Card>
           <CardHeader>
-            <CardTitle>Son Auditler</CardTitle>
+            <CardTitle>Son Ölçümler</CardTitle>
             <CardDescription>
               En son oluşturulan AI görünürlük ölçümleri.
             </CardDescription>
@@ -208,21 +214,20 @@ export default async function DashboardPage() {
                           </p>
 
                           <Badge variant={getStatusVariant(audit.status)}>
-                            {audit.status}
+                            {getStatusLabel(audit.status)}
                           </Badge>
                         </div>
 
                         <p className="mt-1 text-sm text-muted-foreground">
-                          {audit.completed_prompts} / {audit.total_prompts} prompt
-                          tamamlandı
+                          {audit.completed_prompts} / {audit.total_prompts}{" "}
+                          prompt tamamlandı
                         </p>
 
                         {auditScore ? (
                           <p className="mt-1 text-sm text-muted-foreground">
                             Görünürlük:{" "}
                             {Math.round(auditScore.visibility_score)}/100 ·
-                            Pay:{" "}
-                            {Math.round(auditScore.share_of_voice)}%
+                            Pay: {Math.round(auditScore.share_of_voice)}%
                           </p>
                         ) : (
                           <p className="mt-1 text-sm text-muted-foreground">
@@ -246,9 +251,9 @@ export default async function DashboardPage() {
               </div>
             ) : (
               <div className="rounded-lg border border-dashed p-8 text-center">
-                <p className="font-medium">Henüz audit yok</p>
+                <p className="font-medium">Henüz ölçüm yok</p>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Bir marka ekleyip prompt oluşturduktan sonra audit başlat.
+                  Bir marka ekleyip prompt oluşturduktan sonra ölçüm başlat.
                 </p>
 
                 <Button asChild className="mt-4">
@@ -274,13 +279,16 @@ export default async function DashboardPage() {
                   <div key={recommendation.id} className="rounded-lg border p-4">
                     <div className="mb-2 flex flex-wrap gap-2">
                       <Badge variant="secondary">
-                        {recommendation.category}
+                        {getCategoryLabel(recommendation.category)}
                       </Badge>
                       <Badge variant="outline">
-                        Priority: {recommendation.priority}
+                        Öncelik:{" "}
+                        {getRecommendationPriorityLabel(
+                          recommendation.priority
+                        )}
                       </Badge>
                       <Badge variant="outline">
-                        Impact: {recommendation.impact}
+                        Etki: {getImpactLabel(recommendation.impact)}
                       </Badge>
                     </div>
 
@@ -295,7 +303,7 @@ export default async function DashboardPage() {
               <div className="rounded-lg border border-dashed p-8 text-center">
                 <p className="font-medium">Henüz öneri yok</p>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Audit cevaplarını analiz edince öneriler burada görünecek.
+                  Ölçüm cevaplarını analiz edince öneriler burada görünecek.
                 </p>
               </div>
             )}
@@ -316,8 +324,8 @@ export default async function DashboardPage() {
             {averageOpportunityScore}%
           </p>
           <p className="mt-2 text-sm text-muted-foreground">
-            Bu değer yükseldikçe, içerik ve GEO optimizasyonu için daha fazla
-            fırsat var demektir.
+            Bu değer yükseldikçe, içerik ve AI görünürlük optimizasyonu için
+            daha fazla fırsat var demektir.
           </p>
         </CardContent>
       </Card>
