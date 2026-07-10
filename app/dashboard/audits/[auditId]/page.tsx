@@ -177,6 +177,11 @@ export default async function AuditDetailPage({
           <form action={`/api/audits/${audit.id}/analyze`} method="post">
             <Button type="submit">Analiz et</Button>
           </form>
+          <Button asChild variant="outline">
+          <Link href={`/dashboard/audits/${audit.id}/report`}>
+               Raporu gör
+                      </Link>
+                </Button>
         </div>
       </section>
 
