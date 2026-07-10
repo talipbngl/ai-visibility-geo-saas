@@ -167,6 +167,28 @@ const competitorStats = Array.from(competitorStatsMap.values())
         : null,
   }))
   .sort((a, b) => b.mentionCount - a.mentionCount);
+  const riskNotes = Array.from(
+  new Set(
+    (analyses ?? []).flatMap((analysis) =>
+      Array.isArray(analysis.risk_notes_json)
+        ? (analysis.risk_notes_json as string[])
+        : []
+    )
+  )
+).slice(0, 5);
+
+const opportunityNotes = Array.from(
+  new Set(
+    (analyses ?? []).flatMap((analysis) =>
+      Array.isArray(analysis.opportunity_notes_json)
+        ? (analysis.opportunity_notes_json as string[])
+        : []
+    )
+  )
+).slice(0, 5);
+
+const wonAnalyses = visibleAnalyses.slice(0, 5);
+const lostAnalyses = invisibleAnalyses.slice(0, 5);
   return (
     <div className="space-y-6">
       <section className="rounded-xl border bg-background p-8">
@@ -358,6 +380,47 @@ const competitorStats = Array.from(competitorStatsMap.values())
     </CardContent>
   </Card>
 ) : null}
+{riskNotes.length > 0 || opportunityNotes.length > 0 ? (
+  <section className="grid gap-4 lg:grid-cols-2">
+    {riskNotes.length > 0 ? (
+      <Card>
+        <CardHeader>
+          <CardTitle>Risk Notları</CardTitle>
+          <CardDescription>
+            AI cevaplarında markanın zayıf göründüğü alanlar.
+          </CardDescription>
+        </CardHeader>
+
+        <CardContent>
+          <ul className="list-disc space-y-2 pl-5 text-sm text-muted-foreground">
+            {riskNotes.map((risk, index) => (
+              <li key={`${risk}-${index}`}>{risk}</li>
+            ))}
+          </ul>
+        </CardContent>
+      </Card>
+    ) : null}
+
+    {opportunityNotes.length > 0 ? (
+      <Card>
+        <CardHeader>
+          <CardTitle>Fırsat Notları</CardTitle>
+          <CardDescription>
+            İçerik ve AI görünürlük optimizasyonu için öne çıkan fırsatlar.
+          </CardDescription>
+        </CardHeader>
+
+        <CardContent>
+          <ul className="list-disc space-y-2 pl-5 text-sm text-muted-foreground">
+            {opportunityNotes.map((opportunity, index) => (
+              <li key={`${opportunity}-${index}`}>{opportunity}</li>
+            ))}
+          </ul>
+        </CardContent>
+      </Card>
+    ) : null}
+  </section>
+) : null}
           {recommendations && recommendations.length > 0 ? (
             <Card>
               <CardHeader>
@@ -403,42 +466,116 @@ const competitorStats = Array.from(competitorStatsMap.values())
             </Card>
           ) : null}
 
-          {invisibleAnalyses.length > 0 ? (
-            <Card>
-              <CardHeader>
-                <CardTitle>Öncelikli Fırsat Alanları</CardTitle>
-                <CardDescription>
-                  Markanın görünmediği test soruları.
-                </CardDescription>
-              </CardHeader>
+         <section className="grid gap-6 lg:grid-cols-2">
+  <Card>
+    <CardHeader>
+      <CardTitle>Markanın Göründüğü Sorular</CardTitle>
+      <CardDescription>
+        Markanın AI cevabında geçtiği test soruları.
+      </CardDescription>
+    </CardHeader>
 
-              <CardContent>
-                <div className="space-y-3">
-                  {invisibleAnalyses.slice(0, 5).map((analysis) => {
-                    const run = Array.isArray(analysis.audit_runs)
-                      ? analysis.audit_runs[0]
-                      : analysis.audit_runs;
+    <CardContent>
+      {wonAnalyses.length > 0 ? (
+        <div className="space-y-3">
+          {wonAnalyses.map((analysis) => {
+            const run = Array.isArray(analysis.audit_runs)
+              ? analysis.audit_runs[0]
+              : analysis.audit_runs;
 
-                    const prompt = Array.isArray(run?.prompts)
-                      ? run?.prompts[0]
-                      : run?.prompts;
+            const prompt = Array.isArray(run?.prompts)
+              ? run?.prompts[0]
+              : run?.prompts;
 
-                    return (
-                      <div key={analysis.id} className="rounded-lg border p-4">
-                        <p className="font-medium">
-                          {prompt?.text ?? "Test sorusu bulunamadı"}
-                        </p>
+            return (
+              <div key={analysis.id} className="rounded-lg border p-4">
+                <div className="mb-2 flex flex-wrap gap-2">
+                  <Badge variant="secondary">Göründü</Badge>
 
-                        <p className="mt-2 text-sm text-muted-foreground">
-                          {analysis.summary}
-                        </p>
-                      </div>
-                    );
-                  })}
+                  {analysis.brand_rank ? (
+                    <Badge variant="outline">
+                      Sıra: {analysis.brand_rank}
+                    </Badge>
+                  ) : null}
+
+                  {analysis.brand_sentiment ? (
+                    <Badge variant="outline">
+                      Ton: {analysis.brand_sentiment}
+                    </Badge>
+                  ) : null}
                 </div>
-              </CardContent>
-            </Card>
-          ) : null}
+
+                <p className="font-medium">
+                  {prompt?.text ?? "Test sorusu bulunamadı"}
+                </p>
+
+                <p className="mt-2 text-sm text-muted-foreground">
+                  {analysis.summary}
+                </p>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="rounded-lg border border-dashed p-6 text-center">
+          <p className="font-medium">Marka hiçbir soruda görünmedi</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Bu durum güçlü bir içerik ve görünürlük optimizasyonu ihtiyacı
+            olduğunu gösterir.
+          </p>
+        </div>
+      )}
+    </CardContent>
+  </Card>
+
+  <Card>
+    <CardHeader>
+      <CardTitle>Markanın Görünmediği Sorular</CardTitle>
+      <CardDescription>
+        Öncelikli içerik ve optimizasyon fırsatları.
+      </CardDescription>
+    </CardHeader>
+
+    <CardContent>
+      {lostAnalyses.length > 0 ? (
+        <div className="space-y-3">
+          {lostAnalyses.map((analysis) => {
+            const run = Array.isArray(analysis.audit_runs)
+              ? analysis.audit_runs[0]
+              : analysis.audit_runs;
+
+            const prompt = Array.isArray(run?.prompts)
+              ? run?.prompts[0]
+              : run?.prompts;
+
+            return (
+              <div key={analysis.id} className="rounded-lg border p-4">
+                <div className="mb-2">
+                  <Badge variant="outline">Görünmedi</Badge>
+                </div>
+
+                <p className="font-medium">
+                  {prompt?.text ?? "Test sorusu bulunamadı"}
+                </p>
+
+                <p className="mt-2 text-sm text-muted-foreground">
+                  {analysis.summary}
+                </p>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="rounded-lg border border-dashed p-6 text-center">
+          <p className="font-medium">Marka tüm analiz edilen sorularda göründü</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Bu iyi bir sinyal. Takip için düzenli ölçüm yapılmalı.
+          </p>
+        </div>
+      )}
+    </CardContent>
+  </Card>
+</section>
         </>
       )}
     </div>
