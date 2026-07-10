@@ -54,9 +54,9 @@ export default async function AuditsPage() {
   return (
     <div className="space-y-6">
       <section className="rounded-xl border bg-background p-6">
-        <h1 className="text-2xl font-semibold tracking-tight">Auditler</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Ölçümler</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Başlatılan AI görünürlük auditleri burada listelenir.
+          Başlatılan AI görünürlük ölçümleri burada listelenir.
         </p>
       </section>
 

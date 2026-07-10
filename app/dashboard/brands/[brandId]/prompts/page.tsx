@@ -85,14 +85,14 @@ export default async function PromptsPage({
     <div className="space-y-6">
       <section className="flex flex-col justify-between gap-4 rounded-xl border bg-background p-6 md:flex-row md:items-center">
         <div>
-          <p className="text-sm text-muted-foreground">Prompt yönetimi</p>
-          <h1 className="text-2xl font-semibold tracking-tight">
-            {brand.name} promptları
-          </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            AI görünürlük auditinde çalıştırılacak soruları burada hazırlıyoruz.
-          </p>
-        </div>
+            <p className="text-sm text-muted-foreground">Test sorusu yönetimii</p>
+            <h1 className="text-2xl font-semibold tracking-tight">
+              {brand.name} test soruları
+            </h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              AI görünürlük ölçümünde çalıştırılacak soruları burada hazırlıyoruz.
+            </p>
+          </div>
 
         <div className="flex flex-wrap gap-2">
   <Button asChild variant="outline">
@@ -100,7 +100,7 @@ export default async function PromptsPage({
   </Button>
 
   <form action={`/api/brands/${brand.id}/audits`} method="post">
-    <Button type="submit">Audit başlat</Button>
+    <Button type="submit">Ölçüm başlat</Button>
   </form>
 </div>
       </section>
@@ -115,7 +115,7 @@ export default async function PromptsPage({
         <div className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Yeni Prompt Seti</CardTitle>
+              <CardTitle>Yeni Soru Seti</CardTitle>
               <CardDescription>
                 Promptları satın alma, karşılaştırma veya yerel öneri gibi gruplara ayır.
               </CardDescription>
@@ -148,16 +148,16 @@ export default async function PromptsPage({
                 </div>
 
                 <Button type="submit" className="w-full">
-                  Prompt setini kaydet
+                  Soru setini kaydet
                 </Button>
               </form>
             </CardContent>
           </Card>
           <Card>
   <CardHeader>
-    <CardTitle>AI ile Prompt Üret</CardTitle>
+    <CardTitle>AI ile Test sorusu Üret</CardTitle>
     <CardDescription>
-      Marka ve rakip bilgilerine göre otomatik prompt önerileri oluştur.
+      Marka ve rakip bilgilerine göre otomatik test önerileri oluştur.
     </CardDescription>
   </CardHeader>
 
@@ -168,7 +168,7 @@ export default async function PromptsPage({
       className="space-y-4"
     >
       <div className="space-y-2">
-        <Label htmlFor="promptCount">Prompt sayısı</Label>
+        <Label htmlFor="promptCount">Test sorusu sayısı</Label>
         <Input
           id="promptCount"
           name="promptCount"
@@ -183,7 +183,7 @@ export default async function PromptsPage({
       </div>
 
       <Button type="submit" className="w-full">
-        AI ile prompt üret
+        AI ile test sorusu üret
       </Button>
     </form>
   </CardContent>
@@ -191,7 +191,7 @@ export default async function PromptsPage({
 
           <Card>
             <CardHeader>
-              <CardTitle>Yeni Prompt Ekle</CardTitle>
+              <CardTitle>Yeni Test sorusu Ekle</CardTitle>
               <CardDescription>
                 Önce en az bir prompt seti oluşturmalısın.
               </CardDescription>
@@ -205,7 +205,7 @@ export default async function PromptsPage({
                   className="space-y-4"
                 >
                   <div className="space-y-2">
-                    <Label htmlFor="promptSetId">Prompt seti</Label>
+                    <Label htmlFor="promptSetId">Soru seti</Label>
                     <select
                       id="promptSetId"
                       name="promptSetId"
@@ -221,7 +221,7 @@ export default async function PromptsPage({
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="text">Prompt *</Label>
+                    <Label htmlFor="text">Test sorusu *</Label>
                     <Textarea
                       id="text"
                       name="text"
@@ -241,15 +241,15 @@ export default async function PromptsPage({
                         defaultValue="buying_intent"
                       >
                         {intentOptions.map((intent) => (
-                          <option key={intent} value={intent}>
+                           <option key={intent} value={intent}>
                             {getIntentLabel(intent)}
-                          </option>
-                        ))}
+                             </option>
+                            ))}
                       </select>
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="priority">Priority</Label>
+                      <Label htmlFor="priority">Öncelik</Label>
                       <Input
                         id="priority"
                         name="priority"
@@ -293,11 +293,11 @@ export default async function PromptsPage({
                       defaultChecked
                       className="size-4"
                     />
-                    Aktif prompt
+                    Aktif test sorusu
                   </label>
 
                   <Button type="submit" className="w-full">
-                    Promptu kaydet
+                    Test sorusunu kaydet
                   </Button>
                 </form>
               ) : (
@@ -314,7 +314,7 @@ export default async function PromptsPage({
 
         <Card>
           <CardHeader>
-            <CardTitle>Prompt Listesi</CardTitle>
+            <CardTitle>Test sorusu Listesi</CardTitle>
             <CardDescription>
               Audit çalıştırırken bu aktif promptlar kullanılacak.
             </CardDescription>
@@ -344,7 +344,7 @@ export default async function PromptsPage({
                             <div className="mb-2 flex flex-wrap gap-2">
                               <Badge variant="secondary">{prompt.intent}</Badge>
                               <Badge variant="outline">
-                                Priority {prompt.priority}
+                                Öncelik {prompt.priority}
                               </Badge>
                               <Badge variant={prompt.is_active ? "default" : "outline"}>
                                 {prompt.is_active ? "Aktif" : "Pasif"}
@@ -362,7 +362,7 @@ export default async function PromptsPage({
                       </div>
                     ) : (
                       <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
-                        Bu sette henüz prompt yok.
+                        Bu sette henüz test sorusu yok.
                       </div>
                     )}
                   </div>
@@ -370,9 +370,9 @@ export default async function PromptsPage({
               </div>
             ) : (
               <div className="rounded-lg border border-dashed p-8 text-center">
-                <p className="font-medium">Henüz prompt seti yok</p>
+                <p className="font-medium">Henüz soru seti yok</p>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  İlk audit için önce prompt seti oluştur.
+                  İlk ölçüm için önce soru seti oluştur.
                 </p>
               </div>
             )}

@@ -131,7 +131,7 @@ export default async function BrandDetailPage({
 
         <Card>
           <CardHeader>
-            <CardTitle>Auditler</CardTitle>
+            <CardTitle>Ölçümler</CardTitle>
             <CardDescription>Çalıştırılan analiz sayısı</CardDescription>
           </CardHeader>
           <CardContent>

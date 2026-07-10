@@ -18,7 +18,7 @@ const navigationItems = [
     icon: Building2,
   },
   {
-    title: "Auditler",
+    title: "Ölçümler",
     href: "/dashboard/audits",
     icon: BarChart3,
   },
