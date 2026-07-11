@@ -1,5 +1,7 @@
 import Link from "next/link";
+
 import { createClient } from "@/lib/supabase/server";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -8,6 +10,29 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { EmptyState, PageHeader } from "@/features/ui/components";
+
+type CountRow = {
+  brand_id: string | null;
+};
+
+function buildCountMap(rows: CountRow[] | null | undefined) {
+  const map = new Map<string, number>();
+
+  (rows ?? []).forEach((row) => {
+    if (!row.brand_id) return;
+
+    map.set(row.brand_id, (map.get(row.brand_id) ?? 0) + 1);
+  });
+
+  return map;
+}
+
+function getWebsiteLabel(value: string | null) {
+  if (!value) return null;
+
+  return value.replace(/^https?:\/\//, "").replace(/\/$/, "");
+}
 
 export default async function BrandsPage() {
   const supabase = await createClient();
@@ -17,91 +42,140 @@ export default async function BrandsPage() {
     .select("id, name, website_url, industry, country, language, created_at")
     .order("created_at", { ascending: false });
 
+  const brandIds = (brands ?? []).map((brand) => brand.id);
+
+  const competitorsResult =
+    brandIds.length > 0
+      ? await supabase
+          .from("competitors")
+          .select("brand_id")
+          .in("brand_id", brandIds)
+      : { data: [] };
+
+  const promptsResult =
+    brandIds.length > 0
+      ? await supabase
+          .from("prompts")
+          .select("brand_id")
+          .in("brand_id", brandIds)
+      : { data: [] };
+
+  const auditsResult =
+    brandIds.length > 0
+      ? await supabase
+          .from("audits")
+          .select("brand_id")
+          .in("brand_id", brandIds)
+      : { data: [] };
+
+  const competitorCountByBrandId = buildCountMap(competitorsResult.data);
+  const promptCountByBrandId = buildCountMap(promptsResult.data);
+  const auditCountByBrandId = buildCountMap(auditsResult.data);
+
   return (
     <div className="space-y-6">
-      <section className="flex flex-col justify-between gap-4 rounded-xl border bg-background p-6 md:flex-row md:items-center">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Markalar</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            AI görünürlüğünü takip edeceğin markalar burada listelenecek.
-          </p>
-        </div>
+      <PageHeader
+        eyebrow="Markalar"
+        title="Takip ettiğin markalar"
+        description="AI görünürlük ölçümü yapacağın markaları buradan yönet. Her marka için rakipleri, test sorularını ve raporları ayrı takip edebilirsin."
+        actions={
+          <Button asChild>
+            <Link href="/dashboard/brands/new">Yeni marka ekle</Link>
+          </Button>
+        }
+      />
 
-        <Button asChild>
-          <Link href="/dashboard/brands/new">Yeni Marka Ekle</Link>
-        </Button>
-      </section>
+      {brands && brands.length > 0 ? (
+        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {brands.map((brand) => {
+            const websiteLabel = getWebsiteLabel(brand.website_url);
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Marka Listesi</CardTitle>
-          <CardDescription>
-            Eklediğin markaların detayına gidebilir veya rakiplerini yönetebilirsin.
-          </CardDescription>
-        </CardHeader>
+            return (
+              <Card key={brand.id} className="shadow-sm transition hover:shadow-md">
+                <CardHeader>
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <CardTitle>{brand.name}</CardTitle>
+                      <CardDescription className="mt-1">
+                        {brand.industry || "Sektör belirtilmedi"}
+                      </CardDescription>
+                    </div>
 
-        <CardContent>
-          {brands && brands.length > 0 ? (
-            <div className="space-y-3">
-              {brands.map((brand) => (
-                <div
-                  key={brand.id}
-                  className="flex flex-col justify-between gap-3 rounded-lg border p-4 md:flex-row md:items-center"
-                >
-                  <div>
-                    <p className="font-medium">{brand.name}</p>
-
-                    <p className="text-sm text-muted-foreground">
-                      {brand.industry || "Sektör belirtilmedi"}
-                    </p>
-
-                    {brand.website_url ? (
-                      <Link
-                        href={brand.website_url}
-                        target="_blank"
-                        className="text-sm text-muted-foreground underline"
-                      >
-                        {brand.website_url}
-                      </Link>
-                    ) : null}
-                  </div>
-
-                  <div className="flex flex-col gap-2 md:items-end">
-                    <div className="text-sm text-muted-foreground">
+                    <Badge variant="secondary">
                       {brand.country || "TR"} / {brand.language || "tr"}
+                    </Badge>
+                  </div>
+                </CardHeader>
+
+                <CardContent className="space-y-4">
+                  {websiteLabel ? (
+                    <p className="text-sm text-muted-foreground">
+                      {websiteLabel}
+                    </p>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      Website eklenmedi
+                    </p>
+                  )}
+
+                  <div className="grid grid-cols-3 gap-2 text-center text-sm">
+                    <div className="rounded-lg border p-3">
+                      <p className="font-semibold">
+                        {competitorCountByBrandId.get(brand.id) ?? 0}
+                      </p>
+                      <p className="text-xs text-muted-foreground">Rakip</p>
                     </div>
 
-                    <div className="flex gap-2">
-                      <Button asChild variant="outline" size="sm">
-                        <Link href={`/dashboard/brands/${brand.id}`}>
-                          Detaya git
-                        </Link>
-                      </Button>
+                    <div className="rounded-lg border p-3">
+                      <p className="font-semibold">
+                        {promptCountByBrandId.get(brand.id) ?? 0}
+                      </p>
+                      <p className="text-xs text-muted-foreground">Soru</p>
+                    </div>
 
-                      <Button asChild size="sm">
-                        <Link href={`/dashboard/brands/${brand.id}/competitors`}>
-                          Rakipler
-                        </Link>
-                      </Button>
+                    <div className="rounded-lg border p-3">
+                      <p className="font-semibold">
+                        {auditCountByBrandId.get(brand.id) ?? 0}
+                      </p>
+                      <p className="text-xs text-muted-foreground">Ölçüm</p>
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="rounded-lg border border-dashed p-8 text-center">
-              <p className="font-medium">Henüz marka yok</p>
-              <p className="mt-1 text-sm text-muted-foreground">
-                İlk AI görünürlük audit’inizi başlatmak için marka ekleyin.
-              </p>
 
-              <Button asChild className="mt-4">
-                <Link href="/dashboard/brands/new">Yeni Marka Ekle</Link>
-              </Button>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                  <div className="flex flex-wrap gap-2">
+                    <Button asChild variant="outline" size="sm">
+                      <Link href={`/dashboard/brands/${brand.id}`}>
+                        Detay
+                      </Link>
+                    </Button>
+
+                    <Button asChild variant="outline" size="sm">
+                      <Link href={`/dashboard/brands/${brand.id}/competitors`}>
+                        Rakipler
+                      </Link>
+                    </Button>
+
+                    <Button asChild size="sm">
+                      <Link href={`/dashboard/brands/${brand.id}/prompts`}>
+                        Test soruları
+                      </Link>
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </section>
+      ) : (
+        <EmptyState
+          title="Henüz marka yok"
+          description="İlk AI görünürlük raporunu oluşturmak için önce takip etmek istediğin markayı ekle."
+          action={
+            <Button asChild>
+              <Link href="/dashboard/brands/new">İlk markayı ekle</Link>
+            </Button>
+          }
+        />
+      )}
     </div>
   );
 }

@@ -10,6 +10,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { EmptyState, PageHeader, StatusBadge } from "@/features/ui/components";
 
 function formatDate(value: string | null) {
   if (!value) return "-";
@@ -18,14 +19,6 @@ function formatDate(value: string | null) {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(new Date(value));
-}
-
-function getStatusVariant(status: string) {
-  if (status === "completed") return "default";
-  if (status === "failed") return "destructive";
-  if (status === "running") return "secondary";
-
-  return "outline";
 }
 
 export default async function AuditsPage() {
@@ -51,85 +44,126 @@ export default async function AuditsPage() {
     (brandsResult.data ?? []).map((brand) => [brand.id, brand.name])
   );
 
+  const auditIds = (audits ?? []).map((audit) => audit.id);
+
+  const scoresResult =
+    auditIds.length > 0
+      ? await supabase
+          .from("audit_scores")
+          .select("audit_id, visibility_score, share_of_voice")
+          .in("audit_id", auditIds)
+      : { data: [] };
+
+  const scoreByAuditId = new Map(
+    (scoresResult.data ?? []).map((score) => [score.audit_id, score])
+  );
+
   return (
     <div className="space-y-6">
-      <section className="rounded-xl border bg-background p-6">
-        <h1 className="text-2xl font-semibold tracking-tight">Ölçümler</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Başlatılan AI görünürlük ölçümleri burada listelenir.
-        </p>
-      </section>
+      <PageHeader
+        eyebrow="Ölçümler"
+        title="AI görünürlük ölçümleri"
+        description="Başlatılan tüm ölçümleri, durumlarını ve rapor bağlantılarını buradan takip et."
+        actions={
+          <Button asChild>
+            <Link href="/dashboard/brands">Markalara git</Link>
+          </Button>
+        }
+      />
 
-      <Card>
+      <Card className="shadow-sm">
         <CardHeader>
-          <CardTitle>Audit Geçmişi</CardTitle>
+          <CardTitle>Ölçüm Geçmişi</CardTitle>
           <CardDescription>
-            Her audit, seçili markanın aktif promptları üzerinden oluşturulur.
+            Her ölçüm, seçili markanın aktif test soruları üzerinden oluşturulur.
           </CardDescription>
         </CardHeader>
 
         <CardContent>
           {audits && audits.length > 0 ? (
             <div className="space-y-3">
-              {audits.map((audit) => (
-                <div
-                  key={audit.id}
-                  className="flex flex-col justify-between gap-3 rounded-lg border p-4 md:flex-row md:items-center"
-                >
-                  <div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="font-medium">
-                        {brandNameById.get(audit.brand_id) ?? "Marka"}
-                      </p>
+              {audits.map((audit) => {
+                const score = scoreByAuditId.get(audit.id);
 
-                      <Badge variant={getStatusVariant(audit.status)}>
-                        {audit.status}
-                      </Badge>
+                return (
+                  <div
+                    key={audit.id}
+                    className="rounded-xl border p-4 transition-colors hover:bg-muted/30"
+                  >
+                    <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
+                      <div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="font-medium">
+                            {brandNameById.get(audit.brand_id) ?? "Marka"}
+                          </p>
+
+                          <StatusBadge status={audit.status} />
+
+                          <Badge variant="outline">
+                            {audit.completed_prompts} / {audit.total_prompts}{" "}
+                            soru
+                          </Badge>
+                        </div>
+
+                        <p className="mt-2 text-sm text-muted-foreground">
+                          Oluşturulma: {formatDate(audit.created_at)}
+                        </p>
+
+                        {audit.error_message ? (
+                          <p className="mt-2 text-sm text-destructive">
+                            {audit.error_message}
+                          </p>
+                        ) : null}
+                      </div>
+
+                      <div className="grid gap-2 text-sm md:grid-cols-2 lg:min-w-[260px]">
+                        <div className="rounded-lg border p-3">
+                          <p className="text-muted-foreground">Görünürlük</p>
+                          <p className="font-semibold">
+                            {score
+                              ? `${Math.round(score.visibility_score)}/100`
+                              : "-"}
+                          </p>
+                        </div>
+
+                        <div className="rounded-lg border p-3">
+                          <p className="text-muted-foreground">Pay</p>
+                          <p className="font-semibold">
+                            {score
+                              ? `${Math.round(score.share_of_voice)}%`
+                              : "-"}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap gap-2">
+                        <Button asChild variant="outline" size="sm">
+                          <Link href={`/dashboard/audits/${audit.id}`}>
+                            Detay
+                          </Link>
+                        </Button>
+
+                        <Button asChild size="sm">
+                          <Link href={`/dashboard/audits/${audit.id}/report`}>
+                            Rapor
+                          </Link>
+                        </Button>
+                      </div>
                     </div>
-
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      {audit.completed_prompts} / {audit.total_prompts} prompt
-                      tamamlandı
-                    </p>
-
-                    {audit.error_message ? (
-                      <p className="mt-1 text-sm text-destructive">
-                        {audit.error_message}
-                      </p>
-                    ) : null}
-
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {formatDate(audit.created_at)}
-                    </p>
                   </div>
-
-                  <div className="flex flex-wrap gap-2">
-  <Button asChild variant="outline" size="sm">
-    <Link href={`/dashboard/audits/${audit.id}`}>
-      Detaya git
-    </Link>
-  </Button>
-
-  <Button asChild size="sm">
-    <Link href={`/dashboard/audits/${audit.id}/report`}>
-      Raporu gör
-    </Link>
-  </Button>
-</div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           ) : (
-            <div className="rounded-lg border border-dashed p-8 text-center">
-              <p className="font-medium">Henüz audit yok</p>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Bir markanın prompt sayfasından audit başlat.
-              </p>
-
-              <Button asChild className="mt-4">
-                <Link href="/dashboard/brands">Markalara git</Link>
-              </Button>
-            </div>
+            <EmptyState
+              title="Henüz ölçüm yok"
+              description="Bir markanın test soruları sayfasından ilk AI görünürlük ölçümünü başlatabilirsin."
+              action={
+                <Button asChild>
+                  <Link href="/dashboard/brands">Markalara git</Link>
+                </Button>
+              }
+            />
           )}
         </CardContent>
       </Card>
