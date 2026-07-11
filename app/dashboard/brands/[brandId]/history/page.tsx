@@ -1,16 +1,17 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+
 import { VisibilityTrendChart } from "@/features/brands/components/VisibilityTrendChart";
 import { createClient } from "@/lib/supabase/server";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+  EmptyState,
+  MetricCard,
+  PageHeader,
+  StatusBadge,
+} from "@/features/ui/components";
 
 type BrandHistoryPageProps = {
   params: Promise<{
@@ -26,6 +27,7 @@ function formatDate(value: string | null) {
     timeStyle: "short",
   }).format(new Date(value));
 }
+
 function formatShortDate(value: string | null) {
   if (!value) return "-";
 
@@ -33,24 +35,6 @@ function formatShortDate(value: string | null) {
     day: "2-digit",
     month: "short",
   }).format(new Date(value));
-}
-function getStatusLabel(status: string) {
-  const labels: Record<string, string> = {
-    pending: "Bekliyor",
-    running: "Çalışıyor",
-    completed: "Tamamlandı",
-    failed: "Başarısız",
-  };
-
-  return labels[status] ?? status;
-}
-
-function getStatusVariant(status: string) {
-  if (status === "completed") return "default" as const;
-  if (status === "failed") return "destructive" as const;
-  if (status === "running") return "secondary" as const;
-
-  return "outline" as const;
 }
 
 function formatScore(value: number | null | undefined) {
@@ -65,10 +49,25 @@ function formatPercent(value: number | null | undefined) {
   return `${Math.round(value)}%`;
 }
 
+function getChangeValue(change: number | null) {
+  if (change === null) return "-";
+  if (change > 0) return `+${Math.round(change)}`;
+
+  return `${Math.round(change)}`;
+}
+
 function getChangeLabel(change: number | null) {
-  if (change === null) return "Karşılaştırma için en az iki analizli ölçüm gerekli.";
-  if (change > 0) return `Önceki ölçüme göre +${Math.round(change)} puan arttı.`;
-  if (change < 0) return `Önceki ölçüme göre ${Math.round(change)} puan düştü.`;
+  if (change === null) {
+    return "Karşılaştırma için en az iki analizli ölçüm gerekli.";
+  }
+
+  if (change > 0) {
+    return `Önceki ölçüme göre +${Math.round(change)} puan arttı.`;
+  }
+
+  if (change < 0) {
+    return `Önceki ölçüme göre ${Math.round(change)} puan düştü.`;
+  }
 
   return "Önceki ölçüme göre değişim yok.";
 }
@@ -127,128 +126,93 @@ export default async function BrandHistoryPage({
       ? Number(latestAnalyzedAudit.score.visibility_score) -
         Number(previousAnalyzedAudit.score.visibility_score)
       : null;
-const trendData = analyzedAudits
-  .slice()
-  .reverse()
-  .map((audit) => ({
-    date: formatShortDate(audit.created_at),
-    visibilityScore: Math.round(Number(audit.score?.visibility_score ?? 0)),
-    shareOfVoice: Math.round(Number(audit.score?.share_of_voice ?? 0)),
-    opportunityScore: Math.round(Number(audit.score?.opportunity_score ?? 0)),
-  }));
+
+  const trendData = analyzedAudits
+    .slice()
+    .reverse()
+    .map((audit) => ({
+      date: formatShortDate(audit.created_at),
+      visibilityScore: Math.round(Number(audit.score?.visibility_score ?? 0)),
+      shareOfVoice: Math.round(Number(audit.score?.share_of_voice ?? 0)),
+      opportunityScore: Math.round(Number(audit.score?.opportunity_score ?? 0)),
+    }));
+
   return (
     <div className="space-y-6">
-      <section className="flex flex-col justify-between gap-4 rounded-xl border bg-background p-6 md:flex-row md:items-center">
-        <div>
-          <p className="text-sm text-muted-foreground">Ölçüm Geçmişi</p>
+      <PageHeader
+        eyebrow="Ölçüm Geçmişi"
+        title={`${brand.name} geçmişi`}
+        description="Markanın AI görünürlük skorunun zaman içindeki değişimini, önceki raporlarını ve ölçüm detaylarını buradan takip et."
+        actions={
+          <>
+            <Button asChild variant="outline">
+              <Link href={`/dashboard/brands/${brand.id}`}>
+                Marka detayına dön
+              </Link>
+            </Button>
 
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight">
-            {brand.name}
-          </h1>
-
-          <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-            Bu sayfada markanın geçmiş AI görünürlük ölçümlerini ve skor
-            değişimini takip edebilirsin.
-          </p>
-        </div>
-
-        <div className="flex flex-wrap gap-2">
-          <Button asChild variant="outline">
-            <Link href={`/dashboard/brands/${brand.id}`}>
-              Marka detayına dön
-            </Link>
-          </Button>
-
-          <Button asChild>
-            <Link href={`/dashboard/brands/${brand.id}/prompts`}>
-              Yeni ölçüm başlat
-            </Link>
-          </Button>
-        </div>
-      </section>
+            <Button asChild>
+              <Link href={`/dashboard/brands/${brand.id}/prompts`}>
+                Yeni ölçüm başlat
+              </Link>
+            </Button>
+          </>
+        }
+      />
 
       <section className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardHeader>
-            <CardTitle>Toplam Ölçüm</CardTitle>
-            <CardDescription>Bu marka için oluşturulan audit sayısı</CardDescription>
-          </CardHeader>
+        <MetricCard
+          title="Toplam Ölçüm"
+          description="Bu marka için oluşturulan ölçüm"
+          value={audits?.length ?? 0}
+        />
 
-          <CardContent>
-            <p className="text-3xl font-semibold">{audits?.length ?? 0}</p>
-          </CardContent>
-        </Card>
+        <MetricCard
+          title="Son Görünürlük"
+          description="En son analiz edilmiş skor"
+          value={
+            latestAnalyzedAudit?.score
+              ? `${formatScore(latestAnalyzedAudit.score.visibility_score)}/100`
+              : "-"
+          }
+        />
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Son Görünürlük</CardTitle>
-            <CardDescription>En son analiz edilmiş ölçüm skoru</CardDescription>
-          </CardHeader>
+        <MetricCard
+          title="Skor Değişimi"
+          description="Önceki analizli ölçüme göre"
+          value={getChangeValue(visibilityChange)}
+          footer={getChangeLabel(visibilityChange)}
+        />
 
-          <CardContent>
-            <p className="text-3xl font-semibold">
-              {latestAnalyzedAudit?.score
-                ? `${formatScore(latestAnalyzedAudit.score.visibility_score)}/100`
-                : "-"}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Skor Değişimi</CardTitle>
-            <CardDescription>Önceki analizli ölçüme göre fark</CardDescription>
-          </CardHeader>
-
-          <CardContent>
-            <p className="text-3xl font-semibold">
-              {visibilityChange === null
-                ? "-"
-                : visibilityChange > 0
-                  ? `+${Math.round(visibilityChange)}`
-                  : Math.round(visibilityChange)}
-            </p>
-
-            <p className="mt-2 text-sm text-muted-foreground">
-              {getChangeLabel(visibilityChange)}
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-  <CardHeader>
-    <CardTitle>Görünürlük Trendi</CardTitle>
-    <CardDescription>
-      Markanın ölçümler boyunca görünürlük, görünürlük payı ve fırsat skoru
-      değişimi.
-    </CardDescription>
-  </CardHeader>
-
-  <CardContent>
-    <VisibilityTrendChart data={trendData} />
-  </CardContent>
-</Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Son Fırsat Skoru</CardTitle>
-            <CardDescription>İyileştirme alanı oranı</CardDescription>
-          </CardHeader>
-
-          <CardContent>
-            <p className="text-3xl font-semibold">
-              {latestAnalyzedAudit?.score
-                ? formatPercent(latestAnalyzedAudit.score.opportunity_score)
-                : "-"}
-            </p>
-          </CardContent>
-        </Card>
+        <MetricCard
+          title="Son Fırsat Skoru"
+          description="İyileştirme alanı oranı"
+          value={
+            latestAnalyzedAudit?.score
+              ? formatPercent(latestAnalyzedAudit.score.opportunity_score)
+              : "-"
+          }
+        />
       </section>
 
-      <Card>
+      <Card className="shadow-sm">
+        <CardHeader>
+          <CardTitle>Görünürlük Trendi</CardTitle>
+          <CardDescription>
+            Ölçümler boyunca görünürlük, görünürlük payı ve fırsat skoru değişimi.
+          </CardDescription>
+        </CardHeader>
+
+        <CardContent>
+          <VisibilityTrendChart data={trendData} />
+        </CardContent>
+      </Card>
+
+      <Card className="shadow-sm">
         <CardHeader>
           <CardTitle>Geçmiş Ölçümler</CardTitle>
           <CardDescription>
-            Tüm auditleri, skorları ve rapor bağlantılarını buradan takip et.
+            Tüm ölçümleri, skorları ve rapor bağlantılarını buradan takip et.
           </CardDescription>
         </CardHeader>
 
@@ -258,89 +222,88 @@ const trendData = analyzedAudits
               {auditsWithScores.map((audit) => (
                 <div
                   key={audit.id}
-                  className="flex flex-col justify-between gap-4 rounded-lg border p-4 lg:flex-row lg:items-center"
+                  className="rounded-xl border p-4 transition-colors hover:bg-muted/30"
                 >
-                  <div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Badge variant={getStatusVariant(audit.status)}>
-                        {getStatusLabel(audit.status)}
-                      </Badge>
+                  <div className="flex flex-col justify-between gap-4 xl:flex-row xl:items-center">
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <StatusBadge status={audit.status} />
 
-                      <Badge variant="outline">
-                        {audit.completed_prompts} / {audit.total_prompts} prompt
-                      </Badge>
-                    </div>
+                        <Badge variant="outline">
+                          {audit.completed_prompts} / {audit.total_prompts} soru
+                        </Badge>
+                      </div>
 
-                    <p className="mt-2 text-sm text-muted-foreground">
-                      Oluşturulma: {formatDate(audit.created_at)}
-                    </p>
-                  </div>
-
-                  <div className="grid gap-3 text-sm md:grid-cols-4 lg:min-w-[520px]">
-                    <div className="rounded-lg border p-3">
-                      <p className="text-muted-foreground">Görünürlük</p>
-                      <p className="font-semibold">
-                        {audit.score
-                          ? `${formatScore(audit.score.visibility_score)}/100`
-                          : "-"}
+                      <p className="mt-2 text-sm text-muted-foreground">
+                        Oluşturulma: {formatDate(audit.created_at)}
                       </p>
                     </div>
 
-                    <div className="rounded-lg border p-3">
-                      <p className="text-muted-foreground">Pay</p>
-                      <p className="font-semibold">
-                        {audit.score
-                          ? formatPercent(audit.score.share_of_voice)
-                          : "-"}
-                      </p>
+                    <div className="grid gap-2 text-sm md:grid-cols-4 xl:min-w-[520px]">
+                      <div className="rounded-lg border p-3">
+                        <p className="text-muted-foreground">Görünürlük</p>
+                        <p className="font-semibold">
+                          {audit.score
+                            ? `${formatScore(audit.score.visibility_score)}/100`
+                            : "-"}
+                        </p>
+                      </div>
+
+                      <div className="rounded-lg border p-3">
+                        <p className="text-muted-foreground">Pay</p>
+                        <p className="font-semibold">
+                          {audit.score
+                            ? formatPercent(audit.score.share_of_voice)
+                            : "-"}
+                        </p>
+                      </div>
+
+                      <div className="rounded-lg border p-3">
+                        <p className="text-muted-foreground">Ortalama sıra</p>
+                        <p className="font-semibold">
+                          {audit.score?.average_rank ?? "-"}
+                        </p>
+                      </div>
+
+                      <div className="rounded-lg border p-3">
+                        <p className="text-muted-foreground">Olumlu ton</p>
+                        <p className="font-semibold">
+                          {audit.score
+                            ? formatPercent(audit.score.positive_sentiment_rate)
+                            : "-"}
+                        </p>
+                      </div>
                     </div>
 
-                    <div className="rounded-lg border p-3">
-                      <p className="text-muted-foreground">Ortalama sıra</p>
-                      <p className="font-semibold">
-                        {audit.score?.average_rank ?? "-"}
-                      </p>
+                    <div className="flex flex-wrap gap-2">
+                      <Button asChild variant="outline" size="sm">
+                        <Link href={`/dashboard/audits/${audit.id}`}>
+                          Detay
+                        </Link>
+                      </Button>
+
+                      <Button asChild size="sm">
+                        <Link href={`/dashboard/audits/${audit.id}/report`}>
+                          Rapor
+                        </Link>
+                      </Button>
                     </div>
-
-                    <div className="rounded-lg border p-3">
-                      <p className="text-muted-foreground">Olumlu ton</p>
-                      <p className="font-semibold">
-                        {audit.score
-                          ? formatPercent(audit.score.positive_sentiment_rate)
-                          : "-"}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-wrap gap-2">
-                    <Button asChild variant="outline" size="sm">
-                      <Link href={`/dashboard/audits/${audit.id}`}>
-                        Detay
-                      </Link>
-                    </Button>
-
-                    <Button asChild size="sm">
-                      <Link href={`/dashboard/audits/${audit.id}/report`}>
-                        Rapor
-                      </Link>
-                    </Button>
                   </div>
                 </div>
               ))}
             </div>
           ) : (
-            <div className="rounded-lg border border-dashed p-8 text-center">
-              <p className="font-medium">Henüz ölçüm yok</p>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Bu marka için prompt oluşturup ilk ölçümü başlat.
-              </p>
-
-              <Button asChild className="mt-4">
-                <Link href={`/dashboard/brands/${brand.id}/prompts`}>
-                  Promptlara git
-                </Link>
-              </Button>
-            </div>
+            <EmptyState
+              title="Henüz ölçüm yok"
+              description="Bu marka için test soruları oluşturup ilk AI görünürlük ölçümünü başlat."
+              action={
+                <Button asChild>
+                  <Link href={`/dashboard/brands/${brand.id}/prompts`}>
+                    Test sorularına git
+                  </Link>
+                </Button>
+              }
+            />
           )}
         </CardContent>
       </Card>

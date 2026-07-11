@@ -12,6 +12,12 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import {
+  EmptyState,
+  MetricCard,
+  PageHeader,
+  StatusBadge,
+} from "@/features/ui/components";
+import {
   getCategoryLabel,
   getEffortLabel,
   getImpactLabel,
@@ -19,7 +25,6 @@ import {
   getPriorityLabel,
   getRecommendationPriorityLabel,
   getSentimentLabel,
-  getStatusLabel,
 } from "@/lib/ui/labels";
 
 type AuditDetailPageProps = {
@@ -46,12 +51,39 @@ function formatDate(value: string | null) {
   }).format(new Date(value));
 }
 
-function getStatusVariant(status: string) {
-  if (status === "completed") return "default";
-  if (status === "failed") return "destructive";
-  if (status === "running") return "secondary";
+function getPromptText(run: {
+  prompt_text_snapshot: string | null;
+  prompts?: { text?: string | null } | { text?: string | null }[] | null;
+}) {
+  if (run.prompt_text_snapshot) return run.prompt_text_snapshot;
 
-  return "outline";
+  const prompt = Array.isArray(run.prompts) ? run.prompts[0] : run.prompts;
+
+  return prompt?.text ?? "Test sorusu bulunamadı";
+}
+
+function getPromptIntent(run: {
+  prompt_intent_snapshot: string | null;
+  prompts?: { intent?: string | null } | { intent?: string | null }[] | null;
+}) {
+  if (run.prompt_intent_snapshot) return run.prompt_intent_snapshot;
+
+  const prompt = Array.isArray(run.prompts) ? run.prompts[0] : run.prompts;
+
+  return prompt?.intent ?? null;
+}
+
+function getPromptPriority(run: {
+  prompt_priority_snapshot: number | null;
+  prompts?: { priority?: number | null } | { priority?: number | null }[] | null;
+}) {
+  if (run.prompt_priority_snapshot !== null) {
+    return run.prompt_priority_snapshot;
+  }
+
+  const prompt = Array.isArray(run.prompts) ? run.prompts[0] : run.prompts;
+
+  return prompt?.priority ?? null;
 }
 
 export default async function AuditDetailPage({
@@ -108,6 +140,12 @@ export default async function AuditDetailPage({
       started_at,
       completed_at,
       created_at,
+      prompt_text_snapshot,
+      prompt_intent_snapshot,
+      prompt_priority_snapshot,
+      prompt_language_snapshot,
+      prompt_country_snapshot,
+      prompt_city_snapshot,
       prompts (
         id,
         text,
@@ -132,61 +170,61 @@ export default async function AuditDetailPage({
 
   return (
     <div className="space-y-6">
-      <section className="flex flex-col justify-between gap-4 rounded-xl border bg-background p-6 md:flex-row md:items-center">
-        <div>
-          <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-2xl font-semibold tracking-tight">
-              Ölçüm Detayı
-            </h1>
-
-            <Badge variant={getStatusVariant(audit.status)}>
-              {getStatusLabel(audit.status)}
-            </Badge>
-          </div>
-
-          <p className="mt-1 text-sm text-muted-foreground">
-            {brand?.name ?? "Marka"} için oluşturulan AI görünürlük ölçümü.
-          </p>
-
-          <p className="mt-1 text-xs text-muted-foreground">
-            Oluşturulma: {formatDate(audit.created_at)}
-          </p>
-        </div>
-
-        <div className="flex flex-wrap gap-2">
-          <Button asChild variant="outline">
-            <Link href="/dashboard/audits">Ölçümlere dön</Link>
-          </Button>
-
-          {brand ? (
+      <PageHeader
+        eyebrow="Ölçüm Detayı"
+        title={`${brand?.name ?? "Marka"} ölçümü`}
+        description="Bu ekranda AI cevaplarını, analiz durumunu, skorları ve prompt bazlı sonuçları inceleyebilirsin."
+        actions={
+          <>
             <Button asChild variant="outline">
-              <Link href={`/dashboard/brands/${brand.id}/prompts`}>
-                Promptlara dön
-              </Link>
+              <Link href="/dashboard/audits">Ölçümlere dön</Link>
             </Button>
-          ) : null}
 
-          {audit.status !== "completed" ? (
-            <form action={`/api/audits/${audit.id}/run`} method="post">
+            {brand ? (
+              <Button asChild variant="outline">
+                <Link href={`/dashboard/brands/${brand.id}/prompts`}>
+                  Test sorularına dön
+                </Link>
+              </Button>
+            ) : null}
+
+            {audit.status !== "completed" ? (
+              <form action={`/api/audits/${audit.id}/run`} method="post">
+                <Button type="submit" variant="outline">
+                  Ölçümü çalıştır
+                </Button>
+              </form>
+            ) : null}
+
+            <form action={`/api/audits/${audit.id}/analyze`} method="post">
               <Button type="submit" variant="outline">
-                Ölçümü çalıştır
+                Analiz et
               </Button>
             </form>
-          ) : null}
 
-          <form action={`/api/audits/${audit.id}/analyze`} method="post">
-            <Button type="submit">Analiz et</Button>
-          </form>
-          <Button asChild variant="outline">
-          <Link href={`/dashboard/audits/${audit.id}/report`}>
-               Raporu gör
-                      </Link>
-                </Button>
-        </div>
-      </section>
+            <Button asChild>
+              <Link href={`/dashboard/audits/${audit.id}/report`}>
+                Raporu gör
+              </Link>
+            </Button>
+          </>
+        }
+      />
+
+      <div className="flex flex-wrap items-center gap-2">
+        <StatusBadge status={audit.status} />
+
+        <Badge variant="outline">
+          Oluşturulma: {formatDate(audit.created_at)}
+        </Badge>
+
+        {brand?.industry ? (
+          <Badge variant="secondary">{brand.industry}</Badge>
+        ) : null}
+      </div>
 
       {query.error ? (
-        <Card className="border-destructive">
+        <Card className="border-destructive shadow-sm">
           <CardContent className="pt-6 text-sm text-destructive">
             {query.error}
           </CardContent>
@@ -194,100 +232,60 @@ export default async function AuditDetailPage({
       ) : null}
 
       <section className="grid gap-4 md:grid-cols-3">
-        <Card>
-          <CardHeader>
-            <CardTitle>Toplam Prompt</CardTitle>
-            <CardDescription>Bu ölçümde test edilen soru sayısı</CardDescription>
-          </CardHeader>
+        <MetricCard
+          title="Toplam Soru"
+          description="Bu ölçümde test edilen soru"
+          value={audit.total_prompts}
+        />
 
-          <CardContent>
-            <p className="text-3xl font-semibold">{audit.total_prompts}</p>
-          </CardContent>
-        </Card>
+        <MetricCard
+          title="Tamamlanan"
+          description="Cevabı alınan soru"
+          value={audit.completed_prompts}
+        />
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Tamamlanan</CardTitle>
-            <CardDescription>Cevabı alınan prompt sayısı</CardDescription>
-          </CardHeader>
-
-          <CardContent>
-            <p className="text-3xl font-semibold">
-              {audit.completed_prompts}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>AI Motoru</CardTitle>
-            <CardDescription>Cevap üretmek için kullanılan model</CardDescription>
-          </CardHeader>
-
-          <CardContent>
-            <p className="text-lg font-semibold">Gemini</p>
-          </CardContent>
-        </Card>
+        <MetricCard
+          title="AI Motoru"
+          description="Cevap üretiminde kullanılan sağlayıcı"
+          value="Gemini"
+        />
       </section>
 
       {score ? (
         <section className="grid gap-4 md:grid-cols-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Görünürlük Skoru</CardTitle>
-              <CardDescription>Markanın cevaplarda görünme oranı</CardDescription>
-            </CardHeader>
+          <MetricCard
+            title="Görünürlük Skoru"
+            description="Markanın cevaplarda görünme oranı"
+            value={`${Math.round(score.visibility_score)}/100`}
+          />
 
-            <CardContent>
-              <p className="text-3xl font-semibold">
-                {Math.round(score.visibility_score)}/100
-              </p>
-            </CardContent>
-          </Card>
+          <MetricCard
+            title="Görünürlük Payı"
+            description="Rakiplere göre marka payı"
+            value={`${Math.round(score.share_of_voice)}%`}
+          />
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Görünürlük Payı</CardTitle>
-              <CardDescription>Rakiplere göre görünürlük oranı</CardDescription>
-            </CardHeader>
+          <MetricCard
+            title="Ortalama Sıra"
+            description="Marka geçtiğinde yaklaşık konum"
+            value={score.average_rank ? score.average_rank : "-"}
+          />
 
-            <CardContent>
-              <p className="text-3xl font-semibold">
-                {Math.round(score.share_of_voice)}%
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Ortalama Sıra</CardTitle>
-              <CardDescription>Marka geçtiğinde yaklaşık konum</CardDescription>
-            </CardHeader>
-
-            <CardContent>
-              <p className="text-3xl font-semibold">
-                {score.average_rank ? score.average_rank : "-"}
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Olumlu Ton</CardTitle>
-              <CardDescription>Olumlu marka bahsi oranı</CardDescription>
-            </CardHeader>
-
-            <CardContent>
-              <p className="text-3xl font-semibold">
-                {Math.round(score.positive_sentiment_rate)}%
-              </p>
-            </CardContent>
-          </Card>
+          <MetricCard
+            title="Olumlu Ton"
+            description="Olumlu marka bahsi oranı"
+            value={`${Math.round(score.positive_sentiment_rate)}%`}
+          />
         </section>
-      ) : null}
+      ) : (
+        <EmptyState
+          title="Henüz skor yok"
+          description="AI cevapları tamamlandıktan sonra analiz et butonuna basınca skorlar burada görünecek."
+        />
+      )}
 
       {audit.error_message ? (
-        <Card className="border-destructive">
+        <Card className="border-destructive shadow-sm">
           <CardHeader>
             <CardTitle>Ölçüm Notu</CardTitle>
           </CardHeader>
@@ -299,7 +297,7 @@ export default async function AuditDetailPage({
       ) : null}
 
       {recommendations && recommendations.length > 0 ? (
-        <Card>
+        <Card className="shadow-sm">
           <CardHeader>
             <CardTitle>Aksiyon Önerileri</CardTitle>
             <CardDescription>
@@ -308,9 +306,9 @@ export default async function AuditDetailPage({
           </CardHeader>
 
           <CardContent>
-            <div className="space-y-3">
+            <div className="grid gap-3 md:grid-cols-2">
               {recommendations.map((recommendation) => (
-                <div key={recommendation.id} className="rounded-lg border p-4">
+                <div key={recommendation.id} className="rounded-xl border p-4">
                   <div className="mb-2 flex flex-wrap gap-2">
                     <Badge variant="secondary">
                       {getCategoryLabel(recommendation.category)}
@@ -333,7 +331,7 @@ export default async function AuditDetailPage({
                   </div>
 
                   <p className="font-medium">{recommendation.title}</p>
-                  <p className="mt-1 text-sm text-muted-foreground">
+                  <p className="mt-1 text-sm leading-6 text-muted-foreground">
                     {recommendation.description}
                   </p>
                 </div>
@@ -343,23 +341,18 @@ export default async function AuditDetailPage({
         </Card>
       ) : null}
 
-      <Card>
+      <Card className="shadow-sm">
         <CardHeader>
           <CardTitle>Prompt Sonuçları</CardTitle>
           <CardDescription>
-            AI cevapları, marka görünürlüğü ve prompt bazlı analizler burada
-            listelenir.
+            AI cevapları, marka görünürlüğü ve soru bazlı analizler.
           </CardDescription>
         </CardHeader>
 
         <CardContent>
           {runs && runs.length > 0 ? (
-            <div className="space-y-3">
+            <div className="space-y-4">
               {runs.map((run) => {
-                const prompt = Array.isArray(run.prompts)
-                  ? run.prompts[0]
-                  : run.prompts;
-
                 const analysis = Array.isArray(run.analyses)
                   ? run.analyses[0]
                   : run.analyses;
@@ -378,33 +371,41 @@ export default async function AuditDetailPage({
                   ? (analysis.opportunity_notes_json as string[])
                   : [];
 
+                const promptText = getPromptText(run);
+                const promptIntent = getPromptIntent(run);
+                const promptPriority = getPromptPriority(run);
+
                 return (
-                  <div key={run.id} className="rounded-lg border p-4">
-                    <div className="mb-2 flex flex-wrap gap-2">
-                      <Badge variant={getStatusVariant(run.status)}>
-                        {getStatusLabel(run.status)}
-                      </Badge>
+                  <div
+                    key={run.id}
+                    className="rounded-xl border p-4 transition-colors hover:bg-muted/30"
+                  >
+                    <div className="mb-3 flex flex-wrap gap-2">
+                      <StatusBadge status={run.status} />
 
                       <Badge variant="secondary">{run.engine}</Badge>
 
                       {run.model ? (
                         <Badge variant="outline">{run.model}</Badge>
                       ) : null}
+
+                      {promptIntent ? (
+                        <Badge variant="outline">
+                          {getIntentLabel(promptIntent)}
+                        </Badge>
+                      ) : null}
+
+                      <Badge variant="outline">
+                        Öncelik: {getPriorityLabel(promptPriority)}
+                      </Badge>
                     </div>
 
-                    <p className="font-medium">
-                      {prompt?.text ?? "Prompt metni bulunamadı"}
+                    <p className="text-sm font-medium leading-6">
+                      {promptText}
                     </p>
 
-                    {prompt ? (
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        Niyet: {getIntentLabel(prompt.intent)} / Öncelik:{" "}
-                        {getPriorityLabel(prompt.priority)}
-                      </p>
-                    ) : null}
-
                     {analysis ? (
-                      <div className="mt-4 rounded-lg border bg-background p-4">
+                      <div className="mt-4 rounded-xl border bg-background p-4">
                         <div className="mb-3 flex flex-wrap gap-2">
                           <Badge
                             variant={
@@ -434,12 +435,12 @@ export default async function AuditDetailPage({
                         </div>
 
                         <p className="text-sm font-medium">Analiz özeti</p>
-                        <p className="mt-1 text-sm text-muted-foreground">
+                        <p className="mt-1 text-sm leading-6 text-muted-foreground">
                           {analysis.summary}
                         </p>
 
                         {competitors.length > 0 ? (
-                          <div className="mt-3">
+                          <div className="mt-4">
                             <p className="text-sm font-medium">
                               Rakip görünürlüğü
                             </p>
@@ -468,52 +469,61 @@ export default async function AuditDetailPage({
                           </div>
                         ) : null}
 
-                        {risks.length > 0 ? (
-                          <div className="mt-3 rounded-lg border border-destructive/40 p-3">
-                            <p className="text-sm font-medium text-destructive">
-                              Riskler
-                            </p>
+                        {risks.length > 0 || opportunities.length > 0 ? (
+                          <div className="mt-4 grid gap-3 md:grid-cols-2">
+                            {risks.length > 0 ? (
+                              <div className="rounded-xl border border-destructive/40 p-3">
+                                <p className="text-sm font-medium text-destructive">
+                                  Riskler
+                                </p>
 
-                            <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-muted-foreground">
-                              {risks.map((risk, index) => (
-                                <li key={`${risk}-${index}`}>{risk}</li>
-                              ))}
-                            </ul>
-                          </div>
-                        ) : null}
+                                <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-muted-foreground">
+                                  {risks.map((risk, index) => (
+                                    <li key={`${risk}-${index}`}>{risk}</li>
+                                  ))}
+                                </ul>
+                              </div>
+                            ) : null}
 
-                        {opportunities.length > 0 ? (
-                          <div className="mt-3 rounded-lg border p-3">
-                            <p className="text-sm font-medium">Fırsatlar</p>
+                            {opportunities.length > 0 ? (
+                              <div className="rounded-xl border p-3">
+                                <p className="text-sm font-medium">
+                                  Fırsatlar
+                                </p>
 
-                            <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-muted-foreground">
-                              {opportunities.map((opportunity, index) => (
-                                <li key={`${opportunity}-${index}`}>
-                                  {opportunity}
-                                </li>
-                              ))}
-                            </ul>
+                                <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-muted-foreground">
+                                  {opportunities.map((opportunity, index) => (
+                                    <li key={`${opportunity}-${index}`}>
+                                      {opportunity}
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            ) : null}
                           </div>
                         ) : null}
                       </div>
                     ) : (
-                      <div className="mt-4 rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
-                        Bu prompt için henüz analiz yok. Üstteki “Analiz et”
+                      <div className="mt-4 rounded-xl border border-dashed p-4 text-sm text-muted-foreground">
+                        Bu soru için henüz analiz yok. Üstteki “Analiz et”
                         butonuna bas.
                       </div>
                     )}
 
                     {run.raw_answer ? (
-                      <div className="mt-4">
-                        <p className="text-sm font-medium">AI cevabı</p>
-                        <p className="mt-2 whitespace-pre-wrap rounded-lg bg-muted p-3 text-sm">
+                      <details className="mt-4 rounded-xl border bg-muted/20 p-4">
+                        <summary className="cursor-pointer text-sm font-medium">
+                          AI cevabını göster
+                        </summary>
+
+                        <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-muted-foreground">
                           {run.raw_answer}
                         </p>
-                      </div>
+                      </details>
                     ) : null}
 
                     {run.error_message ? (
-                      <p className="mt-2 text-sm text-destructive">
+                      <p className="mt-3 text-sm text-destructive">
                         {run.error_message}
                       </p>
                     ) : null}
@@ -522,12 +532,10 @@ export default async function AuditDetailPage({
               })}
             </div>
           ) : (
-            <div className="rounded-lg border border-dashed p-8 text-center">
-              <p className="font-medium">Run kaydı yok</p>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Ölçüm oluşturulurken prompt çalıştırma kayıtları yazılmalıydı.
-              </p>
-            </div>
+            <EmptyState
+              title="Run kaydı yok"
+              description="Ölçüm oluşturulurken soru çalıştırma kayıtları yazılmalıydı."
+            />
           )}
         </CardContent>
       </Card>
