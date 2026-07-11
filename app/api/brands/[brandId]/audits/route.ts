@@ -43,13 +43,13 @@ export async function POST(request: Request, context: RouteContext) {
   }
 
   const { data: prompts, error: promptsError } = await supabase
-    .from("prompts")
-    .select("id")
-    .eq("brand_id", brand.id)
-    .eq("is_active", true)
-    .order("priority", { ascending: false })
-    .order("created_at", { ascending: true })
-    .limit(10);
+  .from("prompts")
+  .select("id, text, intent, priority, language, country, city")
+  .eq("brand_id", brand.id)
+  .eq("is_active", true)
+  .order("priority", { ascending: false })
+  .order("created_at", { ascending: true })
+  .limit(10);
 
   if (promptsError) {
     return redirectTo(
@@ -91,14 +91,22 @@ export async function POST(request: Request, context: RouteContext) {
   }
 
   const { error: runsError } = await supabase.from("audit_runs").insert(
-    prompts.map((prompt) => ({
-      audit_id: audit.id,
-      prompt_id: prompt.id,
-      engine: "gemini",
-      model: process.env.GEMINI_MODEL ?? "gemini-3.5-flash",
-      status: "pending",
-    }))
-  );
+  prompts.map((prompt) => ({
+    audit_id: audit.id,
+    prompt_id: prompt.id,
+
+    prompt_text_snapshot: prompt.text,
+    prompt_intent_snapshot: prompt.intent,
+    prompt_priority_snapshot: prompt.priority,
+    prompt_language_snapshot: prompt.language,
+    prompt_country_snapshot: prompt.country,
+    prompt_city_snapshot: prompt.city,
+
+    engine: "gemini",
+    model: process.env.GEMINI_MODEL ?? "gemini-3.1-flash-lite",
+    status: "pending",
+  }))
+);
 
   if (runsError) {
     await supabase
