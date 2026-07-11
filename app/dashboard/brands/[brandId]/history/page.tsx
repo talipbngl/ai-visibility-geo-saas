@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-
+import { VisibilityTrendChart } from "@/features/brands/components/VisibilityTrendChart";
 import { createClient } from "@/lib/supabase/server";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -26,7 +26,14 @@ function formatDate(value: string | null) {
     timeStyle: "short",
   }).format(new Date(value));
 }
+function formatShortDate(value: string | null) {
+  if (!value) return "-";
 
+  return new Intl.DateTimeFormat("tr-TR", {
+    day: "2-digit",
+    month: "short",
+  }).format(new Date(value));
+}
 function getStatusLabel(status: string) {
   const labels: Record<string, string> = {
     pending: "Bekliyor",
@@ -120,7 +127,15 @@ export default async function BrandHistoryPage({
       ? Number(latestAnalyzedAudit.score.visibility_score) -
         Number(previousAnalyzedAudit.score.visibility_score)
       : null;
-
+const trendData = analyzedAudits
+  .slice()
+  .reverse()
+  .map((audit) => ({
+    date: formatShortDate(audit.created_at),
+    visibilityScore: Math.round(Number(audit.score?.visibility_score ?? 0)),
+    shareOfVoice: Math.round(Number(audit.score?.share_of_voice ?? 0)),
+    opportunityScore: Math.round(Number(audit.score?.opportunity_score ?? 0)),
+  }));
   return (
     <div className="space-y-6">
       <section className="flex flex-col justify-between gap-4 rounded-xl border bg-background p-6 md:flex-row md:items-center">
@@ -199,6 +214,19 @@ export default async function BrandHistoryPage({
             </p>
           </CardContent>
         </Card>
+        <Card>
+  <CardHeader>
+    <CardTitle>Görünürlük Trendi</CardTitle>
+    <CardDescription>
+      Markanın ölçümler boyunca görünürlük, görünürlük payı ve fırsat skoru
+      değişimi.
+    </CardDescription>
+  </CardHeader>
+
+  <CardContent>
+    <VisibilityTrendChart data={trendData} />
+  </CardContent>
+</Card>
 
         <Card>
           <CardHeader>
