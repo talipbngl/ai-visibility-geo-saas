@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getIntentLabel } from "@/lib/ui/labels";
+
+import { getIntentLabel, getPriorityLabel } from "@/lib/ui/labels";
 import { createClient } from "@/lib/supabase/server";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -85,24 +86,31 @@ export default async function PromptsPage({
     <div className="space-y-6">
       <section className="flex flex-col justify-between gap-4 rounded-xl border bg-background p-6 md:flex-row md:items-center">
         <div>
-            <p className="text-sm text-muted-foreground">Test sorusu yönetimii</p>
-            <h1 className="text-2xl font-semibold tracking-tight">
-              {brand.name} test soruları
-            </h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              AI görünürlük ölçümünde çalıştırılacak soruları burada hazırlıyoruz.
-            </p>
-          </div>
+          <p className="text-sm text-muted-foreground">
+            Test sorusu yönetimi
+          </p>
+
+          <h1 className="text-2xl font-semibold tracking-tight">
+            {brand.name} test soruları
+          </h1>
+
+          <p className="mt-1 text-sm text-muted-foreground">
+            AI görünürlük ölçümünde çalıştırılacak soruları burada
+            hazırlıyoruz.
+          </p>
+        </div>
 
         <div className="flex flex-wrap gap-2">
-  <Button asChild variant="outline">
-    <Link href={`/dashboard/brands/${brand.id}`}>Marka detayına dön</Link>
-  </Button>
+          <Button asChild variant="outline">
+            <Link href={`/dashboard/brands/${brand.id}`}>
+              Marka detayına dön
+            </Link>
+          </Button>
 
-  <form action={`/api/brands/${brand.id}/audits`} method="post">
-    <Button type="submit">Ölçüm başlat</Button>
-  </form>
-</div>
+          <form action={`/api/brands/${brand.id}/audits`} method="post">
+            <Button type="submit">Ölçüm başlat</Button>
+          </form>
+        </div>
       </section>
 
       {query.error ? (
@@ -117,7 +125,8 @@ export default async function PromptsPage({
             <CardHeader>
               <CardTitle>Yeni Soru Seti</CardTitle>
               <CardDescription>
-                Promptları satın alma, karşılaştırma veya yerel öneri gibi gruplara ayır.
+                Test sorularını satın alma, karşılaştırma veya yerel öneri gibi
+                gruplara ayır.
               </CardDescription>
             </CardHeader>
 
@@ -132,7 +141,7 @@ export default async function PromptsPage({
                   <Input
                     id="setName"
                     name="name"
-                    placeholder="Satın alma promptları"
+                    placeholder="Satın alma soruları"
                     required
                   />
                 </div>
@@ -153,47 +162,49 @@ export default async function PromptsPage({
               </form>
             </CardContent>
           </Card>
-          <Card>
-  <CardHeader>
-    <CardTitle>AI ile Test sorusu Üret</CardTitle>
-    <CardDescription>
-      Marka ve rakip bilgilerine göre otomatik test önerileri oluştur.
-    </CardDescription>
-  </CardHeader>
-
-  <CardContent>
-    <form
-      action={`/api/brands/${brand.id}/prompts/generate`}
-      method="post"
-      className="space-y-4"
-    >
-      <div className="space-y-2">
-        <Label htmlFor="promptCount">Test sorusu sayısı</Label>
-        <Input
-          id="promptCount"
-          name="promptCount"
-          type="number"
-          min="5"
-          max="30"
-          defaultValue="10"
-        />
-        <p className="text-xs text-muted-foreground">
-          İlk test için 10 prompt yeterli. Maliyet kontrolü için üst limit 30.
-        </p>
-      </div>
-
-      <Button type="submit" className="w-full">
-        AI ile test sorusu üret
-      </Button>
-    </form>
-  </CardContent>
-</Card>
 
           <Card>
             <CardHeader>
-              <CardTitle>Yeni Test sorusu Ekle</CardTitle>
+              <CardTitle>AI ile Test Sorusu Üret</CardTitle>
               <CardDescription>
-                Önce en az bir prompt seti oluşturmalısın.
+                Marka ve rakip bilgilerine göre otomatik test soruları oluştur.
+              </CardDescription>
+            </CardHeader>
+
+            <CardContent>
+              <form
+                action={`/api/brands/${brand.id}/prompts/generate`}
+                method="post"
+                className="space-y-4"
+              >
+                <div className="space-y-2">
+                  <Label htmlFor="promptCount">Test sorusu sayısı</Label>
+                  <Input
+                    id="promptCount"
+                    name="promptCount"
+                    type="number"
+                    min="5"
+                    max="30"
+                    defaultValue="10"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    İlk test için 10 soru yeterli. Maliyet kontrolü için üst
+                    limit 30.
+                  </p>
+                </div>
+
+                <Button type="submit" className="w-full">
+                  AI ile test sorusu üret
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Yeni Test Sorusu Ekle</CardTitle>
+              <CardDescription>
+                Önce en az bir soru seti oluşturmalısın.
               </CardDescription>
             </CardHeader>
 
@@ -233,7 +244,7 @@ export default async function PromptsPage({
 
                   <div className="grid gap-4 md:grid-cols-2">
                     <div className="space-y-2">
-                      <Label htmlFor="intent">Intent</Label>
+                      <Label htmlFor="intent">Niyet</Label>
                       <select
                         id="intent"
                         name="intent"
@@ -241,10 +252,10 @@ export default async function PromptsPage({
                         defaultValue="buying_intent"
                       >
                         {intentOptions.map((intent) => (
-                           <option key={intent} value={intent}>
+                          <option key={intent} value={intent}>
                             {getIntentLabel(intent)}
-                             </option>
-                            ))}
+                          </option>
+                        ))}
                       </select>
                     </div>
 
@@ -302,9 +313,9 @@ export default async function PromptsPage({
                 </form>
               ) : (
                 <div className="rounded-lg border border-dashed p-6 text-center">
-                  <p className="font-medium">Önce prompt seti oluştur</p>
+                  <p className="font-medium">Önce soru seti oluştur</p>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    Prompt eklemek için bir set gerekir.
+                    Test sorusu eklemek için bir set gerekir.
                   </p>
                 </div>
               )}
@@ -314,9 +325,9 @@ export default async function PromptsPage({
 
         <Card>
           <CardHeader>
-            <CardTitle>Test sorusu Listesi</CardTitle>
+            <CardTitle>Test Sorusu Listesi</CardTitle>
             <CardDescription>
-              Audit çalıştırırken bu aktif promptlar kullanılacak.
+              Ölçüm çalıştırılırken sadece aktif test soruları kullanılacak.
             </CardDescription>
           </CardHeader>
 
@@ -327,6 +338,7 @@ export default async function PromptsPage({
                   <div key={set.id} className="space-y-3">
                     <div>
                       <h3 className="font-semibold">{set.name}</h3>
+
                       {set.description ? (
                         <p className="text-sm text-muted-foreground">
                           {set.description}
@@ -342,21 +354,49 @@ export default async function PromptsPage({
                             className="rounded-lg border p-4"
                           >
                             <div className="mb-2 flex flex-wrap gap-2">
-                              <Badge variant="secondary">{prompt.intent}</Badge>
-                              <Badge variant="outline">
-                                Öncelik {prompt.priority}
+                              <Badge variant="secondary">
+                                {getIntentLabel(prompt.intent)}
                               </Badge>
-                              <Badge variant={prompt.is_active ? "default" : "outline"}>
+
+                              <Badge variant="outline">
+                                Öncelik: {getPriorityLabel(prompt.priority)}
+                              </Badge>
+
+                              <Badge
+                                variant={
+                                  prompt.is_active ? "default" : "outline"
+                                }
+                              >
                                 {prompt.is_active ? "Aktif" : "Pasif"}
                               </Badge>
                             </div>
 
-                            <p className="text-sm font-medium">{prompt.text}</p>
+                            <p className="text-sm font-medium">
+                              {prompt.text}
+                            </p>
 
                             <p className="mt-2 text-xs text-muted-foreground">
-                              {prompt.country || "TR"} / {prompt.language || "tr"}
+                              {prompt.country || "TR"} /{" "}
+                              {prompt.language || "tr"}
                               {prompt.city ? ` / ${prompt.city}` : ""}
                             </p>
+
+                            <div className="mt-3 flex flex-wrap gap-2">
+                              <form
+                                action={`/api/prompts/${prompt.id}/toggle`}
+                                method="post"
+                              >
+                                <Button
+                                  type="submit"
+                                  variant="outline"
+                                  size="sm"
+                                >
+                                  {prompt.is_active
+                                    ? "Pasifleştir"
+                                    : "Aktifleştir"}
+                                </Button>
+                              </form>
+                            </div>
                           </div>
                         ))}
                       </div>
