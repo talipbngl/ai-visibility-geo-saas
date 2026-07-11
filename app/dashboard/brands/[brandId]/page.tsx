@@ -122,7 +122,11 @@ const { data: latestScore } = latestAudit
           <Button asChild variant="outline">
             <Link href="/dashboard/brands">Markalara dön</Link>
           </Button>
-
+           <Button asChild variant="outline">
+  <Link href={`/dashboard/brands/${brand.id}/history`}>
+    Ölçüm geçmişi
+  </Link>
+</Button>
           <Button asChild variant="outline">
             <Link href={`/dashboard/brands/${brand.id}/competitors`}>
               Rakipler
