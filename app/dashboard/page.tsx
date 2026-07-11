@@ -11,10 +11,15 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import {
+  EmptyState,
+  MetricCard,
+  PageHeader,
+  StatusBadge,
+} from "@/features/ui/components";
+import {
   getCategoryLabel,
   getImpactLabel,
   getRecommendationPriorityLabel,
-  getStatusLabel,
 } from "@/lib/ui/labels";
 
 function formatDate(value: string | null) {
@@ -24,14 +29,6 @@ function formatDate(value: string | null) {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(new Date(value));
-}
-
-function getStatusVariant(status: string) {
-  if (status === "completed") return "default";
-  if (status === "failed") return "destructive";
-  if (status === "running") return "secondary";
-
-  return "outline";
 }
 
 function round(value: number) {
@@ -124,71 +121,111 @@ export default async function DashboardPage() {
     .order("created_at", { ascending: false })
     .limit(5);
 
+  const hasAnyBrand = (brandCount ?? 0) > 0;
+  const hasAnyAudit = (auditCount ?? 0) > 0;
+
   return (
     <div className="space-y-6">
-      <section className="rounded-xl border bg-background p-6">
-        <p className="text-sm text-muted-foreground">Genel Bakış</p>
-        <h1 className="mt-1 text-2xl font-semibold tracking-tight">
-          AI Görünürlük Paneli
-        </h1>
-        <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-          Markalarının AI cevaplarında ne kadar göründüğünü, rakiplere göre
-          görünürlük payını ve aksiyon önerilerini buradan takip edebilirsin.
-        </p>
-      </section>
+      <PageHeader
+        eyebrow="Genel Bakış"
+        title="AI Görünürlük Paneli"
+        description="Markalarının AI cevaplarında ne kadar göründüğünü, rakiplere göre görünürlük payını ve aksiyon önerilerini tek ekrandan takip et."
+        actions={
+          <>
+            <Button asChild variant="outline">
+              <Link href="/dashboard/brands">Markalar</Link>
+            </Button>
+
+            <Button asChild>
+              <Link href="/dashboard/brands/new">Yeni marka ekle</Link>
+            </Button>
+          </>
+        }
+      />
+
+      <Card className="border-primary/20 bg-primary/5 shadow-sm">
+        <CardHeader>
+          <CardTitle>Hızlı başlangıç</CardTitle>
+          <CardDescription>
+            İlk raporu almak için bu 3 adımı tamamlaman yeterli.
+          </CardDescription>
+        </CardHeader>
+
+        <CardContent>
+          <div className="grid gap-3 md:grid-cols-3">
+            <div className="rounded-xl border bg-background/80 p-4">
+              <div className="mb-3 flex size-8 items-center justify-center rounded-full border bg-background text-sm font-semibold">
+                1
+              </div>
+              <p className="font-medium">Markanı ekle</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Ölçüm yapılacak marka ve web sitesi bilgisini gir.
+              </p>
+            </div>
+
+            <div className="rounded-xl border bg-background/80 p-4">
+              <div className="mb-3 flex size-8 items-center justify-center rounded-full border bg-background text-sm font-semibold">
+                2
+              </div>
+              <p className="font-medium">Rakipleri tanımla</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                AI cevaplarında karşılaştırılacak rakip markaları ekle.
+              </p>
+            </div>
+
+            <div className="rounded-xl border bg-background/80 p-4">
+              <div className="mb-3 flex size-8 items-center justify-center rounded-full border bg-background text-sm font-semibold">
+                3
+              </div>
+              <p className="font-medium">Ölçüm başlat</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Test sorularını çalıştır, analiz et ve raporu incele.
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       <section className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardHeader>
-            <CardTitle>Markalar</CardTitle>
-            <CardDescription>Takip edilen marka sayısı</CardDescription>
-          </CardHeader>
+        <MetricCard
+          title="Markalar"
+          description="Takip edilen marka"
+          value={brandCount ?? 0}
+        />
 
-          <CardContent>
-            <p className="text-3xl font-semibold">{brandCount ?? 0}</p>
-          </CardContent>
-        </Card>
+        <MetricCard
+          title="Ölçümler"
+          description="Başlatılan toplam ölçüm"
+          value={auditCount ?? 0}
+        />
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Ölçümler</CardTitle>
-            <CardDescription>Başlatılan toplam audit sayısı</CardDescription>
-          </CardHeader>
+        <MetricCard
+          title="Ortalama Görünürlük"
+          description="Tüm analizlerin ortalaması"
+          value={`${averageVisibilityScore}/100`}
+        />
 
-          <CardContent>
-            <p className="text-3xl font-semibold">{auditCount ?? 0}</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Ortalama Görünürlük</CardTitle>
-            <CardDescription>Marka görünürlük skoru</CardDescription>
-          </CardHeader>
-
-          <CardContent>
-            <p className="text-3xl font-semibold">
-              {averageVisibilityScore}/100
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Görünürlük Payı</CardTitle>
-            <CardDescription>Rakiplere göre ortalama pay</CardDescription>
-          </CardHeader>
-
-          <CardContent>
-            <p className="text-3xl font-semibold">
-              {averageShareOfVoice}%
-            </p>
-          </CardContent>
-        </Card>
+        <MetricCard
+          title="Görünürlük Payı"
+          description="Rakiplere göre ortalama pay"
+          value={`${averageShareOfVoice}%`}
+        />
       </section>
 
-      <section className="grid gap-6 lg:grid-cols-[1.4fr_1fr]">
-        <Card>
+      {!hasAnyBrand ? (
+        <EmptyState
+          title="Henüz marka eklenmemiş"
+          description="İlk AI görünürlük raporunu oluşturmak için önce takip etmek istediğin markayı ekle."
+          action={
+            <Button asChild>
+              <Link href="/dashboard/brands/new">İlk markayı ekle</Link>
+            </Button>
+          }
+        />
+      ) : null}
+
+      <section className="grid gap-6 lg:grid-cols-[1.3fr_0.9fr]">
+        <Card className="shadow-sm">
           <CardHeader>
             <CardTitle>Son Ölçümler</CardTitle>
             <CardDescription>
@@ -205,138 +242,134 @@ export default async function DashboardPage() {
                   return (
                     <div
                       key={audit.id}
-                      className="flex flex-col justify-between gap-3 rounded-lg border p-4 md:flex-row md:items-center"
+                      className="rounded-xl border p-4 transition-colors hover:bg-muted/30"
                     >
-                      <div>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <p className="font-medium">
-                            {brandNameById.get(audit.brand_id) ?? "Marka"}
+                      <div className="flex flex-col justify-between gap-3 md:flex-row md:items-start">
+                        <div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="font-medium">
+                              {brandNameById.get(audit.brand_id) ?? "Marka"}
+                            </p>
+
+                            <StatusBadge status={audit.status} />
+                          </div>
+
+                          <p className="mt-2 text-sm text-muted-foreground">
+                            {audit.completed_prompts} / {audit.total_prompts}{" "}
+                            test sorusu tamamlandı
                           </p>
 
-                          <Badge variant={getStatusVariant(audit.status)}>
-                            {getStatusLabel(audit.status)}
-                          </Badge>
+                          {auditScore ? (
+                            <p className="mt-1 text-sm text-muted-foreground">
+                              Görünürlük:{" "}
+                              {Math.round(auditScore.visibility_score)}/100 ·
+                              Pay: {Math.round(auditScore.share_of_voice)}%
+                            </p>
+                          ) : (
+                            <p className="mt-1 text-sm text-muted-foreground">
+                              Henüz analiz edilmedi.
+                            </p>
+                          )}
+
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            {formatDate(audit.created_at)}
+                          </p>
                         </div>
 
-                        <p className="mt-1 text-sm text-muted-foreground">
-                          {audit.completed_prompts} / {audit.total_prompts}{" "}
-                          prompt tamamlandı
-                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          <Button asChild variant="outline" size="sm">
+                            <Link href={`/dashboard/audits/${audit.id}`}>
+                              Detay
+                            </Link>
+                          </Button>
 
-                        {auditScore ? (
-                          <p className="mt-1 text-sm text-muted-foreground">
-                            Görünürlük:{" "}
-                            {Math.round(auditScore.visibility_score)}/100 ·
-                            Pay: {Math.round(auditScore.share_of_voice)}%
-                          </p>
-                        ) : (
-                          <p className="mt-1 text-sm text-muted-foreground">
-                            Henüz analiz edilmedi.
-                          </p>
-                        )}
-
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          {formatDate(audit.created_at)}
-                        </p>
+                          <Button asChild size="sm">
+                            <Link href={`/dashboard/audits/${audit.id}/report`}>
+                              Rapor
+                            </Link>
+                          </Button>
+                        </div>
                       </div>
-
-                      <div className="flex flex-wrap gap-2">
-  <Button asChild variant="outline" size="sm">
-    <Link href={`/dashboard/audits/${audit.id}`}>
-      Detaya git
-    </Link>
-  </Button>
-
-  <Button asChild size="sm">
-    <Link href={`/dashboard/audits/${audit.id}/report`}>
-      Raporu gör
-    </Link>
-  </Button>
-</div>
                     </div>
                   );
                 })}
               </div>
             ) : (
-              <div className="rounded-lg border border-dashed p-8 text-center">
-                <p className="font-medium">Henüz ölçüm yok</p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Bir marka ekleyip prompt oluşturduktan sonra ölçüm başlat.
-                </p>
-
-                <Button asChild className="mt-4">
-                  <Link href="/dashboard/brands">Markalara git</Link>
-                </Button>
-              </div>
+              <EmptyState
+                title="Henüz ölçüm yok"
+                description="Bir marka ekleyip test sorularını hazırladıktan sonra ilk AI görünürlük ölçümünü başlat."
+                action={
+                  <Button asChild>
+                    <Link href="/dashboard/brands">Markalara git</Link>
+                  </Button>
+                }
+              />
             )}
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Aksiyon Önerileri</CardTitle>
-            <CardDescription>
-              Son analizlerden çıkan uygulanabilir öneriler.
-            </CardDescription>
-          </CardHeader>
+        <div className="space-y-6">
+          <Card className="shadow-sm">
+            <CardHeader>
+              <CardTitle>Aksiyon Önerileri</CardTitle>
+              <CardDescription>
+                Son analizlerden çıkan uygulanabilir öneriler.
+              </CardDescription>
+            </CardHeader>
 
-          <CardContent>
-            {recommendations && recommendations.length > 0 ? (
-              <div className="space-y-3">
-                {recommendations.map((recommendation) => (
-                  <div key={recommendation.id} className="rounded-lg border p-4">
-                    <div className="mb-2 flex flex-wrap gap-2">
-                      <Badge variant="secondary">
-                        {getCategoryLabel(recommendation.category)}
-                      </Badge>
-                      <Badge variant="outline">
-                        Öncelik:{" "}
-                        {getRecommendationPriorityLabel(
-                          recommendation.priority
-                        )}
-                      </Badge>
-                      <Badge variant="outline">
-                        Etki: {getImpactLabel(recommendation.impact)}
-                      </Badge>
+            <CardContent>
+              {recommendations && recommendations.length > 0 ? (
+                <div className="space-y-3">
+                  {recommendations.map((recommendation) => (
+                    <div
+                      key={recommendation.id}
+                      className="rounded-xl border p-4"
+                    >
+                      <div className="mb-2 flex flex-wrap gap-2">
+                        <Badge variant="secondary">
+                          {getCategoryLabel(recommendation.category)}
+                        </Badge>
+
+                        <Badge variant="outline">
+                          Öncelik:{" "}
+                          {getRecommendationPriorityLabel(
+                            recommendation.priority
+                          )}
+                        </Badge>
+
+                        <Badge variant="outline">
+                          Etki: {getImpactLabel(recommendation.impact)}
+                        </Badge>
+                      </div>
+
+                      <p className="font-medium">{recommendation.title}</p>
+                      <p className="mt-1 line-clamp-3 text-sm text-muted-foreground">
+                        {recommendation.description}
+                      </p>
                     </div>
+                  ))}
+                </div>
+              ) : (
+                <EmptyState
+                  title="Henüz öneri yok"
+                  description="Ölçüm cevaplarını analiz edince öneriler burada görünecek."
+                />
+              )}
+            </CardContent>
+          </Card>
 
-                    <p className="font-medium">{recommendation.title}</p>
-                    <p className="mt-1 line-clamp-3 text-sm text-muted-foreground">
-                      {recommendation.description}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="rounded-lg border border-dashed p-8 text-center">
-                <p className="font-medium">Henüz öneri yok</p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Ölçüm cevaplarını analiz edince öneriler burada görünecek.
-                </p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+          <MetricCard
+            title="Fırsat Skoru"
+            description="Markanın görünmediği ama rakiplerin göründüğü alanlar"
+            value={`${averageOpportunityScore}%`}
+            footer={
+              hasAnyAudit
+                ? "Skor yükseldikçe içerik ve AI görünürlük fırsatı artar."
+                : "İlk ölçümden sonra bu alan dolacak."
+            }
+          />
+        </div>
       </section>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Fırsat Skoru</CardTitle>
-          <CardDescription>
-            Rakiplerin görünüp markanın görünmediği alanların ortalama oranı.
-          </CardDescription>
-        </CardHeader>
-
-        <CardContent>
-          <p className="text-3xl font-semibold">
-            {averageOpportunityScore}%
-          </p>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Bu değer yükseldikçe, içerik ve AI görünürlük optimizasyonu için
-            daha fazla fırsat var demektir.
-          </p>
-        </CardContent>
-      </Card>
     </div>
   );
 }
