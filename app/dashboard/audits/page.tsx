@@ -103,11 +103,19 @@ export default async function AuditsPage() {
                     </p>
                   </div>
 
-                  <Button asChild size="sm">
-                    <Link href={`/dashboard/audits/${audit.id}`}>
-                      Detaya git
-                    </Link>
-                  </Button>
+                  <div className="flex flex-wrap gap-2">
+  <Button asChild variant="outline" size="sm">
+    <Link href={`/dashboard/audits/${audit.id}`}>
+      Detaya git
+    </Link>
+  </Button>
+
+  <Button asChild size="sm">
+    <Link href={`/dashboard/audits/${audit.id}/report`}>
+      Raporu gör
+    </Link>
+  </Button>
+</div>
                 </div>
               ))}
             </div>

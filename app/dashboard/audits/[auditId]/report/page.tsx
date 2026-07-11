@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-
+import { PrintReportButton } from "@/features/reports/components/PrintReportButton";
 import { createClient } from "@/lib/supabase/server";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -217,19 +217,21 @@ const lostAnalyses = invisibleAnalyses.slice(0, 5);
             </div>
           </div>
 
-          <div className="flex flex-wrap gap-2">
-            <Button asChild variant="outline">
-              <Link href={`/dashboard/audits/${audit.id}`}>
-                Ölçüm detayına dön
-              </Link>
-            </Button>
+          <div className="flex flex-wrap gap-2 print:hidden">
+  <Button asChild variant="outline">
+    <Link href={`/dashboard/audits/${audit.id}`}>
+      Ölçüm detayına dön
+    </Link>
+  </Button>
 
-            <Button asChild>
-              <Link href={`/dashboard/brands/${brand.id}/prompts`}>
-                Yeni ölçüm başlat
-              </Link>
-            </Button>
-          </div>
+  <Button asChild variant="outline">
+    <Link href={`/dashboard/brands/${brand.id}/prompts`}>
+      Yeni ölçüm başlat
+    </Link>
+  </Button>
+
+  <PrintReportButton />
+</div>
         </div>
       </section>
 
