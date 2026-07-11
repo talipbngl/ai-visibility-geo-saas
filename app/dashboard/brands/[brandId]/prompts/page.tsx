@@ -16,6 +16,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { EmptyState, MetricCard, PageHeader } from "@/features/ui/components";
 
 const intentOptions = [
   "buying_intent",
@@ -82,36 +83,37 @@ export default async function PromptsPage({
 
   const firstPromptSetId = promptSets?.[0]?.id;
 
+  const allPrompts =
+    promptSets?.flatMap((set) => set.prompts ?? []) ?? [];
+
+  const activePromptCount = allPrompts.filter(
+    (prompt) => prompt.is_active
+  ).length;
+
+  const passivePromptCount = allPrompts.filter(
+    (prompt) => !prompt.is_active
+  ).length;
+
   return (
     <div className="space-y-6">
-      <section className="flex flex-col justify-between gap-4 rounded-xl border bg-background p-6 md:flex-row md:items-center">
-        <div>
-          <p className="text-sm text-muted-foreground">
-            Test sorusu yönetimi
-          </p>
+      <PageHeader
+        eyebrow="Test Soruları"
+        title={`${brand.name} ölçüm soruları`}
+        description="AI görünürlük ölçümünde kullanılacak test sorularını hazırla. Sadece aktif sorular yeni ölçümlere dahil edilir."
+        actions={
+          <>
+            <Button asChild variant="outline">
+              <Link href={`/dashboard/brands/${brand.id}`}>
+                Marka detayına dön
+              </Link>
+            </Button>
 
-          <h1 className="text-2xl font-semibold tracking-tight">
-            {brand.name} test soruları
-          </h1>
-
-          <p className="mt-1 text-sm text-muted-foreground">
-            AI görünürlük ölçümünde çalıştırılacak soruları burada
-            hazırlıyoruz.
-          </p>
-        </div>
-
-        <div className="flex flex-wrap gap-2">
-          <Button asChild variant="outline">
-            <Link href={`/dashboard/brands/${brand.id}`}>
-              Marka detayına dön
-            </Link>
-          </Button>
-
-          <form action={`/api/brands/${brand.id}/audits`} method="post">
-            <Button type="submit">Ölçüm başlat</Button>
-          </form>
-        </div>
-      </section>
+            <form action={`/api/brands/${brand.id}/audits`} method="post">
+              <Button type="submit">Ölçüm başlat</Button>
+            </form>
+          </>
+        }
+      />
 
       {query.error ? (
         <Alert variant="destructive">
@@ -119,51 +121,64 @@ export default async function PromptsPage({
         </Alert>
       ) : null}
 
-      <section className="grid gap-6 lg:grid-cols-[420px_1fr]">
+      <section className="grid gap-4 md:grid-cols-3">
+        <MetricCard
+          title="Soru Setleri"
+          description="Gruplanmış test sorusu seti"
+          value={promptSets?.length ?? 0}
+        />
+
+        <MetricCard
+          title="Aktif Sorular"
+          description="Yeni ölçümlere dahil edilir"
+          value={activePromptCount}
+        />
+
+        <MetricCard
+          title="Pasif Sorular"
+          description="Ölçüme dahil edilmez"
+          value={passivePromptCount}
+        />
+      </section>
+
+      <Card className="border-primary/20 bg-primary/5 shadow-sm">
+        <CardHeader>
+          <CardTitle>Bu sayfada ne yapacaksın?</CardTitle>
+          <CardDescription>
+            Önce soru seti oluştur, sonra AI ile soru üret veya manuel soru ekle.
+            Hazır olduğunda ölçümü başlat.
+          </CardDescription>
+        </CardHeader>
+
+        <CardContent>
+          <div className="grid gap-3 md:grid-cols-3">
+            <div className="rounded-xl border bg-background/80 p-4">
+              <p className="font-medium">1. Soru seti oluştur</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Satın alma, karşılaştırma veya yerel öneri gibi gruplar aç.
+              </p>
+            </div>
+
+            <div className="rounded-xl border bg-background/80 p-4">
+              <p className="font-medium">2. Test sorularını hazırla</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                AI ile otomatik üret veya elle soru ekle.
+              </p>
+            </div>
+
+            <div className="rounded-xl border bg-background/80 p-4">
+              <p className="font-medium">3. Ölçüm başlat</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Aktif sorular üzerinden AI görünürlük raporu oluştur.
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <section className="grid gap-6 xl:grid-cols-[420px_1fr]">
         <div className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Yeni Soru Seti</CardTitle>
-              <CardDescription>
-                Test sorularını satın alma, karşılaştırma veya yerel öneri gibi
-                gruplara ayır.
-              </CardDescription>
-            </CardHeader>
-
-            <CardContent>
-              <form
-                action={`/api/brands/${brand.id}/prompt-sets`}
-                method="post"
-                className="space-y-4"
-              >
-                <div className="space-y-2">
-                  <Label htmlFor="setName">Set adı *</Label>
-                  <Input
-                    id="setName"
-                    name="name"
-                    placeholder="Satın alma soruları"
-                    required
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="setDescription">Açıklama</Label>
-                  <Textarea
-                    id="setDescription"
-                    name="description"
-                    placeholder="Yüksek satın alma niyetli AI soruları"
-                    rows={3}
-                  />
-                </div>
-
-                <Button type="submit" className="w-full">
-                  Soru setini kaydet
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
-
-          <Card>
+          <Card className="shadow-sm">
             <CardHeader>
               <CardTitle>AI ile Test Sorusu Üret</CardTitle>
               <CardDescription>
@@ -200,11 +215,52 @@ export default async function PromptsPage({
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="shadow-sm">
             <CardHeader>
-              <CardTitle>Yeni Test Sorusu Ekle</CardTitle>
+              <CardTitle>Yeni Soru Seti</CardTitle>
               <CardDescription>
-                Önce en az bir soru seti oluşturmalısın.
+                Test sorularını konu veya niyete göre grupla.
+              </CardDescription>
+            </CardHeader>
+
+            <CardContent>
+              <form
+                action={`/api/brands/${brand.id}/prompt-sets`}
+                method="post"
+                className="space-y-4"
+              >
+                <div className="space-y-2">
+                  <Label htmlFor="setName">Set adı *</Label>
+                  <Input
+                    id="setName"
+                    name="name"
+                    placeholder="Satın alma soruları"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="setDescription">Açıklama</Label>
+                  <Textarea
+                    id="setDescription"
+                    name="description"
+                    placeholder="Yüksek satın alma niyetli AI soruları"
+                    rows={3}
+                  />
+                </div>
+
+                <Button type="submit" className="w-full">
+                  Soru setini kaydet
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+
+          <Card className="shadow-sm">
+            <CardHeader>
+              <CardTitle>Manuel Test Sorusu Ekle</CardTitle>
+              <CardDescription>
+                Belirli bir soruyu doğrudan ölçüme dahil etmek için ekle.
               </CardDescription>
             </CardHeader>
 
@@ -312,22 +368,21 @@ export default async function PromptsPage({
                   </Button>
                 </form>
               ) : (
-                <div className="rounded-lg border border-dashed p-6 text-center">
-                  <p className="font-medium">Önce soru seti oluştur</p>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    Test sorusu eklemek için bir set gerekir.
-                  </p>
-                </div>
+                <EmptyState
+                  title="Önce soru seti oluştur"
+                  description="Manuel test sorusu eklemek için önce bir soru seti gerekir."
+                />
               )}
             </CardContent>
           </Card>
         </div>
 
-        <Card>
+        <Card className="shadow-sm">
           <CardHeader>
             <CardTitle>Test Sorusu Listesi</CardTitle>
             <CardDescription>
-              Ölçüm çalıştırılırken sadece aktif test soruları kullanılacak.
+              Aktif sorular yeni ölçümlere dahil edilir. Pasif sorular saklanır
+              ama ölçüme girmez.
             </CardDescription>
           </CardHeader>
 
@@ -336,14 +391,18 @@ export default async function PromptsPage({
               <div className="space-y-6">
                 {promptSets.map((set) => (
                   <div key={set.id} className="space-y-3">
-                    <div>
+                    <div className="rounded-xl border bg-muted/20 p-4">
                       <h3 className="font-semibold">{set.name}</h3>
 
                       {set.description ? (
-                        <p className="text-sm text-muted-foreground">
+                        <p className="mt-1 text-sm text-muted-foreground">
                           {set.description}
                         </p>
-                      ) : null}
+                      ) : (
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          Açıklama eklenmedi.
+                        </p>
+                      )}
                     </div>
 
                     {set.prompts && set.prompts.length > 0 ? (
@@ -351,9 +410,9 @@ export default async function PromptsPage({
                         {set.prompts.map((prompt) => (
                           <div
                             key={prompt.id}
-                            className="rounded-lg border p-4"
+                            className="rounded-xl border p-4 transition-colors hover:bg-muted/30"
                           >
-                            <div className="mb-2 flex flex-wrap gap-2">
+                            <div className="mb-3 flex flex-wrap gap-2">
                               <Badge variant="secondary">
                                 {getIntentLabel(prompt.intent)}
                               </Badge>
@@ -371,17 +430,17 @@ export default async function PromptsPage({
                               </Badge>
                             </div>
 
-                            <p className="text-sm font-medium">
+                            <p className="text-sm font-medium leading-6">
                               {prompt.text}
                             </p>
 
-                            <p className="mt-2 text-xs text-muted-foreground">
-                              {prompt.country || "TR"} /{" "}
-                              {prompt.language || "tr"}
-                              {prompt.city ? ` / ${prompt.city}` : ""}
-                            </p>
+                            <div className="mt-3 flex flex-col justify-between gap-3 border-t pt-3 md:flex-row md:items-center">
+                              <p className="text-xs text-muted-foreground">
+                                {prompt.country || "TR"} /{" "}
+                                {prompt.language || "tr"}
+                                {prompt.city ? ` / ${prompt.city}` : ""}
+                              </p>
 
-                            <div className="mt-3 flex flex-wrap gap-2">
                               <form
                                 action={`/api/prompts/${prompt.id}/toggle`}
                                 method="post"
@@ -401,20 +460,19 @@ export default async function PromptsPage({
                         ))}
                       </div>
                     ) : (
-                      <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
-                        Bu sette henüz test sorusu yok.
-                      </div>
+                      <EmptyState
+                        title="Bu sette henüz test sorusu yok"
+                        description="AI ile soru üret veya manuel olarak test sorusu ekle."
+                      />
                     )}
                   </div>
                 ))}
               </div>
             ) : (
-              <div className="rounded-lg border border-dashed p-8 text-center">
-                <p className="font-medium">Henüz soru seti yok</p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  İlk ölçüm için önce soru seti oluştur.
-                </p>
-              </div>
+              <EmptyState
+                title="Henüz soru seti yok"
+                description="İlk ölçüm için önce bir soru seti oluştur."
+              />
             )}
           </CardContent>
         </Card>
