@@ -15,6 +15,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { EmptyState, PageHeader } from "@/features/ui/components";
 
 type CompetitorsPageProps = {
   params: Promise<{
@@ -24,6 +25,12 @@ type CompetitorsPageProps = {
     error?: string;
   }>;
 };
+
+function getWebsiteLabel(value: string | null) {
+  if (!value) return "Website eklenmedi";
+
+  return value.replace(/^https?:\/\//, "").replace(/\/$/, "");
+}
 
 export default async function CompetitorsPage({
   params,
@@ -64,42 +71,26 @@ export default async function CompetitorsPage({
 
   return (
     <div className="space-y-6">
-      <section className="flex flex-col justify-between gap-4 rounded-xl border bg-background p-6 md:flex-row md:items-center">
-        <div>
-          <p className="text-sm text-muted-foreground">Rakip yönetimi</p>
+      <PageHeader
+        eyebrow="Rakip Yönetimi"
+        title={`${brand.name} rakipleri`}
+        description="AI cevaplarında markanı hangi rakiplerle karşılaştıracağımızı burada belirliyoruz. İlk ölçüm için 3-5 rakip eklemek iyi bir başlangıçtır."
+        actions={
+          <>
+            <Button asChild variant="outline">
+              <Link href={`/dashboard/brands/${brand.id}`}>
+                Marka detayına dön
+              </Link>
+            </Button>
 
-          <div className="mt-1 flex flex-wrap items-center gap-2">
-            <h1 className="text-2xl font-semibold tracking-tight">
-              {brand.name} rakipleri
-            </h1>
-
-            <Badge variant="secondary">{brand.country || "TR"}</Badge>
-            <Badge variant="outline">{brand.language || "tr"}</Badge>
-          </div>
-
-          <p className="mt-2 text-sm text-muted-foreground">
-            {brand.industry || "Sektör belirtilmedi"}
-          </p>
-
-          <p className="mt-1 text-sm text-muted-foreground">
-            AI cevaplarında markanı hangi rakiplerle karşılaştıracağımızı burada belirliyoruz.
-          </p>
-        </div>
-
-        <div className="flex flex-wrap gap-2">
-          <Button asChild variant="outline">
-            <Link href={`/dashboard/brands/${brand.id}`}>
-              Marka detayına dön
-            </Link>
-          </Button>
-
-          <Button asChild>
-            <Link href={`/dashboard/brands/${brand.id}/prompts`}>
-              Promptlar
-            </Link>
-          </Button>
-        </div>
-      </section>
+            <Button asChild>
+              <Link href={`/dashboard/brands/${brand.id}/prompts`}>
+                Test sorularına geç
+              </Link>
+            </Button>
+          </>
+        }
+      />
 
       {query.error ? (
         <Alert variant="destructive">
@@ -108,11 +99,11 @@ export default async function CompetitorsPage({
       ) : null}
 
       <section className="grid gap-6 lg:grid-cols-[420px_1fr]">
-        <Card>
+        <Card className="shadow-sm">
           <CardHeader>
             <CardTitle>Yeni Rakip Ekle</CardTitle>
             <CardDescription>
-              İlk audit için en az 3 rakip eklemek iyi bir başlangıçtır.
+              Rakip adı, web sitesi ve farklı yazımlarını ekle.
             </CardDescription>
           </CardHeader>
 
@@ -120,14 +111,14 @@ export default async function CompetitorsPage({
             <form
               action={`/api/brands/${brand.id}/competitors`}
               method="post"
-              className="space-y-5"
+              className="space-y-4"
             >
               <div className="space-y-2">
                 <Label htmlFor="name">Rakip adı *</Label>
                 <Input
                   id="name"
                   name="name"
-                  placeholder="Kronotrop"
+                  placeholder="Kahve Dünyası"
                   required
                 />
               </div>
@@ -137,7 +128,7 @@ export default async function CompetitorsPage({
                 <Input
                   id="websiteUrl"
                   name="websiteUrl"
-                  placeholder="https://kronotrop.com.tr"
+                  placeholder="https://www.kahvedunyasi.com"
                 />
               </div>
 
@@ -146,7 +137,7 @@ export default async function CompetitorsPage({
                 <Textarea
                   id="description"
                   name="description"
-                  placeholder="Rakip ne satıyor, hangi konuda güçlü?"
+                  placeholder="Türkiye'de bilinirliği yüksek kahve markası."
                   rows={3}
                 />
               </div>
@@ -156,11 +147,12 @@ export default async function CompetitorsPage({
                 <Textarea
                   id="aliases"
                   name="aliases"
-                  placeholder={"Kronotrop\nkronotrop.com.tr\nKronotrop Coffee"}
+                  placeholder={"Kahve Dünyası\nkahvedunyasi.com\nKahve Dunyasi"}
                   rows={4}
                 />
                 <p className="text-xs text-muted-foreground">
-                  Her satıra bir farklı yazım gir. AI cevabında bu yazımlar yakalanacak.
+                  Her satıra bir farklı yazım gir. AI cevabında bu yazımlar
+                  yakalanacak.
                 </p>
               </div>
 
@@ -171,69 +163,75 @@ export default async function CompetitorsPage({
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="shadow-sm">
           <CardHeader>
             <CardTitle>Rakip Listesi</CardTitle>
             <CardDescription>
-              Audit sırasında bu rakiplerin AI cevaplarında geçip geçmediği ölçülecek.
+              Ölçüm sırasında AI cevaplarında bu rakiplerin geçip geçmediği
+              kontrol edilir.
             </CardDescription>
           </CardHeader>
 
           <CardContent>
             {competitors && competitors.length > 0 ? (
-              <div className="space-y-4">
+              <div className="grid gap-4 md:grid-cols-2">
                 {competitors.map((competitor) => (
-                  <div key={competitor.id} className="rounded-lg border p-4">
-                    <div className="flex flex-col justify-between gap-3 md:flex-row md:items-start">
-                      <div>
-                        <p className="font-medium">{competitor.name}</p>
+                  <div
+                    key={competitor.id}
+                    className="rounded-xl border p-4 transition-colors hover:bg-muted/30"
+                  >
+                    <div>
+                      <p className="font-medium">{competitor.name}</p>
 
-                        {competitor.website_url ? (
-                          <Link
-                            href={competitor.website_url}
-                            target="_blank"
-                            className="text-sm text-muted-foreground underline"
-                          >
-                            {competitor.website_url}
-                          </Link>
-                        ) : (
-                          <p className="text-sm text-muted-foreground">
-                            Website eklenmedi
-                          </p>
-                        )}
+                      {competitor.website_url ? (
+                        <Link
+                          href={competitor.website_url}
+                          target="_blank"
+                          className="mt-1 block text-sm text-muted-foreground underline underline-offset-4"
+                        >
+                          {getWebsiteLabel(competitor.website_url)}
+                        </Link>
+                      ) : (
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          Website eklenmedi
+                        </p>
+                      )}
 
-                        {competitor.description ? (
-                          <p className="mt-2 text-sm text-muted-foreground">
-                            {competitor.description}
-                          </p>
-                        ) : null}
-                      </div>
+                      {competitor.description ? (
+                        <p className="mt-3 text-sm leading-6 text-muted-foreground">
+                          {competitor.description}
+                        </p>
+                      ) : null}
                     </div>
 
-                    {competitor.competitor_aliases &&
-                    competitor.competitor_aliases.length > 0 ? (
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        {competitor.competitor_aliases.map((alias) => (
-                          <Badge key={alias.id} variant="secondary">
-                            {alias.alias}
-                          </Badge>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="mt-3 text-xs text-muted-foreground">
-                        Alias eklenmedi.
+                    <div className="mt-4 border-t pt-4">
+                      <p className="mb-2 text-xs font-medium text-muted-foreground">
+                        Aliaslar
                       </p>
-                    )}
+
+                      {competitor.competitor_aliases &&
+                      competitor.competitor_aliases.length > 0 ? (
+                        <div className="flex flex-wrap gap-2">
+                          {competitor.competitor_aliases.map((alias) => (
+                            <Badge key={alias.id} variant="secondary">
+                              {alias.alias}
+                            </Badge>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-muted-foreground">
+                          Alias eklenmedi.
+                        </p>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
             ) : (
-              <div className="rounded-lg border border-dashed p-8 text-center">
-                <p className="font-medium">Henüz rakip yok</p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  İlk audit raporunun anlamlı olması için 3-5 rakip ekle.
-                </p>
-              </div>
+              <EmptyState
+                title="Henüz rakip yok"
+                description="İlk AI görünürlük raporunun anlamlı olması için 3-5 rakip ekle."
+              />
             )}
           </CardContent>
         </Card>

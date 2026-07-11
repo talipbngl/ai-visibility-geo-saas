@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/server";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -11,6 +12,12 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  EmptyState,
+  MetricCard,
+  PageHeader,
+  StatusBadge,
+} from "@/features/ui/components";
 
 type BrandDetailPageProps = {
   params: Promise<{
@@ -20,6 +27,7 @@ type BrandDetailPageProps = {
     error?: string;
   }>;
 };
+
 function formatDate(value: string | null) {
   if (!value) return "-";
 
@@ -29,16 +37,12 @@ function formatDate(value: string | null) {
   }).format(new Date(value));
 }
 
-function getStatusLabel(status: string) {
-  const labels: Record<string, string> = {
-    pending: "Bekliyor",
-    running: "Çalışıyor",
-    completed: "Tamamlandı",
-    failed: "Başarısız",
-  };
+function getWebsiteLabel(value: string | null) {
+  if (!value) return "-";
 
-  return labels[status] ?? status;
+  return value.replace(/^https?:\/\//, "").replace(/\/$/, "");
 }
+
 export default async function BrandDetailPage({
   params,
   searchParams,
@@ -80,239 +84,242 @@ export default async function BrandDetailPage({
     .from("audits")
     .select("id", { count: "exact", head: true })
     .eq("brand_id", brand.id);
-    const { data: latestAudit } = await supabase
-  .from("audits")
-  .select(
-    "id, status, total_prompts, completed_prompts, created_at"
-  )
-  .eq("brand_id", brand.id)
-  .order("created_at", { ascending: false })
-  .limit(1)
-  .maybeSingle();
 
-const { data: latestScore } = latestAudit
-  ? await supabase
-      .from("audit_scores")
-      .select(
-        "visibility_score, share_of_voice, average_rank, positive_sentiment_rate, opportunity_score"
-      )
-      .eq("audit_id", latestAudit.id)
-      .maybeSingle()
-  : { data: null };
+  const { data: latestAudit } = await supabase
+    .from("audits")
+    .select("id, status, total_prompts, completed_prompts, created_at")
+    .eq("brand_id", brand.id)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const { data: latestScore } = latestAudit
+    ? await supabase
+        .from("audit_scores")
+        .select(
+          "visibility_score, share_of_voice, average_rank, positive_sentiment_rate, opportunity_score"
+        )
+        .eq("audit_id", latestAudit.id)
+        .maybeSingle()
+    : { data: null };
 
   return (
     <div className="space-y-6">
-      <section className="flex flex-col justify-between gap-4 rounded-xl border bg-background p-6 md:flex-row md:items-center">
-        <div>
-          <div className="mb-2 flex flex-wrap items-center gap-2">
-            <h1 className="text-2xl font-semibold tracking-tight">
-              {brand.name}
-            </h1>
+      <PageHeader
+        eyebrow="Marka Detayı"
+        title={brand.name}
+        description="Bu markanın rakiplerini, test sorularını, ölçüm geçmişini ve son AI görünürlük raporunu buradan yönet."
+        actions={
+          <>
+            <Button asChild variant="outline">
+              <Link href="/dashboard/brands">Markalara dön</Link>
+            </Button>
 
-            <Badge variant="secondary">{brand.country || "TR"}</Badge>
-            <Badge variant="outline">{brand.language || "tr"}</Badge>
-          </div>
+            <Button asChild variant="outline">
+              <Link href={`/dashboard/brands/${brand.id}/history`}>
+                Ölçüm geçmişi
+              </Link>
+            </Button>
 
-          <p className="text-sm text-muted-foreground">
-            {brand.industry || "Sektör belirtilmedi"}
-          </p>
-        </div>
+            <Button asChild variant="outline">
+              <Link href={`/dashboard/brands/${brand.id}/competitors`}>
+                Rakipler
+              </Link>
+            </Button>
 
-        <div className="flex flex-wrap gap-2">
-          <Button asChild variant="outline">
-            <Link href="/dashboard/brands">Markalara dön</Link>
-          </Button>
-           <Button asChild variant="outline">
-  <Link href={`/dashboard/brands/${brand.id}/history`}>
-    Ölçüm geçmişi
-  </Link>
-</Button>
-          <Button asChild variant="outline">
-            <Link href={`/dashboard/brands/${brand.id}/competitors`}>
-              Rakipler
-            </Link>
-          </Button>
-
-          <Button asChild>
-            <Link href={`/dashboard/brands/${brand.id}/prompts`}>
-              Promptlar
-            </Link>
-          </Button>
-        </div>
-      </section>
+            <Button asChild>
+              <Link href={`/dashboard/brands/${brand.id}/prompts`}>
+                Test soruları
+              </Link>
+            </Button>
+          </>
+        }
+      />
 
       {query.error ? (
-        <Card className="border-destructive">
-          <CardContent className="pt-6 text-sm text-destructive">
-            {query.error}
-          </CardContent>
-        </Card>
+        <Alert variant="destructive">
+          <AlertDescription>{query.error}</AlertDescription>
+        </Alert>
       ) : null}
 
       <section className="grid gap-4 md:grid-cols-3">
-        <Card>
-          <CardHeader>
-            <CardTitle>Rakipler</CardTitle>
-            <CardDescription>Eklenen rakip sayısı</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-semibold">{competitorCount ?? 0}</p>
-          </CardContent>
-        </Card>
+        <MetricCard
+          title="Rakipler"
+          description="Karşılaştırılan marka"
+          value={competitorCount ?? 0}
+        />
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Promptlar</CardTitle>
-            <CardDescription>Test edilecek prompt sayısı</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-semibold">{promptCount ?? 0}</p>
-          </CardContent>
-        </Card>
+        <MetricCard
+          title="Test Soruları"
+          description="Ölçümde kullanılacak soru"
+          value={promptCount ?? 0}
+        />
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Ölçümler</CardTitle>
-            <CardDescription>Çalıştırılan analiz sayısı</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-semibold">{auditCount ?? 0}</p>
-          </CardContent>
-        </Card>
+        <MetricCard
+          title="Ölçümler"
+          description="Başlatılan toplam ölçüm"
+          value={auditCount ?? 0}
+        />
       </section>
-      <Card>
-  <CardHeader>
-    <CardTitle>Son AI Görünürlük Ölçümü</CardTitle>
-    <CardDescription>
-      Bu marka için en son oluşturulan ölçüm ve rapor özeti.
-    </CardDescription>
-  </CardHeader>
 
-  <CardContent>
-    {latestAudit ? (
-      <div className="space-y-4">
-        <div className="grid gap-4 md:grid-cols-4">
-          <div className="rounded-lg border p-4">
-            <p className="text-sm text-muted-foreground">Durum</p>
-            <p className="mt-1 text-lg font-semibold">
-              {getStatusLabel(latestAudit.status)}
-            </p>
-          </div>
+      <Card className="shadow-sm">
+        <CardHeader>
+          <CardTitle>Son AI Görünürlük Ölçümü</CardTitle>
+          <CardDescription>
+            Bu marka için en son oluşturulan ölçümün kısa özeti.
+          </CardDescription>
+        </CardHeader>
 
-          <div className="rounded-lg border p-4">
-            <p className="text-sm text-muted-foreground">Tamamlanan</p>
-            <p className="mt-1 text-lg font-semibold">
-              {latestAudit.completed_prompts} / {latestAudit.total_prompts}
-            </p>
-          </div>
+        <CardContent>
+          {latestAudit ? (
+            <div className="space-y-4">
+              <div className="grid gap-4 md:grid-cols-4">
+                <div className="rounded-xl border p-4">
+                  <p className="text-sm text-muted-foreground">Durum</p>
+                  <div className="mt-2">
+                    <StatusBadge status={latestAudit.status} />
+                  </div>
+                </div>
 
-          <div className="rounded-lg border p-4">
-            <p className="text-sm text-muted-foreground">Görünürlük</p>
-            <p className="mt-1 text-lg font-semibold">
-              {latestScore
-                ? `${Math.round(latestScore.visibility_score)}/100`
-                : "-"}
-            </p>
-          </div>
+                <div className="rounded-xl border p-4">
+                  <p className="text-sm text-muted-foreground">Tamamlanan</p>
+                  <p className="mt-1 text-xl font-semibold">
+                    {latestAudit.completed_prompts} /{" "}
+                    {latestAudit.total_prompts}
+                  </p>
+                </div>
 
-          <div className="rounded-lg border p-4">
-            <p className="text-sm text-muted-foreground">Görünürlük Payı</p>
-            <p className="mt-1 text-lg font-semibold">
-              {latestScore
-                ? `${Math.round(latestScore.share_of_voice)}%`
-                : "-"}
-            </p>
-          </div>
-        </div>
+                <div className="rounded-xl border p-4">
+                  <p className="text-sm text-muted-foreground">Görünürlük</p>
+                  <p className="mt-1 text-xl font-semibold">
+                    {latestScore
+                      ? `${Math.round(latestScore.visibility_score)}/100`
+                      : "-"}
+                  </p>
+                </div>
 
-        <div className="flex flex-col justify-between gap-3 rounded-lg border p-4 md:flex-row md:items-center">
-          <div>
-            <p className="font-medium">Son ölçüm raporu</p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Oluşturulma: {formatDate(latestAudit.created_at)}
-            </p>
-          </div>
+                <div className="rounded-xl border p-4">
+                  <p className="text-sm text-muted-foreground">
+                    Görünürlük Payı
+                  </p>
+                  <p className="mt-1 text-xl font-semibold">
+                    {latestScore
+                      ? `${Math.round(latestScore.share_of_voice)}%`
+                      : "-"}
+                  </p>
+                </div>
+              </div>
 
-          <div className="flex flex-wrap gap-2">
-            <Button asChild variant="outline" size="sm">
-              <Link href={`/dashboard/audits/${latestAudit.id}`}>
-                Ölçüm detayına git
-              </Link>
-            </Button>
+              <div className="flex flex-col justify-between gap-3 rounded-xl border bg-muted/20 p-4 md:flex-row md:items-center">
+                <div>
+                  <p className="font-medium">Son ölçüm raporu</p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Oluşturulma: {formatDate(latestAudit.created_at)}
+                  </p>
+                </div>
 
-            <Button asChild size="sm">
-              <Link href={`/dashboard/audits/${latestAudit.id}/report`}>
-                Raporu gör
-              </Link>
-            </Button>
-          </div>
-        </div>
-      </div>
-    ) : (
-      <div className="rounded-lg border border-dashed p-8 text-center">
-        <p className="font-medium">Henüz ölçüm yok</p>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Bu marka için test soruları oluşturduktan sonra ilk AI görünürlük
-          ölçümünü başlatabilirsin.
-        </p>
+                <div className="flex flex-wrap gap-2">
+                  <Button asChild variant="outline" size="sm">
+                    <Link href={`/dashboard/audits/${latestAudit.id}`}>
+                      Ölçüm detayı
+                    </Link>
+                  </Button>
 
-        <Button asChild className="mt-4">
-          <Link href={`/dashboard/brands/${brand.id}/prompts`}>
-            Test sorularına git
-          </Link>
-        </Button>
-      </div>
-    )}
-  </CardContent>
-</Card>
+                  <Button asChild size="sm">
+                    <Link href={`/dashboard/audits/${latestAudit.id}/report`}>
+                      Raporu gör
+                    </Link>
+                  </Button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <EmptyState
+              title="Henüz ölçüm yok"
+              description="Bu marka için önce rakipleri ve test sorularını hazırla. Ardından ilk AI görünürlük ölçümünü başlat."
+              action={
+                <Button asChild>
+                  <Link href={`/dashboard/brands/${brand.id}/prompts`}>
+                    Test sorularına git
+                  </Link>
+                </Button>
+              }
+            />
+          )}
+        </CardContent>
+      </Card>
 
-      <section className="grid gap-4 lg:grid-cols-2">
-        <Card>
+      <section className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
+        <Card className="shadow-sm">
           <CardHeader>
             <CardTitle>Marka Bilgileri</CardTitle>
             <CardDescription>
-              Audit ve prompt üretiminde kullanılacak temel bilgiler.
+              Prompt üretimi ve analizlerde kullanılan temel bilgiler.
             </CardDescription>
           </CardHeader>
 
           <CardContent className="space-y-4">
-            <div>
-              <p className="text-sm text-muted-foreground">Website</p>
-              {brand.website_url ? (
-                <Link
-                  href={brand.website_url}
-                  target="_blank"
-                  className="font-medium underline"
-                >
-                  {brand.website_url}
-                </Link>
-              ) : (
-                <p className="font-medium">-</p>
-              )}
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="rounded-xl border p-4">
+                <p className="text-sm text-muted-foreground">Website</p>
+                {brand.website_url ? (
+                  <Link
+                    href={brand.website_url}
+                    target="_blank"
+                    className="mt-1 block font-medium underline underline-offset-4"
+                  >
+                    {getWebsiteLabel(brand.website_url)}
+                  </Link>
+                ) : (
+                  <p className="mt-1 font-medium">-</p>
+                )}
+              </div>
+
+              <div className="rounded-xl border p-4">
+                <p className="text-sm text-muted-foreground">Pazar</p>
+                <p className="mt-1 font-medium">
+                  {brand.country || "TR"} / {brand.language || "tr"}
+                </p>
+              </div>
             </div>
 
-            <div>
+            <div className="rounded-xl border p-4">
+              <p className="text-sm text-muted-foreground">Sektör</p>
+              <p className="mt-1 font-medium">
+                {brand.industry || "Sektör belirtilmedi"}
+              </p>
+            </div>
+
+            <div className="rounded-xl border p-4">
               <p className="text-sm text-muted-foreground">Açıklama</p>
-              <p className="font-medium">{brand.description || "-"}</p>
+              <p className="mt-1 text-sm leading-6">
+                {brand.description || "-"}
+              </p>
             </div>
 
-            <div>
-              <p className="text-sm text-muted-foreground">Hedef kitle</p>
-              <p className="font-medium">{brand.target_audience || "-"}</p>
-            </div>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="rounded-xl border p-4">
+                <p className="text-sm text-muted-foreground">Hedef kitle</p>
+                <p className="mt-1 text-sm leading-6">
+                  {brand.target_audience || "-"}
+                </p>
+              </div>
 
-            <div>
-              <p className="text-sm text-muted-foreground">Ana teklif</p>
-              <p className="font-medium">{brand.primary_offer || "-"}</p>
+              <div className="rounded-xl border p-4">
+                <p className="text-sm text-muted-foreground">Ana teklif</p>
+                <p className="mt-1 text-sm leading-6">
+                  {brand.primary_offer || "-"}
+                </p>
+              </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="shadow-sm">
           <CardHeader>
-            <CardTitle>Aliaslar</CardTitle>
+            <CardTitle>Marka Aliasları</CardTitle>
             <CardDescription>
-              AI cevaplarında markayı yakalamak için farklı yazımlar.
+              AI cevaplarında markayı yakalamak için kullanılan farklı yazımlar.
             </CardDescription>
           </CardHeader>
 
@@ -326,9 +333,10 @@ const { data: latestScore } = latestAudit
                 ))}
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground">
-                Henüz alias eklenmedi.
-              </p>
+              <EmptyState
+                title="Henüz alias eklenmedi"
+                description="Markanın farklı yazımları analiz kalitesini artırır."
+              />
             )}
           </CardContent>
         </Card>
