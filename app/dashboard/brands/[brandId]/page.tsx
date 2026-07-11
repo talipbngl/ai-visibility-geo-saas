@@ -20,7 +20,25 @@ type BrandDetailPageProps = {
     error?: string;
   }>;
 };
+function formatDate(value: string | null) {
+  if (!value) return "-";
 
+  return new Intl.DateTimeFormat("tr-TR", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(new Date(value));
+}
+
+function getStatusLabel(status: string) {
+  const labels: Record<string, string> = {
+    pending: "Bekliyor",
+    running: "Çalışıyor",
+    completed: "Tamamlandı",
+    failed: "Başarısız",
+  };
+
+  return labels[status] ?? status;
+}
 export default async function BrandDetailPage({
   params,
   searchParams,
@@ -62,6 +80,25 @@ export default async function BrandDetailPage({
     .from("audits")
     .select("id", { count: "exact", head: true })
     .eq("brand_id", brand.id);
+    const { data: latestAudit } = await supabase
+  .from("audits")
+  .select(
+    "id, status, total_prompts, completed_prompts, created_at"
+  )
+  .eq("brand_id", brand.id)
+  .order("created_at", { ascending: false })
+  .limit(1)
+  .maybeSingle();
+
+const { data: latestScore } = latestAudit
+  ? await supabase
+      .from("audit_scores")
+      .select(
+        "visibility_score, share_of_voice, average_rank, positive_sentiment_rate, opportunity_score"
+      )
+      .eq("audit_id", latestAudit.id)
+      .maybeSingle()
+  : { data: null };
 
   return (
     <div className="space-y-6">
@@ -139,6 +176,91 @@ export default async function BrandDetailPage({
           </CardContent>
         </Card>
       </section>
+      <Card>
+  <CardHeader>
+    <CardTitle>Son AI Görünürlük Ölçümü</CardTitle>
+    <CardDescription>
+      Bu marka için en son oluşturulan ölçüm ve rapor özeti.
+    </CardDescription>
+  </CardHeader>
+
+  <CardContent>
+    {latestAudit ? (
+      <div className="space-y-4">
+        <div className="grid gap-4 md:grid-cols-4">
+          <div className="rounded-lg border p-4">
+            <p className="text-sm text-muted-foreground">Durum</p>
+            <p className="mt-1 text-lg font-semibold">
+              {getStatusLabel(latestAudit.status)}
+            </p>
+          </div>
+
+          <div className="rounded-lg border p-4">
+            <p className="text-sm text-muted-foreground">Tamamlanan</p>
+            <p className="mt-1 text-lg font-semibold">
+              {latestAudit.completed_prompts} / {latestAudit.total_prompts}
+            </p>
+          </div>
+
+          <div className="rounded-lg border p-4">
+            <p className="text-sm text-muted-foreground">Görünürlük</p>
+            <p className="mt-1 text-lg font-semibold">
+              {latestScore
+                ? `${Math.round(latestScore.visibility_score)}/100`
+                : "-"}
+            </p>
+          </div>
+
+          <div className="rounded-lg border p-4">
+            <p className="text-sm text-muted-foreground">Görünürlük Payı</p>
+            <p className="mt-1 text-lg font-semibold">
+              {latestScore
+                ? `${Math.round(latestScore.share_of_voice)}%`
+                : "-"}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex flex-col justify-between gap-3 rounded-lg border p-4 md:flex-row md:items-center">
+          <div>
+            <p className="font-medium">Son ölçüm raporu</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Oluşturulma: {formatDate(latestAudit.created_at)}
+            </p>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <Button asChild variant="outline" size="sm">
+              <Link href={`/dashboard/audits/${latestAudit.id}`}>
+                Ölçüm detayına git
+              </Link>
+            </Button>
+
+            <Button asChild size="sm">
+              <Link href={`/dashboard/audits/${latestAudit.id}/report`}>
+                Raporu gör
+              </Link>
+            </Button>
+          </div>
+        </div>
+      </div>
+    ) : (
+      <div className="rounded-lg border border-dashed p-8 text-center">
+        <p className="font-medium">Henüz ölçüm yok</p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Bu marka için test soruları oluşturduktan sonra ilk AI görünürlük
+          ölçümünü başlatabilirsin.
+        </p>
+
+        <Button asChild className="mt-4">
+          <Link href={`/dashboard/brands/${brand.id}/prompts`}>
+            Test sorularına git
+          </Link>
+        </Button>
+      </div>
+    )}
+  </CardContent>
+</Card>
 
       <section className="grid gap-4 lg:grid-cols-2">
         <Card>
