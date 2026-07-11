@@ -47,6 +47,35 @@ function getScoreComment(score: number) {
 
   return "Marka AI cevaplarında neredeyse görünmüyor. Bu ciddi bir fırsat ve risk alanı.";
 }
+function getScoreLevel(score: number) {
+  if (score >= 75) return "Güçlü";
+  if (score >= 50) return "Orta";
+  if (score >= 25) return "Zayıf";
+
+  return "Kritik";
+}
+
+function getScoreCardClass(score: number) {
+  if (score >= 75) {
+    return "border-emerald-500/40 bg-emerald-500/5";
+  }
+
+  if (score >= 50) {
+    return "border-blue-500/40 bg-blue-500/5";
+  }
+
+  if (score >= 25) {
+    return "border-amber-500/40 bg-amber-500/5";
+  }
+
+  return "border-destructive/40 bg-destructive/5";
+}
+
+function getCompletedRate(completed: number, total: number) {
+  if (total <= 0) return 0;
+
+  return Math.round((completed / total) * 100);
+}
 
 export default async function AuditReportPage({ params }: AuditReportPageProps) {
   const { auditId } = await params;
@@ -115,7 +144,12 @@ export default async function AuditReportPage({ params }: AuditReportPageProps) 
   .eq("audit_runs.audit_id", audit.id);
 
   const visibilityScore = score?.visibility_score ?? 0;
+  const roundedVisibilityScore = Math.round(visibilityScore);
 
+const completedRate = getCompletedRate(
+  audit.completed_prompts,
+  audit.total_prompts
+);
 const visibleAnalyses =
   analyses?.filter((analysis) => analysis.brand_mentioned) ?? [];
 
@@ -167,6 +201,8 @@ const competitorStats = Array.from(competitorStatsMap.values())
         : null,
   }))
   .sort((a, b) => b.mentionCount - a.mentionCount);
+  const strongestCompetitor = competitorStats[0];
+const topRecommendation = recommendations?.[0];
   const riskNotes = Array.from(
   new Set(
     (analyses ?? []).flatMap((analysis) =>
@@ -234,7 +270,106 @@ const lostAnalyses = invisibleAnalyses.slice(0, 5);
 </div>
         </div>
       </section>
+{score ? (
+  <section className="grid gap-4 lg:grid-cols-[1.4fr_0.8fr]">
+    <Card className={getScoreCardClass(roundedVisibilityScore)}>
+      <CardHeader>
+        <div className="flex flex-col justify-between gap-4 md:flex-row md:items-start">
+          <div>
+            <p className="text-sm text-muted-foreground">
+              Genel AI Görünürlük Durumu
+            </p>
 
+            <CardTitle className="mt-2 text-4xl">
+              {roundedVisibilityScore}/100
+            </CardTitle>
+
+            <CardDescription className="mt-2 text-base">
+              {getScoreComment(visibilityScore)}
+            </CardDescription>
+          </div>
+
+          <Badge variant="secondary" className="w-fit text-sm">
+            Durum: {getScoreLevel(visibilityScore)}
+          </Badge>
+        </div>
+      </CardHeader>
+
+      <CardContent>
+        <div className="grid gap-3 md:grid-cols-3">
+          <div className="rounded-lg border bg-background/70 p-4">
+            <p className="text-sm text-muted-foreground">Tamamlanma</p>
+            <p className="mt-1 text-2xl font-semibold">{completedRate}%</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {audit.completed_prompts} / {audit.total_prompts} test sorusu
+            </p>
+          </div>
+
+          <div className="rounded-lg border bg-background/70 p-4">
+            <p className="text-sm text-muted-foreground">Görünürlük Payı</p>
+            <p className="mt-1 text-2xl font-semibold">
+              {Math.round(score.share_of_voice)}%
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Rakiplere göre marka payı
+            </p>
+          </div>
+
+          <div className="rounded-lg border bg-background/70 p-4">
+            <p className="text-sm text-muted-foreground">Fırsat Skoru</p>
+            <p className="mt-1 text-2xl font-semibold">
+              {Math.round(score.opportunity_score)}%
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              İyileştirme alanı
+            </p>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+
+    <Card>
+      <CardHeader>
+        <CardTitle>Hızlı İçgörü</CardTitle>
+        <CardDescription>
+          Bu rapordan çıkan en önemli sinyaller.
+        </CardDescription>
+      </CardHeader>
+
+      <CardContent className="space-y-4">
+        <div>
+          <p className="text-sm text-muted-foreground">En görünür rakip</p>
+          <p className="mt-1 font-medium">
+            {strongestCompetitor
+              ? strongestCompetitor.name
+              : "Rakip görünürlüğü yok"}
+          </p>
+
+          {strongestCompetitor ? (
+            <p className="mt-1 text-xs text-muted-foreground">
+              {strongestCompetitor.mentionCount} cevapta göründü.
+            </p>
+          ) : null}
+        </div>
+
+        <div className="border-t pt-4">
+          <p className="text-sm text-muted-foreground">En önemli aksiyon</p>
+          <p className="mt-1 font-medium">
+            {topRecommendation
+              ? topRecommendation.title
+              : "Henüz aksiyon önerisi oluşmadı"}
+          </p>
+
+          {topRecommendation ? (
+            <p className="mt-1 text-xs text-muted-foreground line-clamp-3">
+              {topRecommendation.description}
+            </p>
+          ) : null}
+        </div>
+      </CardContent>
+    </Card>
+  </section>
+) : null}
       {!score ? (
         <Card className="border-destructive">
           <CardHeader>
