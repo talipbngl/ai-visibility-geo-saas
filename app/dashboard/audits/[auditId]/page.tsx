@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-
+import { AuditProgressPanel } from "@/features/audits/components/AuditProgressPanel";
 import { createClient } from "@/lib/supabase/server";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -332,32 +332,13 @@ const isReportReady = Boolean(score);
           value="Gemini"
         />
       </section>
-       <section className="grid gap-4 md:grid-cols-4">
-  <MetricCard
-    title="Bekleyen"
-    description="Henüz çalıştırılmamış soru"
-    value={pendingRunCount}
-  />
-
-  <MetricCard
-    title="Çalışıyor"
-    description="İşlenmekte olan soru"
-    value={runningRunCount}
-  />
-
-  <MetricCard
-    title="Tamamlanan"
-    description="Cevabı alınan soru"
-    value={completedRunCount}
-  />
-
-  <MetricCard
-    title="Hatalı"
-    description="Tekrar denenebilir soru"
-    value={failedRunCount}
-  />
-</section>
-
+        <AuditProgressPanel
+           totalCount={totalRunCount}
+              pendingCount={pendingRunCount}
+                 runningCount={runningRunCount}
+                    completedCount={completedRunCount}
+                       failedCount={failedRunCount}
+              />
       {score ? (
         <section className="grid gap-4 md:grid-cols-4">
           <MetricCard
