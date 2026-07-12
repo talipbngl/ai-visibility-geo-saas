@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-
+import { WebsiteSignalSummary } from "@/features/website/components/WebsiteSignalSummary";
 import { PrintReportButton } from "@/features/reports/components/PrintReportButton";
 import { createClient } from "@/lib/supabase/server";
 import { Badge } from "@/components/ui/badge";
@@ -175,6 +175,18 @@ export default async function AuditReportPage({ params }: AuditReportPageProps) 
   if (!brand) {
     notFound();
   }
+
+  const { data: websiteSnapshots } = await supabase
+    .from("brand_website_snapshots")
+    .select(
+      "id, website_url, title, meta_description, word_count, content_score, service_signals_json, trust_signals_json, created_at"
+    )
+    .eq("brand_id", brand.id)
+    .eq("status", "completed")
+    .order("created_at", { ascending: false })
+    .limit(1);
+
+  const websiteSnapshot = websiteSnapshots?.[0] ?? null;
 
   const { data: score } = await supabase
     .from("audit_scores")
@@ -522,6 +534,12 @@ export default async function AuditReportPage({ params }: AuditReportPageProps) 
               </div>
             </CardContent>
           </Card>
+
+          <WebsiteSignalSummary
+            brandId={brand.id}
+            brandName={brand.name}
+            snapshot={websiteSnapshot}
+          />
 
           {competitorStats.length > 0 ? (
             <Card className="shadow-sm">
