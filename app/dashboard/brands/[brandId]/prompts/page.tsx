@@ -440,7 +440,11 @@ export default async function PromptsPage({
                                 {prompt.language || "tr"}
                                 {prompt.city ? ` / ${prompt.city}` : ""}
                               </p>
-
+                               <Button asChild variant="outline" size="sm">
+  <Link href={`/dashboard/prompts/${prompt.id}/edit`}>
+    Düzenle
+  </Link>
+</Button>
                               <form
                                 action={`/api/prompts/${prompt.id}/toggle`}
                                 method="post"
