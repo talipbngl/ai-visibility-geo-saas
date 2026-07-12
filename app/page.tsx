@@ -62,7 +62,7 @@ export default function LandingPage() {
             </Button>
 
             <Button asChild>
-              <Link href="/register">Ücretsiz başla</Link>
+                <Link href="/request-report">Rapor iste</Link>
             </Button>
           </div>
         </div>
@@ -220,9 +220,12 @@ export default function LandingPage() {
           </CardHeader>
 
           <CardContent className="flex flex-col gap-3 sm:flex-row">
-            <Button asChild>
-              <Link href="/register">Ücretsiz başla</Link>
+            <Button asChild size="lg">
+              <Link href="/request-report">Rapor iste</Link>
             </Button>
+            <Button asChild>
+  <Link href="/request-report">İlk raporu iste</Link>
+</Button>
 
             <Button asChild variant="outline">
               <Link href="/login">Zaten hesabım var</Link>

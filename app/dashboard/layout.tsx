@@ -17,6 +17,10 @@ const navigationItems = [
     description: "Ana panel",
   },
   {
+    href: "/dashboard/leads",
+    label: "Talepler",
+  },
+  {
     label: "Markalar",
     href: "/dashboard/brands",
     description: "Marka ve rakip yönetimi",
