@@ -277,18 +277,24 @@ export default async function DashboardPage() {
                         </div>
 
                         <div className="flex flex-wrap gap-2">
-                          <Button asChild variant="outline" size="sm">
-                            <Link href={`/dashboard/audits/${audit.id}`}>
-                              Detay
-                            </Link>
-                          </Button>
+  <form action={`/api/audits/${audit.id}/continue`} method="post">
+    <Button type="submit" size="sm">
+      Devam et
+    </Button>
+  </form>
 
-                          <Button asChild size="sm">
-                            <Link href={`/dashboard/audits/${audit.id}/report`}>
-                              Rapor
-                            </Link>
-                          </Button>
-                        </div>
+  <Button asChild variant="outline" size="sm">
+    <Link href={`/dashboard/audits/${audit.id}`}>
+      Detay
+    </Link>
+  </Button>
+
+  <Button asChild variant="outline" size="sm">
+    <Link href={`/dashboard/audits/${audit.id}/report`}>
+      Rapor
+    </Link>
+  </Button>
+</div>
                       </div>
                     </div>
                   );
