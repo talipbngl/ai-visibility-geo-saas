@@ -23,11 +23,12 @@ function getCheckBadge(isOk: boolean) {
 export default async function HealthPage() {
   const supabase = await createClient();
 
-  const hasSupabaseUrl = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL);
-  const hasSupabaseKey = Boolean(process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY);
-  const hasSupabaseSecret = Boolean(process.env.SUPABASE_SECRET_KEY);
-  const hasGeminiKey = Boolean(process.env.GEMINI_API_KEY);
-  const hasGeminiModel = Boolean(process.env.GEMINI_MODEL);
+  const hasAppUrl = Boolean(process.env.NEXT_PUBLIC_APP_URL);
+const hasSupabaseUrl = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL);
+const hasSupabaseKey = Boolean(process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY);
+const hasSupabaseSecret = Boolean(process.env.SUPABASE_SECRET_KEY);
+const hasGeminiKey = Boolean(process.env.GEMINI_API_KEY);
+const hasGeminiModel = Boolean(process.env.GEMINI_MODEL);
 
   const { count: brandCount } = await supabase
     .from("brands")
@@ -42,6 +43,11 @@ export default async function HealthPage() {
     .select("id", { count: "exact", head: true });
 
   const envChecks = [
+    {
+  title: "App URL",
+  description: "Local ve production ortamında uygulamanın ana adresini belirler.",
+  isOk: hasAppUrl,
+},
     {
       title: "Supabase URL",
       description: "Frontend ve server bağlantısı için gerekli.",
