@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+
 import { PrintReportButton } from "@/features/reports/components/PrintReportButton";
 import { createClient } from "@/lib/supabase/server";
 import { Badge } from "@/components/ui/badge";
@@ -11,16 +12,45 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  EmptyState,
+  MetricCard,
+  PageHeader,
+  StatusBadge,
+} from "@/features/ui/components";
+import {
+  getCategoryLabel,
+  getEffortLabel,
+  getImpactLabel,
+  getIntentLabel,
+  getPriorityLabel,
+  getRecommendationPriorityLabel,
+  getSentimentLabel,
+} from "@/lib/ui/labels";
 
 type AuditReportPageProps = {
   params: Promise<{
     auditId: string;
   }>;
 };
+
 type CompetitorVisibility = {
   name: string;
   mentioned: boolean;
   rank: number | null;
+};
+
+type NestedPrompt = {
+  text?: string | null;
+  intent?: string | null;
+  priority?: number | null;
+};
+
+type NestedRun = {
+  prompt_text_snapshot?: string | null;
+  prompt_intent_snapshot?: string | null;
+  prompt_priority_snapshot?: number | null;
+  prompts?: NestedPrompt | NestedPrompt[] | null;
 };
 
 function formatDate(value: string | null) {
@@ -38,7 +68,7 @@ function getScoreComment(score: number) {
   }
 
   if (score >= 50) {
-    return "Marka bazı cevaplarda görünür ancak rakiplere karşı hâlâ geliştirme alanı var.";
+    return "Marka bazı cevaplarda görünür; ancak rakiplere karşı hâlâ geliştirme alanı var.";
   }
 
   if (score >= 25) {
@@ -47,6 +77,7 @@ function getScoreComment(score: number) {
 
   return "Marka AI cevaplarında neredeyse görünmüyor. Bu ciddi bir fırsat ve risk alanı.";
 }
+
 function getScoreLevel(score: number) {
   if (score >= 75) return "Güçlü";
   if (score >= 50) return "Orta";
@@ -75,6 +106,47 @@ function getCompletedRate(completed: number, total: number) {
   if (total <= 0) return 0;
 
   return Math.round((completed / total) * 100);
+}
+
+function getNestedRun(value: NestedRun | NestedRun[] | null | undefined) {
+  if (Array.isArray(value)) return value[0] ?? null;
+
+  return value ?? null;
+}
+
+function getNestedPrompt(run: NestedRun | null) {
+  if (!run?.prompts) return null;
+
+  return Array.isArray(run.prompts) ? run.prompts[0] ?? null : run.prompts;
+}
+
+function getPromptText(run: NestedRun | null) {
+  if (run?.prompt_text_snapshot) return run.prompt_text_snapshot;
+
+  const prompt = getNestedPrompt(run);
+
+  return prompt?.text ?? "Test sorusu bulunamadı";
+}
+
+function getPromptIntent(run: NestedRun | null) {
+  if (run?.prompt_intent_snapshot) return run.prompt_intent_snapshot;
+
+  const prompt = getNestedPrompt(run);
+
+  return prompt?.intent ?? null;
+}
+
+function getPromptPriority(run: NestedRun | null) {
+  if (
+    run?.prompt_priority_snapshot !== null &&
+    run?.prompt_priority_snapshot !== undefined
+  ) {
+    return run.prompt_priority_snapshot;
+  }
+
+  const prompt = getNestedPrompt(run);
+
+  return prompt?.priority ?? null;
 }
 
 export default async function AuditReportPage({ params }: AuditReportPageProps) {
@@ -119,263 +191,164 @@ export default async function AuditReportPage({ params }: AuditReportPageProps) 
     .order("created_at", { ascending: true });
 
   const { data: analyses } = await supabase
-  .from("analyses")
-  .select(
-    `
-    id,
-    brand_mentioned,
-    brand_rank,
-    brand_sentiment,
-    competitors_json,
-    summary,
-    risk_notes_json,
-    opportunity_notes_json,
-    audit_runs (
+    .from("analyses")
+    .select(
+      `
       id,
-      prompts (
+      brand_mentioned,
+      brand_rank,
+      brand_sentiment,
+      competitors_json,
+      summary,
+      risk_notes_json,
+      opportunity_notes_json,
+      audit_runs (
         id,
-        text,
-        intent,
-        priority
+        audit_id,
+        prompt_text_snapshot,
+        prompt_intent_snapshot,
+        prompt_priority_snapshot,
+        prompts (
+          id,
+          text,
+          intent,
+          priority
+        )
       )
+    `
     )
-  `
-  )
-  .eq("audit_runs.audit_id", audit.id);
+    .eq("audit_runs.audit_id", audit.id);
 
-  const visibilityScore = score?.visibility_score ?? 0;
+  const visibilityScore = Number(score?.visibility_score ?? 0);
   const roundedVisibilityScore = Math.round(visibilityScore);
 
-const completedRate = getCompletedRate(
-  audit.completed_prompts,
-  audit.total_prompts
-);
-const visibleAnalyses =
-  analyses?.filter((analysis) => analysis.brand_mentioned) ?? [];
+  const completedRate = getCompletedRate(
+    audit.completed_prompts,
+    audit.total_prompts
+  );
 
-const invisibleAnalyses =
-  analyses?.filter((analysis) => !analysis.brand_mentioned) ?? [];
+  const visibleAnalyses =
+    analyses?.filter((analysis) => analysis.brand_mentioned) ?? [];
 
-const competitorStatsMap = new Map<
-  string,
-  {
-    name: string;
-    mentionCount: number;
-    rankSum: number;
-    rankCount: number;
-  }
->();
+  const invisibleAnalyses =
+    analyses?.filter((analysis) => !analysis.brand_mentioned) ?? [];
 
-(analyses ?? []).forEach((analysis) => {
-  const competitors = Array.isArray(analysis.competitors_json)
-    ? (analysis.competitors_json as CompetitorVisibility[])
-    : [];
-
-  competitors.forEach((competitor) => {
-    if (!competitor.mentioned) return;
-
-    const current = competitorStatsMap.get(competitor.name) ?? {
-      name: competitor.name,
-      mentionCount: 0,
-      rankSum: 0,
-      rankCount: 0,
-    };
-
-    current.mentionCount += 1;
-
-    if (competitor.rank) {
-      current.rankSum += competitor.rank;
-      current.rankCount += 1;
+  const competitorStatsMap = new Map<
+    string,
+    {
+      name: string;
+      mentionCount: number;
+      rankSum: number;
+      rankCount: number;
     }
+  >();
 
-    competitorStatsMap.set(competitor.name, current);
+  (analyses ?? []).forEach((analysis) => {
+    const competitors = Array.isArray(analysis.competitors_json)
+      ? (analysis.competitors_json as CompetitorVisibility[])
+      : [];
+
+    competitors.forEach((competitor) => {
+      if (!competitor.mentioned) return;
+
+      const current = competitorStatsMap.get(competitor.name) ?? {
+        name: competitor.name,
+        mentionCount: 0,
+        rankSum: 0,
+        rankCount: 0,
+      };
+
+      current.mentionCount += 1;
+
+      if (competitor.rank) {
+        current.rankSum += competitor.rank;
+        current.rankCount += 1;
+      }
+
+      competitorStatsMap.set(competitor.name, current);
+    });
   });
-});
 
-const competitorStats = Array.from(competitorStatsMap.values())
-  .map((competitor) => ({
-    ...competitor,
-    averageRank:
-      competitor.rankCount > 0
-        ? Math.round((competitor.rankSum / competitor.rankCount) * 10) / 10
-        : null,
-  }))
-  .sort((a, b) => b.mentionCount - a.mentionCount);
-  const strongestCompetitor = competitorStats[0];
-const topRecommendation = recommendations?.[0];
+  const competitorStats = Array.from(competitorStatsMap.values())
+    .map((competitor) => ({
+      ...competitor,
+      averageRank:
+        competitor.rankCount > 0
+          ? Math.round((competitor.rankSum / competitor.rankCount) * 10) / 10
+          : null,
+    }))
+    .sort((a, b) => b.mentionCount - a.mentionCount);
+
   const riskNotes = Array.from(
-  new Set(
-    (analyses ?? []).flatMap((analysis) =>
-      Array.isArray(analysis.risk_notes_json)
-        ? (analysis.risk_notes_json as string[])
-        : []
+    new Set(
+      (analyses ?? []).flatMap((analysis) =>
+        Array.isArray(analysis.risk_notes_json)
+          ? (analysis.risk_notes_json as string[])
+          : []
+      )
     )
-  )
-).slice(0, 5);
+  ).slice(0, 5);
 
-const opportunityNotes = Array.from(
-  new Set(
-    (analyses ?? []).flatMap((analysis) =>
-      Array.isArray(analysis.opportunity_notes_json)
-        ? (analysis.opportunity_notes_json as string[])
-        : []
+  const opportunityNotes = Array.from(
+    new Set(
+      (analyses ?? []).flatMap((analysis) =>
+        Array.isArray(analysis.opportunity_notes_json)
+          ? (analysis.opportunity_notes_json as string[])
+          : []
+      )
     )
-  )
-).slice(0, 5);
+  ).slice(0, 5);
 
-const wonAnalyses = visibleAnalyses.slice(0, 5);
-const lostAnalyses = invisibleAnalyses.slice(0, 5);
+  const wonAnalyses = visibleAnalyses.slice(0, 5);
+  const lostAnalyses = invisibleAnalyses.slice(0, 5);
+
+  const strongestCompetitor = competitorStats[0];
+  const topRecommendation = recommendations?.[0];
+
   return (
     <div className="space-y-6">
-      <section className="rounded-xl border bg-background p-8">
-        <div className="flex flex-col justify-between gap-4 md:flex-row md:items-start">
-          <div>
-            <p className="text-sm text-muted-foreground">
-              AI Görünürlük Raporu
-            </p>
-
-            <h1 className="mt-2 text-3xl font-semibold tracking-tight">
-              {brand.name}
-            </h1>
-
-            <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-              Bu rapor, markanın AI cevaplarında ne kadar görünür olduğunu,
-              rakiplere karşı konumunu ve iyileştirme fırsatlarını gösterir.
-            </p>
-
-            <div className="mt-4 flex flex-wrap gap-2">
-              {brand.industry ? (
-                <Badge variant="secondary">{brand.industry}</Badge>
-              ) : null}
-
-              <Badge variant="outline">{brand.country || "TR"}</Badge>
-              <Badge variant="outline">{brand.language || "tr"}</Badge>
-            </div>
-          </div>
-
+      <PageHeader
+        eyebrow="AI Görünürlük Raporu"
+        title={brand.name}
+        description="Bu rapor, markanın AI cevaplarında ne kadar görünür olduğunu, rakiplere göre konumunu ve uygulanabilir iyileştirme alanlarını gösterir."
+        actions={
           <div className="flex flex-wrap gap-2 print:hidden">
-  <Button asChild variant="outline">
-    <Link href={`/dashboard/audits/${audit.id}`}>
-      Ölçüm detayına dön
-    </Link>
-  </Button>
+            <Button asChild variant="outline">
+              <Link href={`/dashboard/audits/${audit.id}`}>
+                Ölçüm detayına dön
+              </Link>
+            </Button>
 
-  <Button asChild variant="outline">
-    <Link href={`/dashboard/brands/${brand.id}/prompts`}>
-      Yeni ölçüm başlat
-    </Link>
-  </Button>
+            <Button asChild variant="outline">
+              <Link href={`/dashboard/brands/${brand.id}/prompts`}>
+                Yeni ölçüm başlat
+              </Link>
+            </Button>
 
-  <PrintReportButton />
-</div>
-        </div>
-      </section>
-{score ? (
-  <section className="grid gap-4 lg:grid-cols-[1.4fr_0.8fr]">
-    <Card className={getScoreCardClass(roundedVisibilityScore)}>
-      <CardHeader>
-        <div className="flex flex-col justify-between gap-4 md:flex-row md:items-start">
-          <div>
-            <p className="text-sm text-muted-foreground">
-              Genel AI Görünürlük Durumu
-            </p>
-
-            <CardTitle className="mt-2 text-4xl">
-              {roundedVisibilityScore}/100
-            </CardTitle>
-
-            <CardDescription className="mt-2 text-base">
-              {getScoreComment(visibilityScore)}
-            </CardDescription>
+            <PrintReportButton />
           </div>
+        }
+      />
 
-          <Badge variant="secondary" className="w-fit text-sm">
-            Durum: {getScoreLevel(visibilityScore)}
-          </Badge>
-        </div>
-      </CardHeader>
+      <div className="flex flex-wrap gap-2">
+        <StatusBadge status={audit.status} />
 
-      <CardContent>
-        <div className="grid gap-3 md:grid-cols-3">
-          <div className="rounded-lg border bg-background/70 p-4">
-            <p className="text-sm text-muted-foreground">Tamamlanma</p>
-            <p className="mt-1 text-2xl font-semibold">{completedRate}%</p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              {audit.completed_prompts} / {audit.total_prompts} test sorusu
-            </p>
-          </div>
+        {brand.industry ? (
+          <Badge variant="secondary">{brand.industry}</Badge>
+        ) : null}
 
-          <div className="rounded-lg border bg-background/70 p-4">
-            <p className="text-sm text-muted-foreground">Görünürlük Payı</p>
-            <p className="mt-1 text-2xl font-semibold">
-              {Math.round(score.share_of_voice)}%
-            </p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Rakiplere göre marka payı
-            </p>
-          </div>
+        <Badge variant="outline">{brand.country || "TR"}</Badge>
+        <Badge variant="outline">{brand.language || "tr"}</Badge>
+        <Badge variant="outline">Oluşturulma: {formatDate(audit.created_at)}</Badge>
+      </div>
 
-          <div className="rounded-lg border bg-background/70 p-4">
-            <p className="text-sm text-muted-foreground">Fırsat Skoru</p>
-            <p className="mt-1 text-2xl font-semibold">
-              {Math.round(score.opportunity_score)}%
-            </p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              İyileştirme alanı
-            </p>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-
-    <Card>
-      <CardHeader>
-        <CardTitle>Hızlı İçgörü</CardTitle>
-        <CardDescription>
-          Bu rapordan çıkan en önemli sinyaller.
-        </CardDescription>
-      </CardHeader>
-
-      <CardContent className="space-y-4">
-        <div>
-          <p className="text-sm text-muted-foreground">En görünür rakip</p>
-          <p className="mt-1 font-medium">
-            {strongestCompetitor
-              ? strongestCompetitor.name
-              : "Rakip görünürlüğü yok"}
-          </p>
-
-          {strongestCompetitor ? (
-            <p className="mt-1 text-xs text-muted-foreground">
-              {strongestCompetitor.mentionCount} cevapta göründü.
-            </p>
-          ) : null}
-        </div>
-
-        <div className="border-t pt-4">
-          <p className="text-sm text-muted-foreground">En önemli aksiyon</p>
-          <p className="mt-1 font-medium">
-            {topRecommendation
-              ? topRecommendation.title
-              : "Henüz aksiyon önerisi oluşmadı"}
-          </p>
-
-          {topRecommendation ? (
-            <p className="mt-1 text-xs text-muted-foreground line-clamp-3">
-              {topRecommendation.description}
-            </p>
-          ) : null}
-        </div>
-      </CardContent>
-    </Card>
-  </section>
-) : null}
       {!score ? (
-        <Card className="border-destructive">
+        <Card className="border-destructive shadow-sm">
           <CardHeader>
             <CardTitle>Rapor henüz hazır değil</CardTitle>
             <CardDescription>
-              Bu raporu görmek için önce ölçüm cevaplarını analiz etmen gerekiyor.
+              Bu raporu görmek için önce ölçüm cevaplarını çalıştırıp analiz
+              etmen gerekiyor.
             </CardDescription>
           </CardHeader>
 
@@ -389,177 +362,253 @@ const lostAnalyses = invisibleAnalyses.slice(0, 5);
         </Card>
       ) : (
         <>
-          <section className="grid gap-4 md:grid-cols-4">
-            <Card>
+          <section className="grid gap-4 lg:grid-cols-[1.4fr_0.8fr]">
+            <Card className={`${getScoreCardClass(roundedVisibilityScore)} shadow-sm`}>
               <CardHeader>
-                <CardTitle>Görünürlük Skoru</CardTitle>
-                <CardDescription>Markanın AI cevaplarında görünme oranı</CardDescription>
+                <div className="flex flex-col justify-between gap-4 md:flex-row md:items-start">
+                  <div>
+                    <p className="text-sm text-muted-foreground">
+                      Genel AI Görünürlük Durumu
+                    </p>
+
+                    <CardTitle className="mt-2 text-5xl">
+                      {roundedVisibilityScore}/100
+                    </CardTitle>
+
+                    <CardDescription className="mt-3 text-base leading-7">
+                      {getScoreComment(visibilityScore)}
+                    </CardDescription>
+                  </div>
+
+                  <Badge variant="secondary" className="w-fit text-sm">
+                    Durum: {getScoreLevel(visibilityScore)}
+                  </Badge>
+                </div>
               </CardHeader>
 
               <CardContent>
-                <p className="text-4xl font-semibold">
-                  {Math.round(score.visibility_score)}/100
-                </p>
+                <div className="grid gap-3 md:grid-cols-3">
+                  <div className="rounded-xl border bg-background/80 p-4">
+                    <p className="text-sm text-muted-foreground">Tamamlanma</p>
+                    <p className="mt-1 text-2xl font-semibold">
+                      {completedRate}%
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {audit.completed_prompts} / {audit.total_prompts} test
+                      sorusu
+                    </p>
+                  </div>
+
+                  <div className="rounded-xl border bg-background/80 p-4">
+                    <p className="text-sm text-muted-foreground">
+                      Görünürlük Payı
+                    </p>
+                    <p className="mt-1 text-2xl font-semibold">
+                      {Math.round(score.share_of_voice)}%
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Rakiplere göre marka payı
+                    </p>
+                  </div>
+
+                  <div className="rounded-xl border bg-background/80 p-4">
+                    <p className="text-sm text-muted-foreground">
+                      Fırsat Skoru
+                    </p>
+                    <p className="mt-1 text-2xl font-semibold">
+                      {Math.round(score.opportunity_score)}%
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      İyileştirme alanı
+                    </p>
+                  </div>
+                </div>
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="shadow-sm">
               <CardHeader>
-                <CardTitle>Görünürlük Payı</CardTitle>
-                <CardDescription>Rakiplere göre marka payı</CardDescription>
+                <CardTitle>Hızlı İçgörü</CardTitle>
+                <CardDescription>
+                  Bu rapordan çıkan en önemli sinyaller.
+                </CardDescription>
               </CardHeader>
 
-              <CardContent>
-                <p className="text-4xl font-semibold">
-                  {Math.round(score.share_of_voice)}%
-                </p>
-              </CardContent>
-            </Card>
+              <CardContent className="space-y-4">
+                <div>
+                  <p className="text-sm text-muted-foreground">
+                    En görünür rakip
+                  </p>
+                  <p className="mt-1 font-medium">
+                    {strongestCompetitor
+                      ? strongestCompetitor.name
+                      : "Rakip görünürlüğü yok"}
+                  </p>
 
-            <Card>
-              <CardHeader>
-                <CardTitle>Ortalama Sıra</CardTitle>
-                <CardDescription>Marka geçtiğinde yaklaşık konum</CardDescription>
-              </CardHeader>
+                  {strongestCompetitor ? (
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {strongestCompetitor.mentionCount} cevapta göründü.
+                    </p>
+                  ) : null}
+                </div>
 
-              <CardContent>
-                <p className="text-4xl font-semibold">
-                  {score.average_rank ?? "-"}
-                </p>
-              </CardContent>
-            </Card>
+                <div className="border-t pt-4">
+                  <p className="text-sm text-muted-foreground">
+                    En önemli aksiyon
+                  </p>
+                  <p className="mt-1 font-medium">
+                    {topRecommendation
+                      ? topRecommendation.title
+                      : "Henüz aksiyon önerisi oluşmadı"}
+                  </p>
 
-            <Card>
-              <CardHeader>
-                <CardTitle>Olumlu Ton</CardTitle>
-                <CardDescription>Olumlu marka bahsi oranı</CardDescription>
-              </CardHeader>
-
-              <CardContent>
-                <p className="text-4xl font-semibold">
-                  {Math.round(score.positive_sentiment_rate)}%
-                </p>
+                  {topRecommendation ? (
+                    <p className="mt-1 line-clamp-3 text-xs text-muted-foreground">
+                      {topRecommendation.description}
+                    </p>
+                  ) : null}
+                </div>
               </CardContent>
             </Card>
           </section>
 
-          <Card>
+          <section className="grid gap-4 md:grid-cols-4">
+            <MetricCard
+              title="Görünürlük Skoru"
+              description="Markanın AI cevaplarında görünme oranı"
+              value={`${Math.round(score.visibility_score)}/100`}
+            />
+
+            <MetricCard
+              title="Görünürlük Payı"
+              description="Rakiplere göre marka payı"
+              value={`${Math.round(score.share_of_voice)}%`}
+            />
+
+            <MetricCard
+              title="Ortalama Sıra"
+              description="Marka geçtiğinde yaklaşık konum"
+              value={score.average_rank ?? "-"}
+            />
+
+            <MetricCard
+              title="Olumlu Ton"
+              description="Olumlu marka bahsi oranı"
+              value={`${Math.round(score.positive_sentiment_rate)}%`}
+            />
+          </section>
+
+          <Card className="shadow-sm">
             <CardHeader>
               <CardTitle>Yönetici Özeti</CardTitle>
-              <CardDescription>
-                Ölçüm sonuçlarının kısa yorumu.
-              </CardDescription>
+              <CardDescription>Ölçüm sonuçlarının kısa yorumu.</CardDescription>
             </CardHeader>
 
             <CardContent className="space-y-4">
-              <p className="text-sm text-muted-foreground">
+              <p className="text-sm leading-6 text-muted-foreground">
                 {brand.name} için {audit.completed_prompts} /{" "}
-                {audit.total_prompts} test sorusu tamamlandı. Ölçüm{" "}
-                {formatDate(audit.created_at)} tarihinde oluşturuldu.
+                {audit.total_prompts} test sorusu tamamlandı. Marka{" "}
+                {visibleAnalyses.length} cevapta görünürken,{" "}
+                {invisibleAnalyses.length} cevapta görünmedi.
               </p>
 
-              <div className="rounded-lg border p-4">
-                <p className="font-medium">
-                  {getScoreComment(visibilityScore)}
-                </p>
-
-                <p className="mt-2 text-sm text-muted-foreground">
-                  Marka {visibleAnalyses.length} cevapta görünürken,{" "}
-                  {invisibleAnalyses.length} cevapta görünmedi. Görünmediği
-                  promptlar içerik ve AI görünürlük optimizasyonu için fırsat
-                  alanı olarak değerlendirilebilir.
+              <div className="rounded-xl border bg-muted/20 p-4">
+                <p className="font-medium">{getScoreComment(visibilityScore)}</p>
+                <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                  Markanın görünmediği sorular; içerik üretimi, karşılaştırma
+                  sayfaları, otorite sinyalleri ve AI görünürlük optimizasyonu
+                  için öncelikli fırsat alanı olarak değerlendirilebilir.
                 </p>
               </div>
             </CardContent>
           </Card>
-           {competitorStats.length > 0 ? (
-  <Card>
-    <CardHeader>
-      <CardTitle>Rakip Görünürlüğü</CardTitle>
-      <CardDescription>
-        AI cevaplarında en çok görünen rakipler ve yaklaşık sıralamaları.
-      </CardDescription>
-    </CardHeader>
 
-    <CardContent>
-      <div className="space-y-3">
-        {competitorStats.map((competitor) => (
-          <div
-            key={competitor.name}
-            className="flex flex-col justify-between gap-3 rounded-lg border p-4 md:flex-row md:items-center"
-          >
-            <div>
-              <p className="font-medium">{competitor.name}</p>
-              <p className="mt-1 text-sm text-muted-foreground">
-                {competitor.mentionCount} cevapta göründü.
-              </p>
-            </div>
+          {competitorStats.length > 0 ? (
+            <Card className="shadow-sm">
+              <CardHeader>
+                <CardTitle>Rakip Görünürlüğü</CardTitle>
+                <CardDescription>
+                  AI cevaplarında en çok görünen rakipler ve yaklaşık
+                  sıralamaları.
+                </CardDescription>
+              </CardHeader>
 
-            <div className="flex flex-wrap gap-2">
-              <Badge variant="secondary">
-                Görünme: {competitor.mentionCount} /{" "}
-                {audit.completed_prompts}
-              </Badge>
+              <CardContent>
+                <div className="space-y-3">
+                  {competitorStats.map((competitor) => (
+                    <div
+                      key={competitor.name}
+                      className="flex flex-col justify-between gap-3 rounded-xl border p-4 md:flex-row md:items-center"
+                    >
+                      <div>
+                        <p className="font-medium">{competitor.name}</p>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          {competitor.mentionCount} cevapta göründü.
+                        </p>
+                      </div>
 
-              <Badge variant="outline">
-                Ortalama sıra: {competitor.averageRank ?? "-"}
-              </Badge>
-            </div>
-          </div>
-        ))}
-      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <Badge variant="secondary">
+                          Görünme: {competitor.mentionCount} /{" "}
+                          {audit.completed_prompts}
+                        </Badge>
 
-      <p className="mt-4 text-sm text-muted-foreground">
-        Rakiplerin sık görünmesi, markanın ilgili AI cevaplarında daha güçlü
-        içerik, otorite ve karşılaştırma sinyallerine ihtiyaç duyduğunu
-        gösterebilir.
-      </p>
-    </CardContent>
-  </Card>
-) : null}
-{riskNotes.length > 0 || opportunityNotes.length > 0 ? (
-  <section className="grid gap-4 lg:grid-cols-2">
-    {riskNotes.length > 0 ? (
-      <Card>
-        <CardHeader>
-          <CardTitle>Risk Notları</CardTitle>
-          <CardDescription>
-            AI cevaplarında markanın zayıf göründüğü alanlar.
-          </CardDescription>
-        </CardHeader>
+                        <Badge variant="outline">
+                          Ortalama sıra: {competitor.averageRank ?? "-"}
+                        </Badge>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          ) : null}
 
-        <CardContent>
-          <ul className="list-disc space-y-2 pl-5 text-sm text-muted-foreground">
-            {riskNotes.map((risk, index) => (
-              <li key={`${risk}-${index}`}>{risk}</li>
-            ))}
-          </ul>
-        </CardContent>
-      </Card>
-    ) : null}
+          {riskNotes.length > 0 || opportunityNotes.length > 0 ? (
+            <section className="grid gap-4 lg:grid-cols-2">
+              {riskNotes.length > 0 ? (
+                <Card className="border-destructive/40 shadow-sm">
+                  <CardHeader>
+                    <CardTitle>Risk Notları</CardTitle>
+                    <CardDescription>
+                      AI cevaplarında markanın zayıf göründüğü alanlar.
+                    </CardDescription>
+                  </CardHeader>
 
-    {opportunityNotes.length > 0 ? (
-      <Card>
-        <CardHeader>
-          <CardTitle>Fırsat Notları</CardTitle>
-          <CardDescription>
-            İçerik ve AI görünürlük optimizasyonu için öne çıkan fırsatlar.
-          </CardDescription>
-        </CardHeader>
+                  <CardContent>
+                    <ul className="list-disc space-y-2 pl-5 text-sm leading-6 text-muted-foreground">
+                      {riskNotes.map((risk, index) => (
+                        <li key={`${risk}-${index}`}>{risk}</li>
+                      ))}
+                    </ul>
+                  </CardContent>
+                </Card>
+              ) : null}
 
-        <CardContent>
-          <ul className="list-disc space-y-2 pl-5 text-sm text-muted-foreground">
-            {opportunityNotes.map((opportunity, index) => (
-              <li key={`${opportunity}-${index}`}>{opportunity}</li>
-            ))}
-          </ul>
-        </CardContent>
-      </Card>
-    ) : null}
-  </section>
-) : null}
+              {opportunityNotes.length > 0 ? (
+                <Card className="shadow-sm">
+                  <CardHeader>
+                    <CardTitle>Fırsat Notları</CardTitle>
+                    <CardDescription>
+                      İçerik ve AI görünürlük optimizasyonu için öne çıkan
+                      fırsatlar.
+                    </CardDescription>
+                  </CardHeader>
+
+                  <CardContent>
+                    <ul className="list-disc space-y-2 pl-5 text-sm leading-6 text-muted-foreground">
+                      {opportunityNotes.map((opportunity, index) => (
+                        <li key={`${opportunity}-${index}`}>{opportunity}</li>
+                      ))}
+                    </ul>
+                  </CardContent>
+                </Card>
+              ) : null}
+            </section>
+          ) : null}
+
           {recommendations && recommendations.length > 0 ? (
-            <Card>
+            <Card className="shadow-sm">
               <CardHeader>
                 <CardTitle>Aksiyon Planı</CardTitle>
                 <CardDescription>
@@ -568,32 +617,37 @@ const lostAnalyses = invisibleAnalyses.slice(0, 5);
               </CardHeader>
 
               <CardContent>
-                <div className="space-y-4">
+                <div className="grid gap-4 md:grid-cols-2">
                   {recommendations.map((recommendation, index) => (
                     <div
                       key={recommendation.id}
-                      className="rounded-lg border p-4"
+                      className="rounded-xl border p-4"
                     >
                       <div className="mb-2 flex flex-wrap gap-2">
-                        <Badge variant="secondary">
-                          {index + 1}. öneri
+                        <Badge variant="secondary">{index + 1}. öneri</Badge>
+
+                        <Badge variant="outline">
+                          {getCategoryLabel(recommendation.category)}
                         </Badge>
 
                         <Badge variant="outline">
-                          Öncelik: {recommendation.priority}
+                          Öncelik:{" "}
+                          {getRecommendationPriorityLabel(
+                            recommendation.priority
+                          )}
                         </Badge>
 
                         <Badge variant="outline">
-                          Etki: {recommendation.impact}
+                          Etki: {getImpactLabel(recommendation.impact)}
                         </Badge>
 
                         <Badge variant="outline">
-                          Efor: {recommendation.effort}
+                          Efor: {getEffortLabel(recommendation.effort)}
                         </Badge>
                       </div>
 
                       <p className="font-medium">{recommendation.title}</p>
-                      <p className="mt-1 text-sm text-muted-foreground">
+                      <p className="mt-1 text-sm leading-6 text-muted-foreground">
                         {recommendation.description}
                       </p>
                     </div>
@@ -603,116 +657,124 @@ const lostAnalyses = invisibleAnalyses.slice(0, 5);
             </Card>
           ) : null}
 
-         <section className="grid gap-6 lg:grid-cols-2">
-  <Card>
-    <CardHeader>
-      <CardTitle>Markanın Göründüğü Sorular</CardTitle>
-      <CardDescription>
-        Markanın AI cevabında geçtiği test soruları.
-      </CardDescription>
-    </CardHeader>
+          <section className="grid gap-6 lg:grid-cols-2">
+            <Card className="shadow-sm">
+              <CardHeader>
+                <CardTitle>Markanın Göründüğü Sorular</CardTitle>
+                <CardDescription>
+                  Markanın AI cevabında geçtiği test soruları.
+                </CardDescription>
+              </CardHeader>
 
-    <CardContent>
-      {wonAnalyses.length > 0 ? (
-        <div className="space-y-3">
-          {wonAnalyses.map((analysis) => {
-            const run = Array.isArray(analysis.audit_runs)
-              ? analysis.audit_runs[0]
-              : analysis.audit_runs;
+              <CardContent>
+                {wonAnalyses.length > 0 ? (
+                  <div className="space-y-3">
+                    {wonAnalyses.map((analysis) => {
+                      const run = getNestedRun(analysis.audit_runs);
+                      const promptIntent = getPromptIntent(run);
+                      const promptPriority = getPromptPriority(run);
 
-            const prompt = Array.isArray(run?.prompts)
-              ? run?.prompts[0]
-              : run?.prompts;
+                      return (
+                        <div key={analysis.id} className="rounded-xl border p-4">
+                          <div className="mb-2 flex flex-wrap gap-2">
+                            <Badge variant="secondary">Göründü</Badge>
 
-            return (
-              <div key={analysis.id} className="rounded-lg border p-4">
-                <div className="mb-2 flex flex-wrap gap-2">
-                  <Badge variant="secondary">Göründü</Badge>
+                            {analysis.brand_rank ? (
+                              <Badge variant="outline">
+                                Sıra: {analysis.brand_rank}
+                              </Badge>
+                            ) : null}
 
-                  {analysis.brand_rank ? (
-                    <Badge variant="outline">
-                      Sıra: {analysis.brand_rank}
-                    </Badge>
-                  ) : null}
+                            {analysis.brand_sentiment ? (
+                              <Badge variant="outline">
+                                Ton:{" "}
+                                {getSentimentLabel(analysis.brand_sentiment)}
+                              </Badge>
+                            ) : null}
 
-                  {analysis.brand_sentiment ? (
-                    <Badge variant="outline">
-                      Ton: {analysis.brand_sentiment}
-                    </Badge>
-                  ) : null}
-                </div>
+                            {promptIntent ? (
+                              <Badge variant="outline">
+                                {getIntentLabel(promptIntent)}
+                              </Badge>
+                            ) : null}
 
-                <p className="font-medium">
-                  {prompt?.text ?? "Test sorusu bulunamadı"}
-                </p>
+                            <Badge variant="outline">
+                              Öncelik: {getPriorityLabel(promptPriority)}
+                            </Badge>
+                          </div>
 
-                <p className="mt-2 text-sm text-muted-foreground">
-                  {analysis.summary}
-                </p>
-              </div>
-            );
-          })}
-        </div>
-      ) : (
-        <div className="rounded-lg border border-dashed p-6 text-center">
-          <p className="font-medium">Marka hiçbir soruda görünmedi</p>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Bu durum güçlü bir içerik ve görünürlük optimizasyonu ihtiyacı
-            olduğunu gösterir.
-          </p>
-        </div>
-      )}
-    </CardContent>
-  </Card>
+                          <p className="font-medium leading-6">
+                            {getPromptText(run)}
+                          </p>
 
-  <Card>
-    <CardHeader>
-      <CardTitle>Markanın Görünmediği Sorular</CardTitle>
-      <CardDescription>
-        Öncelikli içerik ve optimizasyon fırsatları.
-      </CardDescription>
-    </CardHeader>
+                          <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                            {analysis.summary}
+                          </p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <EmptyState
+                    title="Marka hiçbir soruda görünmedi"
+                    description="Bu durum güçlü bir içerik ve görünürlük optimizasyonu ihtiyacı olduğunu gösterir."
+                  />
+                )}
+              </CardContent>
+            </Card>
 
-    <CardContent>
-      {lostAnalyses.length > 0 ? (
-        <div className="space-y-3">
-          {lostAnalyses.map((analysis) => {
-            const run = Array.isArray(analysis.audit_runs)
-              ? analysis.audit_runs[0]
-              : analysis.audit_runs;
+            <Card className="shadow-sm">
+              <CardHeader>
+                <CardTitle>Markanın Görünmediği Sorular</CardTitle>
+                <CardDescription>
+                  Öncelikli içerik ve optimizasyon fırsatları.
+                </CardDescription>
+              </CardHeader>
 
-            const prompt = Array.isArray(run?.prompts)
-              ? run?.prompts[0]
-              : run?.prompts;
+              <CardContent>
+                {lostAnalyses.length > 0 ? (
+                  <div className="space-y-3">
+                    {lostAnalyses.map((analysis) => {
+                      const run = getNestedRun(analysis.audit_runs);
+                      const promptIntent = getPromptIntent(run);
+                      const promptPriority = getPromptPriority(run);
 
-            return (
-              <div key={analysis.id} className="rounded-lg border p-4">
-                <div className="mb-2">
-                  <Badge variant="outline">Görünmedi</Badge>
-                </div>
+                      return (
+                        <div key={analysis.id} className="rounded-xl border p-4">
+                          <div className="mb-2 flex flex-wrap gap-2">
+                            <Badge variant="outline">Görünmedi</Badge>
 
-                <p className="font-medium">
-                  {prompt?.text ?? "Test sorusu bulunamadı"}
-                </p>
+                            {promptIntent ? (
+                              <Badge variant="outline">
+                                {getIntentLabel(promptIntent)}
+                              </Badge>
+                            ) : null}
 
-                <p className="mt-2 text-sm text-muted-foreground">
-                  {analysis.summary}
-                </p>
-              </div>
-            );
-          })}
-        </div>
-      ) : (
-        <div className="rounded-lg border border-dashed p-6 text-center">
-          <p className="font-medium">Marka tüm analiz edilen sorularda göründü</p>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Bu iyi bir sinyal. Takip için düzenli ölçüm yapılmalı.
-          </p>
-        </div>
-      )}
-    </CardContent>
-  </Card>
-</section>
+                            <Badge variant="outline">
+                              Öncelik: {getPriorityLabel(promptPriority)}
+                            </Badge>
+                          </div>
+
+                          <p className="font-medium leading-6">
+                            {getPromptText(run)}
+                          </p>
+
+                          <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                            {analysis.summary}
+                          </p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <EmptyState
+                    title="Marka tüm analiz edilen sorularda göründü"
+                    description="Bu iyi bir sinyal. Takip için düzenli ölçüm yapılmalı."
+                  />
+                )}
+              </CardContent>
+            </Card>
+          </section>
         </>
       )}
     </div>

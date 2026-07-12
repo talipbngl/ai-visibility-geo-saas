@@ -1,39 +1,41 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { redirect } from "next/navigation";
-import { BarChart3, Building2, Home, Settings } from "lucide-react";
 
-import { logoutAction } from "@/features/auth/actions/logout.action";
 import { createClient } from "@/lib/supabase/server";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+
+type DashboardLayoutProps = {
+  children: ReactNode;
+};
 
 const navigationItems = [
   {
-    title: "Genel Bakış",
+    label: "Genel Bakış",
     href: "/dashboard",
-    icon: Home,
+    description: "Ana panel",
   },
   {
-    title: "Markalar",
+    label: "Markalar",
     href: "/dashboard/brands",
-    icon: Building2,
+    description: "Marka ve rakip yönetimi",
   },
   {
-    title: "Ölçümler",
+    label: "Ölçümler",
     href: "/dashboard/audits",
-    icon: BarChart3,
+    description: "Audit ve raporlar",
   },
   {
-    title: "Ayarlar",
+    label: "Ayarlar",
     href: "/dashboard/settings",
-    icon: Settings,
+    description: "Hesap ve çalışma alanı",
   },
 ];
 
 export default async function DashboardLayout({
   children,
-}: {
-  children: React.ReactNode;
-}) {
+}: DashboardLayoutProps) {
   const supabase = await createClient();
 
   const {
@@ -44,74 +46,97 @@ export default async function DashboardLayout({
     redirect("/login");
   }
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("full_name, email")
-    .eq("user_id", user.id)
-    .maybeSingle();
+  async function signOut() {
+    "use server";
+
+    const supabase = await createClient();
+    await supabase.auth.signOut();
+
+    redirect("/login");
+  }
 
   return (
     <div className="min-h-screen bg-muted/30">
-      <aside className="fixed inset-y-0 left-0 hidden w-64 border-r bg-background px-4 py-6 md:block">
-        <div className="mb-8">
-          <Link href="/dashboard" className="block">
-            <p className="text-sm text-muted-foreground">AI Visibility</p>
-            <h1 className="text-lg font-semibold">GEO SaaS</h1>
-          </Link>
-        </div>
+      <div className="flex min-h-screen">
+        <aside className="hidden w-72 border-r bg-background/95 px-4 py-5 shadow-sm md:flex md:flex-col">
+          <div className="rounded-2xl border bg-muted/30 p-4">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              AI Görünürlük
+            </p>
 
-        <nav className="space-y-1">
-          {navigationItems.map((item) => {
-            const Icon = item.icon;
+            <h1 className="mt-1 text-lg font-semibold tracking-tight">
+              Marka Takip Paneli
+            </h1>
 
-            return (
+            <p className="mt-2 text-xs leading-5 text-muted-foreground">
+              Markalarının AI cevaplarında ne kadar göründüğünü ölç, rakiplerle
+              karşılaştır ve raporla.
+            </p>
+          </div>
+
+          <nav className="mt-6 space-y-2">
+            {navigationItems.map((item) => (
               <Link
                 key={item.href}
                 href={item.href}
-                className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground transition hover:bg-muted hover:text-foreground"
+                className="block rounded-xl border border-transparent px-4 py-3 transition hover:border-border hover:bg-muted/50"
               >
-                <Icon className="size-4" />
-                {item.title}
+                <p className="text-sm font-medium">{item.label}</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {item.description}
+                </p>
               </Link>
-            );
-          })}
-        </nav>
+            ))}
+          </nav>
 
-        <div className="absolute bottom-6 left-4 right-4">
-          <div className="mb-3 rounded-lg border bg-muted/40 p-3">
-            <p className="text-sm font-medium">
-              {profile?.full_name || "Kullanıcı"}
-            </p>
-            <p className="truncate text-xs text-muted-foreground">
-              {profile?.email || user.email}
-            </p>
-          </div>
-
-          <form action={logoutAction}>
-            <Button type="submit" variant="outline" className="w-full">
-              Çıkış yap
-            </Button>
-          </form>
-        </div>
-      </aside>
-
-      <div className="md:pl-64">
-        <header className="sticky top-0 z-10 border-b bg-background/95 px-6 py-4 backdrop-blur">
-          <div className="flex items-center justify-between">
+          <div className="mt-auto space-y-4 rounded-2xl border bg-muted/20 p-4">
             <div>
-              <p className="text-sm text-muted-foreground">Dashboard</p>
-              <h2 className="text-xl font-semibold">AI Görünürlük Paneli</h2>
+              <p className="text-xs text-muted-foreground">Oturum</p>
+              <p className="mt-1 truncate text-sm font-medium">
+                {user.email}
+              </p>
             </div>
 
-            <form action={logoutAction} className="md:hidden">
-              <Button type="submit" variant="outline" size="sm">
-                Çıkış
+            <Badge variant="secondary">Beta Panel</Badge>
+
+            <form action={signOut}>
+              <Button type="submit" variant="outline" className="w-full">
+                Çıkış yap
               </Button>
             </form>
           </div>
-        </header>
+        </aside>
 
-        <main className="px-6 py-6">{children}</main>
+        <div className="flex min-w-0 flex-1 flex-col">
+          <header className="sticky top-0 z-20 border-b bg-background/90 px-4 py-3 backdrop-blur md:hidden">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs text-muted-foreground">AI Görünürlük</p>
+                <p className="font-semibold">Marka Takip Paneli</p>
+              </div>
+
+              <form action={signOut}>
+                <Button type="submit" variant="outline" size="sm">
+                  Çıkış
+                </Button>
+              </form>
+            </div>
+
+            <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
+              {navigationItems.map((item) => (
+                <Button key={item.href} asChild variant="outline" size="sm">
+                  <Link href={item.href}>{item.label}</Link>
+                </Button>
+              ))}
+            </div>
+          </header>
+
+          <main className="flex-1">
+            <div className="mx-auto w-full max-w-7xl px-4 py-6 md:px-8 md:py-8">
+              {children}
+            </div>
+          </main>
+        </div>
       </div>
     </div>
   );
