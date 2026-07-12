@@ -114,6 +114,12 @@ export default async function BrandDetailPage({
             <Button asChild variant="outline">
               <Link href="/dashboard/brands">Markalara dön</Link>
             </Button>
+           
+             <Button asChild variant="outline">
+              <Link href={`/dashboard/brands/${brand.id}/edit`}>
+                     Düzenle
+                  </Link>
+                    </Button>
 
             <Button asChild variant="outline">
               <Link href={`/dashboard/brands/${brand.id}/history`}>
