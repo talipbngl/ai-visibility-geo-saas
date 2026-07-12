@@ -193,7 +193,35 @@ const canAnalyze =
   !score;
 
 const isReportReady = Boolean(score);
+const nextStepTitle = failedRunCount
+  ? "Sıradaki adım: Hatalı soruları tekrar dene"
+  : hasWorkToRun
+    ? "Sıradaki adım: AI cevaplarını al"
+    : canAnalyze
+      ? "Sıradaki adım: Sonuçları analiz et"
+      : isReportReady
+        ? "Rapor hazır"
+        : "Ölçümü başlat";
 
+const nextStepDescription = failedRunCount
+  ? "Bazı test soruları hata aldı. Devam ettiğinde sadece hatalı sorular tekrar kuyruğa alınır."
+  : hasWorkToRun
+    ? "Bu ölçümde hâlâ cevap bekleyen test soruları var. Devam ettiğinde AI cevapları alınır."
+    : canAnalyze
+      ? "Tüm test sorularının cevapları alınmış. Devam ettiğinde analiz ve skorlar oluşturulur."
+      : isReportReady
+        ? "Bu ölçüm analiz edilmiş. Müşteriye gösterilecek rapor sayfasını açabilirsin."
+        : "Bu ölçüm için akışı başlatabilirsin.";
+
+const nextStepButtonLabel = failedRunCount
+  ? "Hatalıları tekrar dene"
+  : hasWorkToRun
+    ? "Ölçümü çalıştır"
+    : canAnalyze
+      ? "Analiz et"
+      : isReportReady
+        ? "Raporu gör"
+        : "Devam et";
   return (
     <div className="space-y-6">
       <PageHeader
@@ -213,28 +241,6 @@ const isReportReady = Boolean(score);
                 </Link>
               </Button>
             ) : null}
-
-            {audit.status !== "completed" ? (
-              <form action={`/api/audits/${audit.id}/run`} method="post">
-                <Button type="submit" variant="outline">
-                  Ölçümü çalıştır
-                </Button>
-              </form>
-            ) : null}
-           
-           {failedRunCount > 0 ? (
-  <form action={`/api/audits/${audit.id}/retry-failed`} method="post">
-    <Button type="submit" variant="outline">
-      Hatalıları tekrar dene
-    </Button>
-  </form>
-) : null}
-          
-            <form action={`/api/audits/${audit.id}/analyze`} method="post">
-              <Button type="submit" variant="outline">
-                Analiz et
-              </Button>
-            </form>
 
             <Button asChild>
               <Link href={`/dashboard/audits/${audit.id}/report`}>
@@ -264,54 +270,19 @@ const isReportReady = Boolean(score);
           </CardContent>
         </Card>
       ) : null}
-      {failedRunCount > 0 ? (
-  <ActionPanel
-    title="Sıradaki adım: Hatalı soruları tekrar dene"
-    description="Bazı test soruları cevap alınırken hata verdi. Önce bu soruları tekrar denemelisin."
-  >
-    <form action={`/api/audits/${audit.id}/retry-failed`} method="post">
-      <Button type="submit">Hatalıları tekrar dene</Button>
-    </form>
-  </ActionPanel>
-) : hasWorkToRun ? (
-  <ActionPanel
-    title="Sıradaki adım: AI cevaplarını al"
-    description="Bu ölçümde hâlâ cevap bekleyen test soruları var. Ölçümü çalıştırarak Gemini cevaplarını al."
-  >
-    <form action={`/api/audits/${audit.id}/run`} method="post">
-      <Button type="submit">Ölçümü çalıştır</Button>
-    </form>
-  </ActionPanel>
-) : canAnalyze ? (
-  <ActionPanel
-    title="Sıradaki adım: Sonuçları analiz et"
-    description="Tüm test sorularının cevapları alınmış. Şimdi marka görünürlüğünü, rakipleri ve aksiyon önerilerini analiz et."
-  >
-    <form action={`/api/audits/${audit.id}/analyze`} method="post">
-      <Button type="submit">Analiz et</Button>
-    </form>
-  </ActionPanel>
-) : isReportReady ? (
-  <ActionPanel
-    title="Rapor hazır"
-    description="Bu ölçüm analiz edilmiş. Müşteriye gösterilecek rapor sayfasını açabilirsin."
-  >
-    <Button asChild>
-      <Link href={`/dashboard/audits/${audit.id}/report`}>
-        Raporu gör
-      </Link>
-    </Button>
-  </ActionPanel>
-) : (
-  <ActionPanel
-    title="Ölçüm hazırlanıyor"
-    description="Bu ölçüm için henüz tamamlanmış bir işlem yok. Ölçümü çalıştırarak başlayabilirsin."
-  >
-    <form action={`/api/audits/${audit.id}/run`} method="post">
-      <Button type="submit">Ölçümü çalıştır</Button>
-    </form>
-  </ActionPanel>
-)}
+      <ActionPanel title={nextStepTitle} description={nextStepDescription}>
+        {isReportReady ? (
+          <Button asChild>
+            <Link href={`/dashboard/audits/${audit.id}/report`}>
+              {nextStepButtonLabel}
+            </Link>
+          </Button>
+        ) : (
+          <form action={`/api/audits/${audit.id}/continue`} method="post">
+            <Button type="submit">{nextStepButtonLabel}</Button>
+          </form>
+        )}
+      </ActionPanel>
 
       <section className="grid gap-4 md:grid-cols-3">
         <MetricCard
