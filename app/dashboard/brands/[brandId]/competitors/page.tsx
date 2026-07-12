@@ -78,10 +78,10 @@ export default async function CompetitorsPage({
         actions={
           <>
           <Button asChild variant="outline">
-  <Link href={`/dashboard/brands/${brand.id}/competitors/websites`}>
-    Rakip website analizi
-  </Link>
-</Button>
+            <Link href={`/dashboard/brands/${brand.id}/competitors/websites`}>
+                    Rakip website analizi
+                  </Link>
+            </Button>
             <Button asChild variant="outline">
               <Link href={`/dashboard/brands/${brand.id}`}>
                 Marka detayına dön

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { WebsiteSignalSummary } from "@/features/website/components/WebsiteSignalSummary";
+import { CompetitorWebsiteComparison } from "@/features/website/components/CompetitorWebsiteComparison";
 import { PrintReportButton } from "@/features/reports/components/PrintReportButton";
 import { createClient } from "@/lib/supabase/server";
 import { Badge } from "@/components/ui/badge";
@@ -187,6 +188,58 @@ export default async function AuditReportPage({ params }: AuditReportPageProps) 
     .limit(1);
 
   const websiteSnapshot = websiteSnapshots?.[0] ?? null;
+  const { data: competitorWebsiteSnapshots } = await supabase
+  .from("competitor_website_snapshots")
+  .select(
+    `
+    id,
+    competitor_id,
+    website_url,
+    content_score,
+    word_count,
+    service_signals_json,
+    trust_signals_json,
+    created_at,
+    competitors (
+      id,
+      name
+    )
+  `
+  )
+  .eq("brand_id", brand.id)
+  .eq("status", "completed")
+  .order("created_at", { ascending: false });
+
+const latestCompetitorWebsiteSnapshotMap = new Map<
+  string,
+  NonNullable<typeof competitorWebsiteSnapshots>[number]
+>();
+
+(competitorWebsiteSnapshots ?? []).forEach((snapshot) => {
+  if (!latestCompetitorWebsiteSnapshotMap.has(snapshot.competitor_id)) {
+    latestCompetitorWebsiteSnapshotMap.set(snapshot.competitor_id, snapshot);
+  }
+});
+
+const latestCompetitorWebsiteSnapshots = Array.from(
+  latestCompetitorWebsiteSnapshotMap.values()
+).map((snapshot) => {
+  const competitor = Array.isArray(snapshot.competitors)
+    ? snapshot.competitors[0]
+    : snapshot.competitors;
+
+  return {
+    id: snapshot.id,
+    competitor_id: snapshot.competitor_id,
+    competitor_name: competitor?.name ?? "Rakip",
+    website_url: snapshot.website_url,
+    content_score: snapshot.content_score,
+    word_count: snapshot.word_count,
+    service_signals_json: snapshot.service_signals_json,
+    trust_signals_json: snapshot.trust_signals_json,
+    created_at: snapshot.created_at,
+  };
+});
 
   const { data: score } = await supabase
     .from("audit_scores")
@@ -540,6 +593,10 @@ export default async function AuditReportPage({ params }: AuditReportPageProps) 
             brandName={brand.name}
             snapshot={websiteSnapshot}
           />
+          <CompetitorWebsiteComparison
+  brandSnapshot={websiteSnapshot}
+  competitorSnapshots={latestCompetitorWebsiteSnapshots}
+/>
 
           {competitorStats.length > 0 ? (
             <Card className="shadow-sm">
