@@ -120,6 +120,11 @@ export default async function BrandDetailPage({
                      Düzenle
                   </Link>
                     </Button>
+                    <Button asChild variant="outline">
+  <Link href={`/dashboard/brands/${brand.id}/website`}>
+    Website analizi
+  </Link>
+</Button>
 
             <Button asChild variant="outline">
               <Link href={`/dashboard/brands/${brand.id}/history`}>
