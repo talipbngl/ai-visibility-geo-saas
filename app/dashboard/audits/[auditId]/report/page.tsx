@@ -389,7 +389,11 @@ const latestCompetitorWebsiteSnapshots = Array.from(
                 Yeni ölçüm başlat
               </Link>
             </Button>
-
+              <form action={`/api/audits/${audit.id}/refresh-recommendations`} method="post">
+  <Button type="submit" variant="outline">
+    Önerileri kanıta göre güncelle
+  </Button>
+</form>
             <PrintReportButton />
           </div>
         }

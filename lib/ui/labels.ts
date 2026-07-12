@@ -88,6 +88,11 @@ export function getEffortLabel(effort: string | null) {
 
 export function getCategoryLabel(category: string | null) {
   if (!category) return "-";
+  if (category === "website") return "Website";
+if (category === "content") return "İçerik";
+if (category === "trust") return "Güven";
+if (category === "competitor") return "Rakip";
+if (category === "measurement") return "Takip";
 
   const labels: Record<string, string> = {
     content: "İçerik",
