@@ -17,6 +17,10 @@ const navigationItems = [
     description: "Ana panel",
   },
   {
+  href: "/dashboard/health",
+  label: "Sistem Kontrol",
+},
+  {
     href: "/dashboard/leads",
     label: "Talepler",
   },

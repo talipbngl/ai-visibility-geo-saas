@@ -147,6 +147,11 @@ export default async function DashboardPage() {
           </>
         }
       />
+      <Button asChild variant="outline">
+  <Link href="/dashboard/health">
+    Sistem kontrol
+  </Link>
+</Button>
 
       <Card className="border-primary/20 bg-primary/5 shadow-sm">
         <CardHeader>
