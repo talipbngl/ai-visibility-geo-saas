@@ -74,6 +74,8 @@ export default async function PromptsPage({
         country,
         city,
         is_active,
+        is_archived,
+        archived_at,
         created_at
       )
     `
@@ -83,16 +85,18 @@ export default async function PromptsPage({
 
   const firstPromptSetId = promptSets?.[0]?.id;
 
-  const allPrompts =
-    promptSets?.flatMap((set) => set.prompts ?? []) ?? [];
+ const allPrompts =
+  promptSets?.flatMap((set) => set.prompts ?? []) ?? [];
 
-  const activePromptCount = allPrompts.filter(
-    (prompt) => prompt.is_active
-  ).length;
+const visiblePrompts = allPrompts.filter((prompt) => !prompt.is_archived);
 
-  const passivePromptCount = allPrompts.filter(
-    (prompt) => !prompt.is_active
-  ).length;
+  const activePromptCount = visiblePrompts.filter(
+  (prompt) => prompt.is_active
+).length;
+
+const passivePromptCount = visiblePrompts.filter(
+  (prompt) => !prompt.is_active
+).length;
 
   return (
     <div className="space-y-6">
@@ -107,6 +111,11 @@ export default async function PromptsPage({
                 Marka detayına dön
               </Link>
             </Button>
+            <Button asChild variant="outline">
+  <Link href={`/dashboard/brands/${brand.id}/prompts/archived`}>
+    Arşivlenenler
+  </Link>
+</Button>
 
             <form action={`/api/brands/${brand.id}/audits`} method="post">
               <Button type="submit">Ölçüm başlat</Button>
@@ -404,7 +413,70 @@ export default async function PromptsPage({
                         </p>
                       )}
                     </div>
+                     {(() => {
+  const setPrompts = (set.prompts ?? []).filter(
+    (prompt) => !prompt.is_archived
+  );
 
+  return setPrompts.length > 0 ? (
+    <div className="space-y-3">
+      {setPrompts.map((prompt) => (
+        <div
+          key={prompt.id}
+          className="rounded-xl border p-4 transition-colors hover:bg-muted/30"
+        >
+          <div className="mb-3 flex flex-wrap gap-2">
+            <Badge variant="secondary">
+              {getIntentLabel(prompt.intent)}
+            </Badge>
+
+            <Badge variant="outline">
+              Öncelik: {getPriorityLabel(prompt.priority)}
+            </Badge>
+
+            <Badge variant={prompt.is_active ? "default" : "outline"}>
+              {prompt.is_active ? "Aktif" : "Pasif"}
+            </Badge>
+          </div>
+
+          <p className="text-sm font-medium leading-6">{prompt.text}</p>
+
+          <div className="mt-3 flex flex-col justify-between gap-3 border-t pt-3 md:flex-row md:items-center">
+            <p className="text-xs text-muted-foreground">
+              {prompt.country || "TR"} / {prompt.language || "tr"}
+              {prompt.city ? ` / ${prompt.city}` : ""}
+            </p>
+
+            <div className="flex flex-wrap gap-2">
+              <Button asChild variant="outline" size="sm">
+                <Link href={`/dashboard/prompts/${prompt.id}/edit`}>
+                  Düzenle
+                </Link>
+              </Button>
+
+              <form action={`/api/prompts/${prompt.id}/toggle`} method="post">
+                <Button type="submit" variant="outline" size="sm">
+                  {prompt.is_active ? "Pasifleştir" : "Aktifleştir"}
+                </Button>
+              </form>
+
+              <form action={`/api/prompts/${prompt.id}/archive`} method="post">
+                <Button type="submit" variant="outline" size="sm">
+                  Arşivle
+                </Button>
+              </form>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  ) : (
+    <EmptyState
+      title="Bu sette aktif test sorusu yok"
+      description="AI ile soru üret veya manuel olarak test sorusu ekle."
+    />
+  );
+})()}
                     {set.prompts && set.prompts.length > 0 ? (
                       <div className="space-y-3">
                         {set.prompts.map((prompt) => (

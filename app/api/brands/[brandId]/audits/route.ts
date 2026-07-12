@@ -47,6 +47,7 @@ export async function POST(request: Request, context: RouteContext) {
     .select("id, text, intent, priority, language, country, city")
     .eq("brand_id", brand.id)
     .eq("is_active", true)
+    .eq("is_archived", false)
     .order("priority", { ascending: false })
     .order("created_at", { ascending: true })
     .limit(10);
