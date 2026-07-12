@@ -7,9 +7,9 @@ import {
 } from "@/lib/website-analysis/analyze-website";
 import { createClient } from "@/lib/supabase/server";
 
-type WebsiteAnalysisRouteProps = {
+type CompetitorWebsiteAnalysisRouteProps = {
   params: Promise<{
-    brandId: string;
+    competitorId: string;
   }>;
 };
 
@@ -21,16 +21,31 @@ function redirectTo(path: string, requestUrl: string) {
 
 export async function POST(
   request: Request,
-  { params }: WebsiteAnalysisRouteProps
+  { params }: CompetitorWebsiteAnalysisRouteProps
 ) {
-  const { brandId } = await params;
+  const { competitorId } = await params;
 
   const supabase = await createClient();
 
+  const { data: competitor, error: competitorError } = await supabase
+    .from("competitors")
+    .select("id, brand_id, name, website_url")
+    .eq("id", competitorId)
+    .maybeSingle();
+
+  if (competitorError || !competitor) {
+    return redirectTo(
+      `/dashboard/brands?error=${encodeURIComponent(
+        competitorError?.message ?? "Rakip bulunamadı."
+      )}`,
+      request.url
+    );
+  }
+
   const { data: brand, error: brandError } = await supabase
     .from("brands")
-    .select("id, name, website_url, industry")
-    .eq("id", brandId)
+    .select("id, industry")
+    .eq("id", competitor.brand_id)
     .maybeSingle();
 
   if (brandError || !brand) {
@@ -42,12 +57,12 @@ export async function POST(
     );
   }
 
-  const websiteUrl = normalizeWebsiteUrl(brand.website_url);
+  const websiteUrl = normalizeWebsiteUrl(competitor.website_url);
 
   if (!websiteUrl) {
     return redirectTo(
-      `/dashboard/brands/${brand.id}/website?error=${encodeURIComponent(
-        "Bu marka için website URL bulunamadı. Önce marka bilgilerine website ekle."
+      `/dashboard/brands/${competitor.brand_id}/competitors/websites?error=${encodeURIComponent(
+        "Bu rakip için website URL bulunamadı."
       )}`,
       request.url
     );
@@ -58,7 +73,7 @@ export async function POST(
 
     if (!["http:", "https:"].includes(parsedUrl.protocol)) {
       return redirectTo(
-        `/dashboard/brands/${brand.id}/website?error=${encodeURIComponent(
+        `/dashboard/brands/${competitor.brand_id}/competitors/websites?error=${encodeURIComponent(
           "Sadece http veya https website adresleri analiz edilebilir."
         )}`,
         request.url
@@ -66,7 +81,7 @@ export async function POST(
     }
   } catch {
     return redirectTo(
-      `/dashboard/brands/${brand.id}/website?error=${encodeURIComponent(
+      `/dashboard/brands/${competitor.brand_id}/competitors/websites?error=${encodeURIComponent(
         "Website URL geçerli değil."
       )}`,
       request.url
@@ -79,9 +94,10 @@ export async function POST(
   });
 
   const { error: insertError } = await supabase
-    .from("brand_website_snapshots")
+    .from("competitor_website_snapshots")
     .insert({
-      brand_id: brand.id,
+      competitor_id: competitor.id,
+      brand_id: competitor.brand_id,
       website_url: websiteUrl,
       status: result.status,
       http_status: result.httpStatus,
@@ -98,24 +114,27 @@ export async function POST(
 
   if (insertError) {
     return redirectTo(
-      `/dashboard/brands/${brand.id}/website?error=${encodeURIComponent(
+      `/dashboard/brands/${competitor.brand_id}/competitors/websites?error=${encodeURIComponent(
         insertError.message
       )}`,
       request.url
     );
   }
 
-  revalidatePath(`/dashboard/brands/${brand.id}/website`);
-  revalidatePath(`/dashboard/brands/${brand.id}`);
+  revalidatePath(`/dashboard/brands/${competitor.brand_id}/competitors`);
+  revalidatePath(`/dashboard/brands/${competitor.brand_id}/competitors/websites`);
 
   if (result.status === "failed") {
     return redirectTo(
-      `/dashboard/brands/${brand.id}/website?error=${encodeURIComponent(
-        result.errorMessage ?? "Website analiz edilemedi."
+      `/dashboard/brands/${competitor.brand_id}/competitors/websites?error=${encodeURIComponent(
+        result.errorMessage ?? "Rakip website analiz edilemedi."
       )}`,
       request.url
     );
   }
 
-  return redirectTo(`/dashboard/brands/${brand.id}/website`, request.url);
+  return redirectTo(
+    `/dashboard/brands/${competitor.brand_id}/competitors/websites`,
+    request.url
+  );
 }

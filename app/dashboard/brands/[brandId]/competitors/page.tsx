@@ -77,6 +77,11 @@ export default async function CompetitorsPage({
         description="AI cevaplarında markanı hangi rakiplerle karşılaştıracağımızı burada belirliyoruz. İlk ölçüm için 3-5 rakip eklemek iyi bir başlangıçtır."
         actions={
           <>
+          <Button asChild variant="outline">
+  <Link href={`/dashboard/brands/${brand.id}/competitors/websites`}>
+    Rakip website analizi
+  </Link>
+</Button>
             <Button asChild variant="outline">
               <Link href={`/dashboard/brands/${brand.id}`}>
                 Marka detayına dön
