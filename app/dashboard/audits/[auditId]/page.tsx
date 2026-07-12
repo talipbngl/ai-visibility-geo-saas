@@ -167,7 +167,17 @@ export default async function AuditDetailPage({
     )
     .eq("audit_id", audit.id)
     .order("created_at", { ascending: true });
+  const failedRunCount =
+  runs?.filter((run) => run.status === "failed").length ?? 0;
 
+const pendingRunCount =
+  runs?.filter((run) => run.status === "pending").length ?? 0;
+
+const runningRunCount =
+  runs?.filter((run) => run.status === "running").length ?? 0;
+
+const completedRunCount =
+  runs?.filter((run) => run.status === "completed").length ?? 0;
   return (
     <div className="space-y-6">
       <PageHeader
@@ -195,7 +205,15 @@ export default async function AuditDetailPage({
                 </Button>
               </form>
             ) : null}
-
+           
+           {failedRunCount > 0 ? (
+  <form action={`/api/audits/${audit.id}/retry-failed`} method="post">
+    <Button type="submit" variant="outline">
+      Hatalıları tekrar dene
+    </Button>
+  </form>
+) : null}
+          
             <form action={`/api/audits/${audit.id}/analyze`} method="post">
               <Button type="submit" variant="outline">
                 Analiz et
@@ -250,6 +268,31 @@ export default async function AuditDetailPage({
           value="Gemini"
         />
       </section>
+       <section className="grid gap-4 md:grid-cols-4">
+  <MetricCard
+    title="Bekleyen"
+    description="Henüz çalıştırılmamış soru"
+    value={pendingRunCount}
+  />
+
+  <MetricCard
+    title="Çalışıyor"
+    description="İşlenmekte olan soru"
+    value={runningRunCount}
+  />
+
+  <MetricCard
+    title="Tamamlanan"
+    description="Cevabı alınan soru"
+    value={completedRunCount}
+  />
+
+  <MetricCard
+    title="Hatalı"
+    description="Tekrar denenebilir soru"
+    value={failedRunCount}
+  />
+</section>
 
       {score ? (
         <section className="grid gap-4 md:grid-cols-4">
@@ -374,7 +417,8 @@ export default async function AuditDetailPage({
                 const promptText = getPromptText(run);
                 const promptIntent = getPromptIntent(run);
                 const promptPriority = getPromptPriority(run);
-
+                
+  
                 return (
                   <div
                     key={run.id}
