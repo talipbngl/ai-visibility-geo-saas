@@ -135,6 +135,11 @@ export default async function DashboardPage() {
             <Button asChild variant="outline">
               <Link href="/dashboard/brands">Markalar</Link>
             </Button>
+            <Button asChild variant="outline">
+  <Link href="/dashboard/demo-report">
+    Demo rapor
+  </Link>
+</Button>
 
             <Button asChild>
               <Link href="/dashboard/brands/new">Yeni marka ekle</Link>
