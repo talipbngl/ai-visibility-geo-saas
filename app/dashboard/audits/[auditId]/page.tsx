@@ -16,6 +16,7 @@ import {
   MetricCard,
   PageHeader,
   StatusBadge,
+  ActionPanel,
 } from "@/features/ui/components";
 import {
   getCategoryLabel,
@@ -178,6 +179,21 @@ const runningRunCount =
 
 const completedRunCount =
   runs?.filter((run) => run.status === "completed").length ?? 0;
+
+  const totalRunCount = runs?.length ?? 0;
+
+const hasRuns = totalRunCount > 0;
+
+const hasWorkToRun = pendingRunCount > 0 || runningRunCount > 0;
+
+const canAnalyze =
+  hasRuns &&
+  completedRunCount === totalRunCount &&
+  failedRunCount === 0 &&
+  !score;
+
+const isReportReady = Boolean(score);
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -248,6 +264,54 @@ const completedRunCount =
           </CardContent>
         </Card>
       ) : null}
+      {failedRunCount > 0 ? (
+  <ActionPanel
+    title="Sıradaki adım: Hatalı soruları tekrar dene"
+    description="Bazı test soruları cevap alınırken hata verdi. Önce bu soruları tekrar denemelisin."
+  >
+    <form action={`/api/audits/${audit.id}/retry-failed`} method="post">
+      <Button type="submit">Hatalıları tekrar dene</Button>
+    </form>
+  </ActionPanel>
+) : hasWorkToRun ? (
+  <ActionPanel
+    title="Sıradaki adım: AI cevaplarını al"
+    description="Bu ölçümde hâlâ cevap bekleyen test soruları var. Ölçümü çalıştırarak Gemini cevaplarını al."
+  >
+    <form action={`/api/audits/${audit.id}/run`} method="post">
+      <Button type="submit">Ölçümü çalıştır</Button>
+    </form>
+  </ActionPanel>
+) : canAnalyze ? (
+  <ActionPanel
+    title="Sıradaki adım: Sonuçları analiz et"
+    description="Tüm test sorularının cevapları alınmış. Şimdi marka görünürlüğünü, rakipleri ve aksiyon önerilerini analiz et."
+  >
+    <form action={`/api/audits/${audit.id}/analyze`} method="post">
+      <Button type="submit">Analiz et</Button>
+    </form>
+  </ActionPanel>
+) : isReportReady ? (
+  <ActionPanel
+    title="Rapor hazır"
+    description="Bu ölçüm analiz edilmiş. Müşteriye gösterilecek rapor sayfasını açabilirsin."
+  >
+    <Button asChild>
+      <Link href={`/dashboard/audits/${audit.id}/report`}>
+        Raporu gör
+      </Link>
+    </Button>
+  </ActionPanel>
+) : (
+  <ActionPanel
+    title="Ölçüm hazırlanıyor"
+    description="Bu ölçüm için henüz tamamlanmış bir işlem yok. Ölçümü çalıştırarak başlayabilirsin."
+  >
+    <form action={`/api/audits/${audit.id}/run`} method="post">
+      <Button type="submit">Ölçümü çalıştır</Button>
+    </form>
+  </ActionPanel>
+)}
 
       <section className="grid gap-4 md:grid-cols-3">
         <MetricCard
