@@ -89,8 +89,7 @@ export default function LandingPage() {
             </Button>
 
             <Button asChild size="lg" variant="outline">
-              <Link href="/dashboard/demo-report">Demo raporu gör</Link>
-            </Button>
+              <Link href="/demo-report">Demo raporu gör</Link>            </Button>
           </div>
 
           <p className="mt-4 text-sm text-muted-foreground">
