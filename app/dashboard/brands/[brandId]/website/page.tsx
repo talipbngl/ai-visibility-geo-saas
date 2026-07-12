@@ -246,9 +246,9 @@ export default async function WebsiteAnalysisPage({
           <section className="grid gap-6 lg:grid-cols-2">
             <Card className="shadow-sm">
               <CardHeader>
-                <CardTitle>Hizmet Sinyalleri</CardTitle>
+                <CardTitle>Sektör / Hizmet Sinyalleri</CardTitle>
                 <CardDescription>
-                  Ana sayfa metninde geçen hizmet kelimeleri.
+                  Markanın sektörüne göre ana sayfa metninde aranan önemli kelimeler.
                 </CardDescription>
               </CardHeader>
 

@@ -1,6 +1,6 @@
 import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
-
+import { getWebsiteKeywordPreset } from "@/lib/website-analysis/keyword-presets";
 import { createClient } from "@/lib/supabase/server";
 
 type WebsiteAnalysisRouteProps = {
@@ -15,42 +15,7 @@ type SignalResult = {
   found: boolean;
 };
 
-const serviceKeywords = [
-  "implant",
-  "ortodonti",
-  "çocuk diş",
-  "pedodonti",
-  "diş beyazlatma",
-  "kanal tedavisi",
-  "zirkonyum",
-  "gülüş tasarımı",
-  "estetik diş",
-  "diş taşı",
-  "periodontoloji",
-  "protez",
-  "dolgu",
-  "şeffaf plak",
-  "acil diş",
-];
 
-const trustKeywords = [
-  "doktor",
-  "hekim",
-  "uzman",
-  "hasta yorumu",
-  "yorum",
-  "referans",
-  "sertifika",
-  "deneyim",
-  "randevu",
-  "iletişim",
-  "adres",
-  "telefon",
-  "hakkımızda",
-  "sıkça sorulan",
-  "sss",
-  "kvkk",
-];
 
 function redirectTo(path: string, requestUrl: string) {
   return NextResponse.redirect(new URL(path, requestUrl), {
@@ -259,7 +224,7 @@ export async function POST(
 
   const { data: brand, error: brandError } = await supabase
     .from("brands")
-    .select("id, name, website_url")
+    .select("id, name, website_url,industry")
     .eq("id", brandId)
     .maybeSingle();
 
@@ -352,10 +317,17 @@ export async function POST(
         .filter(Boolean)
         .join(" ")
     );
-
+const keywordPreset = getWebsiteKeywordPreset(brand.industry);
     const wordCount = getWordCount(extractedText);
-    const serviceSignals = getSignals(searchableText, serviceKeywords);
-    const trustSignals = getSignals(searchableText, trustKeywords);
+    const serviceSignals = getSignals(
+  searchableText,
+  keywordPreset.serviceKeywords
+);
+
+const trustSignals = getSignals(
+  searchableText,
+  keywordPreset.trustKeywords
+);
 
     const contentScore = calculateContentScore({
       title,
