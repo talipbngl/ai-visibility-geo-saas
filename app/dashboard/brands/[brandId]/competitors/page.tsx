@@ -208,6 +208,13 @@ export default async function CompetitorsPage({
                       <p className="mb-2 text-xs font-medium text-muted-foreground">
                         Aliaslar
                       </p>
+                      <div className="mt-4 flex flex-wrap gap-2 border-t pt-4">
+  <Button asChild variant="outline" size="sm">
+    <Link href={`/dashboard/competitors/${competitor.id}/edit`}>
+      Düzenle
+    </Link>
+  </Button>
+</div>
 
                       {competitor.competitor_aliases &&
                       competitor.competitor_aliases.length > 0 ? (
