@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { WebsiteSignalSummary } from "@/features/website/components/WebsiteSignalSummary";
+import { EvidenceActionSummary } from "@/features/reports/components/EvidenceActionSummary";
 import { CompetitorWebsiteComparison } from "@/features/website/components/CompetitorWebsiteComparison";
 import { ReportReadinessPanel } from "@/features/reports/components/ReportReadinessPanel";
 import { PrintReportButton } from "@/features/reports/components/PrintReportButton";
@@ -251,11 +252,12 @@ const competitorWebsiteSnapshotCount = latestCompetitorWebsiteSnapshots.length;
     .eq("audit_id", audit.id)
     .maybeSingle();
 
-  const { data: recommendations } = await supabase
-    .from("recommendations")
-    .select("id, category, title, description, priority, effort, impact")
-    .eq("audit_id", audit.id)
-    .order("created_at", { ascending: true });
+ const { data: recommendations } = await supabase
+  .from("recommendations")
+  .select("id, category, title, description, priority, effort, impact")
+  .eq("audit_id", audit.id)
+  .order("priority", { ascending: false })
+  .order("created_at", { ascending: true });
  const recommendationCount = recommendations?.length ?? 0;
 
   const { data: analyses } = await supabase
@@ -612,7 +614,16 @@ const competitorWebsiteSnapshotCount = latestCompetitorWebsiteSnapshots.length;
   brandSnapshot={websiteSnapshot}
   competitorSnapshots={latestCompetitorWebsiteSnapshots}
 />
-
+<EvidenceActionSummary
+  brandName={brand.name}
+  totalPrompts={audit.total_prompts}
+  visibleCount={visibleAnalyses.length}
+  invisibleCount={invisibleAnalyses.length}
+  visibilityScore={visibilityScore}
+  brandWebsiteSnapshot={websiteSnapshot}
+  competitorWebsiteSnapshots={latestCompetitorWebsiteSnapshots}
+  recommendations={recommendations ?? []}
+/>
           {competitorStats.length > 0 ? (
             <Card className="shadow-sm">
               <CardHeader>
