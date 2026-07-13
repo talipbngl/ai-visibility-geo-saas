@@ -398,11 +398,16 @@ const competitorWebsiteSnapshotCount = latestCompetitorWebsiteSnapshots.length;
                 Yeni ölçüm başlat
               </Link>
             </Button>
-              <form action={`/api/audits/${audit.id}/refresh-recommendations`} method="post">
-  <Button type="submit" variant="outline">
-    Önerileri kanıta göre güncelle
-  </Button>
-</form>
+            <Button asChild variant="outline">
+              <Link href={`/dashboard/audits/${audit.id}/client-report`}>
+                Müşteri raporu
+              </Link>
+            </Button>
+                          <form action={`/api/audits/${audit.id}/refresh-recommendations`} method="post">
+              <Button type="submit" variant="outline">
+                Önerileri kanıta göre güncelle
+              </Button>
+            </form>
             <PrintReportButton />
           </div>
         }
