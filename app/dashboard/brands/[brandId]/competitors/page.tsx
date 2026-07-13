@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-
 import { createClient } from "@/lib/supabase/server";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -23,6 +22,8 @@ type CompetitorsPageProps = {
   }>;
   searchParams: Promise<{
     error?: string;
+    message?: string;
+
   }>;
 };
 
@@ -87,7 +88,16 @@ export default async function CompetitorsPage({
                 Marka detayına dön
               </Link>
             </Button>
+              <form
+                action={`/api/brands/${brand.id}/competitors/generate`}
+                method="post"
+              >
+                <input type="hidden" name="competitorCount" value="8" />
 
+                <Button type="submit" variant="outline">
+                  AI ile rakip öner ve ekle
+                </Button>
+              </form>
             <Button asChild>
               <Link href={`/dashboard/brands/${brand.id}/prompts`}>
                 Test sorularına geç
@@ -102,6 +112,21 @@ export default async function CompetitorsPage({
           <AlertDescription>{query.error}</AlertDescription>
         </Alert>
       ) : null}
+      {query.error ? (
+  <Card className="border-destructive shadow-sm">
+    <CardContent className="pt-6 text-sm text-destructive">
+      {query.error}
+    </CardContent>
+  </Card>
+) : null}
+
+{query.message ? (
+  <Card className="border-primary/30 bg-primary/5 shadow-sm">
+    <CardContent className="pt-6 text-sm">
+      {query.message}
+    </CardContent>
+  </Card>
+) : null}
 
       <section className="grid gap-6 lg:grid-cols-[420px_1fr]">
         <Card className="shadow-sm">
