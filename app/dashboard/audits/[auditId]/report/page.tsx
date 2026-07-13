@@ -276,9 +276,10 @@ const competitorWebsiteSnapshotCount = latestCompetitorWebsiteSnapshots.length;
       summary,
       risk_notes_json,
       opportunity_notes_json,
-      audit_runs (
+      audit_runs!inner (
         id,
         audit_id,
+        audit_run_id,
         prompt_text_snapshot,
         prompt_intent_snapshot,
         prompt_priority_snapshot,

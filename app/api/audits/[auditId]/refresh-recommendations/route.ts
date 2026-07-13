@@ -61,26 +61,26 @@ export async function POST(
     )
     .eq("audit_id", audit.id)
     .maybeSingle();
-
-  const { data: analyses } = await supabase
-    .from("analyses")
-    .select(
-      `
-      id,
-      brand_mentioned,
-      brand_rank,
-      brand_sentiment,
-      competitors_json,
-      summary,
-      audit_runs (
-        id,
-        audit_id,
-        prompt_text_snapshot,
-        prompt_intent_snapshot
-      )
+const { data: analyses } = await supabase
+  .from("analyses")
+  .select(
     `
+    id,
+    audit_run_id,
+    brand_mentioned,
+    brand_rank,
+    brand_sentiment,
+    competitors_json,
+    summary,
+    audit_runs!inner (
+      id,
+      audit_id,
+      prompt_text_snapshot,
+      prompt_intent_snapshot
     )
-    .eq("audit_runs.audit_id", audit.id);
+  `
+  )
+  .eq("audit_runs.audit_id", audit.id);
 
   const { data: brandWebsiteSnapshots } = await supabase
     .from("brand_website_snapshots")

@@ -295,34 +295,35 @@ export default async function ClientReportPage({
     .eq("audit_id", audit.id)
     .order("created_at", { ascending: true });
 
-  const { data: analyses } = await supabase
-    .from("analyses")
-    .select(
-      `
-      id,
-      brand_mentioned,
-      brand_rank,
-      brand_sentiment,
-      competitors_json,
-      summary,
-      risk_notes_json,
-      opportunity_notes_json,
-      audit_runs (
-        id,
-        audit_id,
-        prompt_text_snapshot,
-        prompt_intent_snapshot,
-        prompt_priority_snapshot,
-        prompts (
-          id,
-          text,
-          intent,
-          priority
-        )
-      )
+const { data: analyses } = await supabase
+  .from("analyses")
+  .select(
     `
+    id,
+    audit_run_id,
+    brand_mentioned,
+    brand_rank,
+    brand_sentiment,
+    competitors_json,
+    summary,
+    risk_notes_json,
+    opportunity_notes_json,
+    audit_runs!inner (
+      id,
+      audit_id,
+      prompt_text_snapshot,
+      prompt_intent_snapshot,
+      prompt_priority_snapshot,
+      prompts (
+        id,
+        text,
+        intent,
+        priority
+      )
     )
-    .eq("audit_runs.audit_id", audit.id);
+  `
+  )
+  .eq("audit_runs.audit_id", audit.id);
 
   const { data: websiteSnapshots } = await supabase
     .from("brand_website_snapshots")
@@ -629,6 +630,35 @@ export default async function ClientReportPage({
                 tone="orange"
               />
             </div>
+            <div className="mt-6 rounded-3xl border border-slate-200 bg-slate-50 p-5">
+            <h3 className="font-semibold text-slate-950">Skorlar nasıl okunmalı?</h3>
+
+            <div className="mt-3 grid gap-3 text-sm leading-6 text-slate-600 md:grid-cols-3">
+                <p>
+                <span className="font-semibold text-slate-950">
+                    AI Görünürlük Skoru:
+                </span>{" "}
+                Markanın analiz edilen test sorularının kaçında AI cevabında geçtiğini
+                gösterir.
+                </p>
+
+                <p>
+                <span className="font-semibold text-slate-950">
+                    Görünürlük Payı:
+                </span>{" "}
+                Marka ve takip edilen rakiplerin toplam görünürlüğü içinde markanın payını
+                gösterir.
+                </p>
+
+                <p>
+                <span className="font-semibold text-slate-950">
+                    Ortalama Sıra:
+                </span>{" "}
+                Marka cevapta geçtiğinde rakiplere göre yaklaşık kaçıncı sırada
+                göründüğünü gösterir.
+                </p>
+            </div>
+            </div>
 
             <div className="mt-6 grid gap-4 lg:grid-cols-3">
               {topFindings.map((finding, index) => (
@@ -900,7 +930,45 @@ export default async function ClientReportPage({
               </p>
             </div>
           </section>
+          <section>
+  <div className="overflow-hidden rounded-[2rem] bg-gradient-to-br from-slate-950 via-indigo-950 to-blue-900 p-7 text-white">
+    <div className="grid gap-6 lg:grid-cols-[1.4fr_0.6fr] lg:items-center">
+      <div>
+        <p className="text-sm font-semibold uppercase tracking-[0.18em] text-cyan-300">
+          Sonraki Adım
+        </p>
 
+        <h2 className="mt-2 text-3xl font-bold tracking-tight">
+          Bu ön teşhisi detaylı aksiyon planına dönüştürelim
+        </h2>
+
+        <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-300">
+          Bu rapor bir ön analizdir. Bir sonraki adımda markanın görünmediği
+          sorular, rakiplerin öne çıktığı alanlar ve website içerik eksikleri
+          üzerinden uygulanabilir 30 günlük aksiyon planı çıkarılabilir.
+        </p>
+      </div>
+
+      <div className="rounded-3xl bg-white/10 p-5 ring-1 ring-white/20">
+        <p className="text-sm text-slate-300">Önerilen görüşme</p>
+        <p className="mt-1 text-2xl font-bold">15 dakika</p>
+        <p className="mt-2 text-sm leading-6 text-slate-300">
+          Raporun sonuçlarını birlikte yorumlamak ve ilk aksiyonları belirlemek
+          için kısa bir görüşme planlanabilir.
+        </p>
+
+        <a
+          href={`mailto:${process.env.NEXT_PUBLIC_CONTACT_EMAIL ?? ""}?subject=${encodeURIComponent(
+            `${brand.name} AI görünürlük raporu görüşmesi`
+          )}`}
+          className="mt-4 inline-flex rounded-full bg-white px-4 py-2 text-sm font-semibold text-slate-950"
+        >
+          Görüşme talep et
+        </a>
+      </div>
+    </div>
+  </div>
+</section>
           <section>
             <SectionTitle
               eyebrow="05 - Ek"

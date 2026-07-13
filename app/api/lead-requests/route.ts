@@ -19,6 +19,44 @@ function normalizeWebsiteUrl(value: string) {
 
   return `https://${trimmedValue}`;
 }
+async function notifyLeadRequest(args: {
+  name: string;
+  email: string;
+  companyName: string | null;
+  websiteUrl: string | null;
+  industry: string | null;
+  message: string | null;
+}) {
+  const botToken = process.env.TELEGRAM_BOT_TOKEN;
+  const chatId = process.env.TELEGRAM_CHAT_ID;
+
+  if (!botToken || !chatId) {
+    return;
+  }
+
+  const text = [
+    "Yeni rapor talebi geldi 🚀",
+    "",
+    `Ad: ${args.name}`,
+    `Email: ${args.email}`,
+    `Şirket: ${args.companyName ?? "-"}`,
+    `Website: ${args.websiteUrl ?? "-"}`,
+    `Sektör: ${args.industry ?? "-"}`,
+    "",
+    `Mesaj: ${args.message ?? "-"}`,
+  ].join("\n");
+
+  await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      chat_id: chatId,
+      text,
+    }),
+  });
+}
 
 export async function POST(request: Request) {
   const supabase = await createClient();
@@ -65,6 +103,13 @@ export async function POST(request: Request) {
       request.url
     );
   }
-
+await notifyLeadRequest({
+  name,
+  email,
+  companyName,
+  websiteUrl,
+  industry,
+  message,
+});
   return redirectTo("/request-report?success=1", request.url);
 }
