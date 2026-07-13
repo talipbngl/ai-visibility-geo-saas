@@ -1,6 +1,6 @@
 import Link from "next/link";
+
 import { registerAction } from "@/features/auth/actions/register.action";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -22,29 +22,29 @@ type RegisterPageProps = {
 export default async function RegisterPage({
   searchParams,
 }: RegisterPageProps) {
-  const params = await searchParams;
+  const query = await searchParams;
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-muted/30 px-4">
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <CardTitle>Hesap oluştur</CardTitle>
+    <div className="flex min-h-screen items-center justify-center bg-muted/30 px-4 py-10">
+      <Card className="w-full max-w-md shadow-sm">
+        <CardHeader className="space-y-2">
+          <CardTitle className="text-2xl">Hesap oluştur</CardTitle>
           <CardDescription>
-            AI görünürlük paneline başlamak için ücretsiz hesap oluştur.
+            AI görünürlük panelini kullanmak için kayıt oluştur.
           </CardDescription>
         </CardHeader>
 
-        <CardContent>
-          {params.error ? (
-            <Alert variant="destructive" className="mb-4">
-              <AlertDescription>{params.error}</AlertDescription>
-            </Alert>
+        <CardContent className="space-y-5">
+          {query.error ? (
+            <div className="rounded-xl border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm leading-6 text-destructive">
+              {query.error}
+            </div>
           ) : null}
 
-          {params.message ? (
-            <Alert className="mb-4">
-              <AlertDescription>{params.message}</AlertDescription>
-            </Alert>
+          {query.message ? (
+            <div className="rounded-xl border border-primary/30 bg-primary/5 px-4 py-3 text-sm leading-6">
+              {query.message}
+            </div>
           ) : null}
 
           <form action={registerAction} className="space-y-4">
@@ -53,8 +53,10 @@ export default async function RegisterPage({
               <Input
                 id="fullName"
                 name="fullName"
-                placeholder="Zeliş"
+                type="text"
+                placeholder="Ad Soyad"
                 autoComplete="name"
+                required
               />
             </div>
 
@@ -78,23 +80,27 @@ export default async function RegisterPage({
                 type="password"
                 placeholder="En az 6 karakter"
                 autoComplete="new-password"
+                minLength={6}
                 required
               />
             </div>
 
             <Button type="submit" className="w-full">
-              Kayıt ol
+              Hesap oluştur
             </Button>
           </form>
 
-          <p className="mt-4 text-center text-sm text-muted-foreground">
+          <p className="text-center text-sm text-muted-foreground">
             Zaten hesabın var mı?{" "}
-            <Link href="/login" className="font-medium text-foreground">
+            <Link
+              href="/login"
+              className="font-medium text-foreground underline underline-offset-4"
+            >
               Giriş yap
             </Link>
           </p>
         </CardContent>
       </Card>
-    </main>
+    </div>
   );
 }

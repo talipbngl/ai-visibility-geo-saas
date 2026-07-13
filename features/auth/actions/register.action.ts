@@ -1,20 +1,48 @@
 "use server";
 
 import { redirect } from "next/navigation";
+
 import { createClient } from "@/lib/supabase/server";
 
 function getString(formData: FormData, key: string) {
   return String(formData.get(key) ?? "").trim();
 }
 
-function createSlugFromEmail(email: string) {
-  const base = email
-    .split("@")[0]
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "");
+function redirectWithError(message: string): never {
+  redirect(`/register?error=${encodeURIComponent(message)}`);
+}
 
-  return `${base}-${crypto.randomUUID().slice(0, 8)}`;
+function redirectWithLoginMessage(message: string): never {
+  redirect(`/login?message=${encodeURIComponent(message)}`);
+}
+
+function getAuthErrorMessage(message: string) {
+  const normalizedMessage = message.toLowerCase();
+
+  if (
+    normalizedMessage.includes("already registered") ||
+    normalizedMessage.includes("user already registered") ||
+    normalizedMessage.includes("already exists")
+  ) {
+    return "Bu email adresiyle daha önce kayıt olunmuş. Giriş yapmayı deneyin.";
+  }
+
+  if (
+    normalizedMessage.includes("password") &&
+    normalizedMessage.includes("characters")
+  ) {
+    return "Şifre yeterince güçlü değil. En az 6 karakter kullanın.";
+  }
+
+  if (normalizedMessage.includes("invalid email")) {
+    return "Geçerli bir email adresi giriniz.";
+  }
+
+  if (normalizedMessage.includes("rate limit")) {
+    return "Çok fazla deneme yapıldı. Biraz bekleyip tekrar deneyin.";
+  }
+
+  return message || "Kayıt sırasında bilinmeyen bir hata oluştu.";
 }
 
 export async function registerAction(formData: FormData) {
@@ -22,17 +50,29 @@ export async function registerAction(formData: FormData) {
   const email = getString(formData, "email").toLowerCase();
   const password = getString(formData, "password");
 
-  if (!email || !password) {
-    redirect("/register?error=Email ve şifre zorunlu.");
+  if (!fullName) {
+    redirectWithError("Tam ad giriniz.");
+  }
+
+  if (!email) {
+    redirectWithError("Email giriniz.");
+  }
+
+  if (!email.includes("@") || !email.includes(".")) {
+    redirectWithError("Geçerli bir email adresi giriniz.");
+  }
+
+  if (!password) {
+    redirectWithError("Şifre giriniz.");
   }
 
   if (password.length < 6) {
-    redirect("/register?error=Şifre en az 6 karakter olmalı.");
+    redirectWithError("Şifre en az 6 karakter olmalı.");
   }
 
   const supabase = await createClient();
 
-  const { data: authData, error: signUpError } = await supabase.auth.signUp({
+  const { data, error: signUpError } = await supabase.auth.signUp({
     email,
     password,
     options: {
@@ -43,59 +83,24 @@ export async function registerAction(formData: FormData) {
   });
 
   if (signUpError) {
-    redirect(`/register?error=${encodeURIComponent(signUpError.message)}`);
+    redirectWithError(getAuthErrorMessage(signUpError.message));
   }
 
-  const user = authData.user;
+  if (data.session) {
+    const { error: workspaceError } = await supabase.rpc(
+      "ensure_current_user_workspace"
+    );
 
-  if (!user) {
-    redirect("/login?message=Kayıt oluşturuldu. Lütfen giriş yap.");
+    if (workspaceError) {
+      redirectWithError(
+        `Hesap oluşturuldu ama çalışma alanı hazırlanamadı: ${workspaceError.message}`
+      );
+    }
+
+    redirect("/dashboard");
   }
 
-  const { data: profile, error: profileError } = await supabase
-    .from("profiles")
-    .insert({
-      user_id: user.id,
-      full_name: fullName || null,
-      email,
-    })
-    .select("id")
-    .single();
-
-  if (profileError) {
-    redirect(`/register?error=${encodeURIComponent(profileError.message)}`);
-  }
-
-  const workspaceName = fullName
-    ? `${fullName} Workspace`
-    : `${email} Workspace`;
-
-  const { data: workspace, error: workspaceError } = await supabase
-    .from("workspaces")
-    .insert({
-      name: workspaceName,
-      slug: createSlugFromEmail(email),
-      owner_id: profile.id,
-      plan: "free",
-    })
-    .select("id")
-    .single();
-
-  if (workspaceError) {
-    redirect(`/register?error=${encodeURIComponent(workspaceError.message)}`);
-  }
-
-  const { error: memberError } = await supabase
-    .from("workspace_members")
-    .insert({
-      workspace_id: workspace.id,
-      user_id: profile.id,
-      role: "owner",
-    });
-
-  if (memberError) {
-    redirect(`/register?error=${encodeURIComponent(memberError.message)}`);
-  }
-
-  redirect("/dashboard");
+  redirectWithLoginMessage(
+    "Kayıt oluşturuldu. Email onayı gerekiyorsa onaylayıp giriş yapınız."
+  );
 }

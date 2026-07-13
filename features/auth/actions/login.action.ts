@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+
 import { createClient } from "@/lib/supabase/server";
 
 function getString(formData: FormData, key: string) {
@@ -33,6 +34,14 @@ export async function loginAction(formData: FormData) {
 
   if (error) {
     redirect(`/login?error=${encodeURIComponent(error.message)}`);
+  }
+
+  const { error: workspaceError } = await supabase.rpc(
+    "ensure_current_user_workspace"
+  );
+
+  if (workspaceError) {
+    redirect(`/login?error=${encodeURIComponent(workspaceError.message)}`);
   }
 
   redirect(nextPath);

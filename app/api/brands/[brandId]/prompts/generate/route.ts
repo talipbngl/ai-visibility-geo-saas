@@ -23,6 +23,8 @@ const generatedPromptsResponseSchema = z.object({
   prompts: z.array(generatedPromptSchema).min(1).max(50),
 });
 
+type GeneratedPrompt = z.infer<typeof generatedPromptSchema>;
+
 type GeminiGenerateContentResponse = {
   candidates?: Array<{
     finishReason?: string;
@@ -57,6 +59,159 @@ function getPromptCount(value: string) {
   }
 
   return Math.min(Math.max(Math.trunc(count), 5), 30);
+}
+
+function normalizeForCheck(value: string) {
+  return value
+    .toLocaleLowerCase("tr-TR")
+    .replace(/ı/g, "i")
+    .replace(/ğ/g, "g")
+    .replace(/ü/g, "u")
+    .replace(/ş/g, "s")
+    .replace(/ö/g, "o")
+    .replace(/ç/g, "c")
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function getBrandCheckTerms({
+  brandName,
+  aliases,
+}: {
+  brandName: string;
+  aliases: string[];
+}) {
+  const normalizedBrandName = normalizeForCheck(brandName);
+
+  const terms = new Set<string>();
+
+  if (normalizedBrandName) {
+    terms.add(normalizedBrandName);
+  }
+
+  aliases.forEach((alias) => {
+    const normalizedAlias = normalizeForCheck(alias);
+
+    if (normalizedAlias.length >= 3) {
+      terms.add(normalizedAlias);
+    }
+  });
+
+  const countrySuffixes = [
+    " turkiye",
+    " turkey",
+    " tr",
+    " turkiye a s",
+    " turkey a s",
+  ];
+
+  countrySuffixes.forEach((suffix) => {
+    if (normalizedBrandName.endsWith(suffix)) {
+      const withoutSuffix = normalizedBrandName.slice(0, -suffix.length).trim();
+
+      if (withoutSuffix.length >= 3) {
+        terms.add(withoutSuffix);
+      }
+    }
+  });
+
+  return Array.from(terms).filter((term) => term.length >= 3);
+}
+
+function includesAnyBrandTerm(promptText: string, brandTerms: string[]) {
+  const normalizedPrompt = normalizeForCheck(promptText);
+
+  return brandTerms.some((term) => normalizedPrompt.includes(term));
+}
+
+function isNavigationOrDirectBrandPrompt(
+  promptText: string,
+  brandTerms: string[]
+) {
+  const normalizedPrompt = normalizeForCheck(promptText);
+
+  if (!brandTerms.some((term) => normalizedPrompt.includes(term))) {
+    return false;
+  }
+
+  const bannedPatterns = [
+    "nerede",
+    "en yakin",
+    "konum",
+    "adres",
+    "telefon",
+    "iletisim",
+    "saat kaca",
+    "saat kacta",
+    "kaca kadar acik",
+    "kacta aciliyor",
+    "kacta kapaniyor",
+    "calisma saat",
+    "sube nerede",
+    "hangi sube",
+    "menu fiyati",
+    "fiyatlari nedir",
+    "neden tercih edilmeli",
+    "neden tercih etmeliyim",
+  ];
+
+  return bannedPatterns.some((pattern) => normalizedPrompt.includes(pattern));
+}
+
+function deduplicatePrompts(prompts: GeneratedPrompt[]) {
+  const seenPromptTexts = new Set<string>();
+
+  return prompts.filter((prompt) => {
+    const normalizedText = normalizeForCheck(prompt.text);
+
+    if (seenPromptTexts.has(normalizedText)) {
+      return false;
+    }
+
+    seenPromptTexts.add(normalizedText);
+
+    return true;
+  });
+}
+
+function limitBrandMentionedPrompts({
+  prompts,
+  brandTerms,
+  promptCount,
+}: {
+  prompts: GeneratedPrompt[];
+  brandTerms: string[];
+  promptCount: number;
+}) {
+  const maxBrandMentionedCount = Math.max(1, Math.floor(promptCount * 0.3));
+
+  let brandMentionedCount = 0;
+
+  return prompts
+    .filter((prompt) => {
+      if (isNavigationOrDirectBrandPrompt(prompt.text, brandTerms)) {
+        return false;
+      }
+
+      const hasBrandName = includesAnyBrandTerm(prompt.text, brandTerms);
+
+      if (!hasBrandName) return true;
+
+      const isAllowedBrandIntent =
+        prompt.intent === "comparison" ||
+        prompt.intent === "alternative_search" ||
+        prompt.intent === "trust_reputation";
+
+      if (!isAllowedBrandIntent) return false;
+
+      if (brandMentionedCount >= maxBrandMentionedCount) return false;
+
+      brandMentionedCount += 1;
+
+      return true;
+    })
+    .slice(0, promptCount);
 }
 
 type RouteContext = {
@@ -145,20 +300,55 @@ export async function POST(request: Request, context: RouteContext) {
     );
   }
 
+  const brandAliases =
+    brand.brand_aliases && brand.brand_aliases.length > 0
+      ? brand.brand_aliases
+          .map((item) => String(item.alias ?? "").trim())
+          .filter(Boolean)
+      : [];
+
+  const brandTerms = getBrandCheckTerms({
+    brandName: brand.name,
+    aliases: brandAliases,
+  });
+
+  const neutralPromptCount = Math.ceil(promptCount * 0.7);
+  const maxBrandMentionedPromptCount = promptCount - neutralPromptCount;
+
   const systemPrompt = `
 Sen bir AI visibility / GEO uzmanısın.
-Görevin, bir markanın ChatGPT, Gemini, Perplexity ve AI arama yüzeylerinde test edilebileceği kullanıcı promptları üretmek.
+Görevin, bir markanın AI cevaplarında organik olarak görünüp görünmediğini test edecek tarafsız kullanıcı promptları üretmek.
 
-Kurallar:
-- Promptlar gerçek kullanıcının soracağı doğal sorular gibi olmalı.
-- Satın alma niyeti yüksek promptlara öncelik ver.
-- Rakip karşılaştırması yapılabilecek promptlar üret.
+KRİTİK AMAÇ:
+Bu promptlar markayı doğrudan sordurmak için değildir.
+Bu promptlar, gerçek bir kullanıcının markayı bilmeden AI'a sorabileceği kategori, ihtiyaç, lokasyon, alternatif ve karşılaştırma sorularıdır.
+Ölçmek istediğimiz şey şudur: Kullanıcı markayı özellikle sormasa bile AI cevabında marka kendiliğinden geçiyor mu?
+
+Kesin kurallar:
+- Promptların çoğunda ana marka adı geçmemeli.
+- En az ${neutralPromptCount} prompt ana marka adı geçmeden yazılmalı.
+- En fazla ${maxBrandMentionedPromptCount} prompt ana marka adını içerebilir.
+- Ana marka adı sadece karşılaştırma, alternatif arama veya güven/itibar testi için kullanılabilir.
+- "Marka nerede?", "Marka saat kaça kadar açık?", "Marka neden tercih edilmeli?", "Marka fiyatları nedir?" gibi doğrudan marka/navigasyon soruları üretme.
+- Satın alma niyeti yüksek ama tarafsız sorular üret.
+- Rakip karşılaştırması yapılabilecek doğal promptlar üret.
 - Aynı anlama gelen tekrar promptlar üretme.
 - Promptları markanın ülke ve dil bilgisine göre yaz.
 - Her prompt için intent, priority ve reason üret.
 - priority 1 ile 5 arasında olmalı.
 - 5 = en önemli / satın alma niyeti en yüksek prompt.
 - Sadece JSON üret. Açıklama metni yazma.
+
+İyi prompt örnekleri:
+- "İstanbul'da çalışmak için uygun kahve zincirleri hangileri?"
+- "Türkiye'de kaliteli kahve içmek için hangi markaları önerirsin?"
+- "Soğuk kahve çeşitleri güçlü olan kahve zincirleri hangileri?"
+- "Kahve Dünyası alternatifi olarak hangi kahve zincirleri tercih edilebilir?"
+
+Kötü prompt örnekleri:
+- "Starbucks nerede ve saat kaça kadar açık?"
+- "Starbucks neden tercih edilmeli?"
+- "Starbucks'ta en uygun fiyatlı kahve nedir?"
 `;
 
   const userPrompt = `
@@ -174,8 +364,8 @@ Marka:
 
 Marka aliasları:
 ${
-  brand.brand_aliases && brand.brand_aliases.length > 0
-    ? brand.brand_aliases.map((item) => `- ${item.alias}`).join("\n")
+  brandAliases.length > 0
+    ? brandAliases.map((alias) => `- ${alias}`).join("\n")
     : "- Yok"
 }
 
@@ -200,7 +390,13 @@ ${
     : "- Rakip yok"
 }
 
-${promptCount} adet prompt üret.
+${promptCount} adet AI görünürlük test promptu üret.
+
+Zorunlu dağılım:
+- En az ${neutralPromptCount} adet tarafsız kategori / ihtiyaç / lokasyon / öneri sorusu üret. Bu sorularda "${brand.name}" veya marka aliasları geçmesin.
+- En fazla ${maxBrandMentionedPromptCount} adet promptta ana marka adı geçebilir.
+- Marka adı geçen promptlar sadece rakip karşılaştırması, alternatif arama veya güven/itibar testi olabilir.
+- Marka adı geçen promptlarda "nerede", "saat kaça kadar açık", "adres", "telefon", "menü fiyatı" gibi navigasyon soruları olmasın.
 
 Intent seçenekleri sadece şunlar olabilir:
 - buying_intent
@@ -228,107 +424,110 @@ Cevap formatı:
   let outputText: string | undefined;
 
   try {
-  const model = process.env.GEMINI_MODEL ?? "gemini-3.5-flash";
+    const model = process.env.GEMINI_MODEL ?? "gemini-3.5-flash";
 
-  const geminiResponse = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        contents: [
-          {
-            parts: [
-              {
-                text: `${systemPrompt}\n\n${userPrompt}`,
-              },
-            ],
-          },
-        ],
-        generationConfig: {
-          response_mime_type: "application/json",
-          response_schema: {
-            type: "OBJECT",
-            properties: {
-              prompts: {
-                type: "ARRAY",
-                items: {
-                  type: "OBJECT",
-                  properties: {
-                    text: {
-                      type: "STRING",
+    const geminiResponse = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          contents: [
+            {
+              parts: [
+                {
+                  text: `${systemPrompt}\n\n${userPrompt}`,
+                },
+              ],
+            },
+          ],
+          generationConfig: {
+            response_mime_type: "application/json",
+            response_schema: {
+              type: "OBJECT",
+              properties: {
+                prompts: {
+                  type: "ARRAY",
+                  items: {
+                    type: "OBJECT",
+                    properties: {
+                      text: {
+                        type: "STRING",
+                      },
+                      intent: {
+                        type: "STRING",
+                        enum: [
+                          "buying_intent",
+                          "comparison",
+                          "local_recommendation",
+                          "problem_solution",
+                          "alternative_search",
+                          "budget_friendly",
+                          "premium_choice",
+                          "trust_reputation",
+                        ],
+                      },
+                      priority: {
+                        type: "INTEGER",
+                      },
+                      reason: {
+                        type: "STRING",
+                      },
                     },
-                    intent: {
-                      type: "STRING",
-                      enum: [
-                        "buying_intent",
-                        "comparison",
-                        "local_recommendation",
-                        "problem_solution",
-                        "alternative_search",
-                        "budget_friendly",
-                        "premium_choice",
-                        "trust_reputation",
-                      ],
-                    },
-                    priority: {
-                      type: "INTEGER",
-                    },
-                    reason: {
-                      type: "STRING",
-                    },
+                    required: ["text", "intent", "priority", "reason"],
+                    propertyOrdering: ["text", "intent", "priority", "reason"],
                   },
-                  required: ["text", "intent", "priority", "reason"],
-                  propertyOrdering: ["text", "intent", "priority", "reason"],
                 },
               },
+              required: ["prompts"],
+              propertyOrdering: ["prompts"],
             },
-            required: ["prompts"],
-            propertyOrdering: ["prompts"],
           },
-        },
-      }),
+        }),
+      }
+    );
+
+    const geminiData =
+      (await geminiResponse.json()) as GeminiGenerateContentResponse;
+
+    if (!geminiResponse.ok) {
+      throw new Error(
+        geminiData.error?.message ?? "Gemini API isteği başarısız oldu."
+      );
     }
-  );
 
-  const geminiData =
-    (await geminiResponse.json()) as GeminiGenerateContentResponse;
+    outputText = geminiData.candidates?.[0]?.content?.parts
+      ?.map((part) => part.text ?? "")
+      .join("")
+      .trim();
 
-  if (!geminiResponse.ok) {
-    throw new Error(
-      geminiData.error?.message ?? "Gemini API isteği başarısız oldu."
+    if (!outputText) {
+      console.error(
+        "Gemini boş text döndürdü:",
+        JSON.stringify(geminiData, null, 2)
+      );
+
+      throw new Error(
+        `Gemini cevap verdi ama text alanı boş. Finish reason: ${
+          geminiData.candidates?.[0]?.finishReason ?? "bilinmiyor"
+        }`
+      );
+    }
+  } catch (error) {
+    const message =
+      error instanceof Error
+        ? error.message
+        : "Gemini API isteği başarısız oldu.";
+
+    return redirectTo(
+      `/dashboard/brands/${brandId}/prompts?error=${encodeURIComponent(
+        message
+      )}`,
+      request.url
     );
   }
-
-  outputText = geminiData.candidates?.[0]?.content?.parts
-    ?.map((part) => part.text ?? "")
-    .join("")
-    .trim();
-
-  if (!outputText) {
-    console.error("Gemini boş text döndürdü:", JSON.stringify(geminiData, null, 2));
-
-    throw new Error(
-      `Gemini cevap verdi ama text alanı boş. Finish reason: ${
-        geminiData.candidates?.[0]?.finishReason ?? "bilinmiyor"
-      }`
-    );
-  }
-} catch (error) {
-  const message =
-    error instanceof Error
-      ? error.message
-      : "Gemini API isteği başarısız oldu.";
-
-  return redirectTo(
-    `/dashboard/brands/${brandId}/prompts?error=${encodeURIComponent(
-      message
-    )}`,
-    request.url
-  );
-}
 
   if (!outputText) {
     return redirectTo(
@@ -363,13 +562,29 @@ Cevap formatı:
     );
   }
 
+  const generatedPrompts = deduplicatePrompts(parsed.data.prompts);
+  const filteredPrompts = limitBrandMentionedPrompts({
+    prompts: generatedPrompts,
+    brandTerms,
+    promptCount,
+  });
+
+  if (filteredPrompts.length < 5) {
+    return redirectTo(
+      `/dashboard/brands/${brandId}/prompts?error=${encodeURIComponent(
+        "AI çok fazla marka odaklı soru üretti. Lütfen tekrar prompt üretmeyi deneyin."
+      )}`,
+      request.url
+    );
+  }
+
   const { data: promptSet, error: promptSetError } = await supabase
     .from("prompt_sets")
     .insert({
       brand_id: brand.id,
       name: "AI Önerilen Promptlar",
       description:
-        "Marka, rakip ve hedef kitle bilgilerine göre Gemini tarafından üretilen promptlar.",
+        "Marka, rakip ve hedef kitle bilgilerine göre Gemini tarafından üretilen tarafsız görünürlük promptları.",
     })
     .select("id")
     .single();
@@ -384,7 +599,7 @@ Cevap formatı:
   }
 
   const { error: promptsError } = await supabase.from("prompts").insert(
-    parsed.data.prompts.map((prompt) => ({
+    filteredPrompts.map((prompt) => ({
       prompt_set_id: promptSet.id,
       brand_id: brand.id,
       text: prompt.text,
