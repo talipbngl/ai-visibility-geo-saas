@@ -40,60 +40,46 @@ function redirectTo(path: string, requestUrl: string) {
 }
 
 function buildBatchPrompt(args: {
-  brandName: string;
-  brandAliases: string[];
-  competitors: string[];
   prompts: Array<{
     runId: string;
     text: string;
   }>;
 }) {
-  const aliases =
-    args.brandAliases.length > 0 ? args.brandAliases.join(", ") : "Yok";
-
-  const competitors =
-    args.competitors.length > 0 ? args.competitors.join(", ") : "Yok";
-
   const promptList = args.prompts
     .map(
       (prompt, index) => `
-${index + 1}. runId: ${prompt.runId}
-Soru: ${prompt.text}`
+${index + 1}.
+runId: ${prompt.runId}
+Kullanıcı sorusu: ${prompt.text}`
     )
     .join("\n");
 
   return `
-Sen normal bir AI arama/asistan kullanıcısına cevap veren asistansın.
+Sen normal bir kullanıcıya cevap veren bağımsız bir AI asistansın.
 
-Aşağıdaki kullanıcı sorularına ayrı ayrı cevap ver.
+Aşağıdaki kullanıcı sorularına gerçek bir kullanıcıya cevap verir gibi ayrı ayrı cevap ver.
 
-Kurallar:
+KRİTİK KURALLAR:
+- Cevapları herhangi bir takip edilen marka listesine göre sınırlama.
+- Sadece belirli markaları veya rakipleri saymak zorunda değilsin.
+- Kullanıcı öneri istiyorsa, gerçekten aklına gelen uygun markaları/işletmeleri/alternatifleri listele.
+- Cevaplarda farklı markalar, yerel işletmeler veya alternatifler doğal şekilde geçebilir.
+- Eğer emin değilsen “güncel şube/saat bilgisi kontrol edilmeli” gibi kısa uyarı ekleyebilirsin.
+- Marka isimlerini zorla öne çıkarma.
+- Cevapları reklam metni gibi yazma.
 - Cevaplar Türkçe olsun.
-- Her cevap en fazla 4 cümle olsun.
-- Markayı zorla öne çıkarma.
-- Eğer takip edilen marka gerçekten alakalıysa cevaba dahil et.
-- Rakipler alakalıysa onları da dahil edebilirsin.
+- Her cevap 4-6 cümle arası olsun.
 - Sadece JSON döndür. Açıklama yazma.
-
-Takip edilen marka:
-${args.brandName}
-
-Marka aliasları:
-${aliases}
-
-Bilinen rakipler:
-${competitors}
 
 Sorular:
 ${promptList}
 
 Cevap formatı kesinlikle şöyle olmalı:
-
 {
   "answers": [
     {
       "runId": "audit_run_id",
-      "answer": "Bu soruya verilen cevap"
+      "answer": "Bu soruya verilen gerçekçi AI cevabı"
     }
   ]
 }
@@ -101,13 +87,7 @@ Cevap formatı kesinlikle şöyle olmalı:
 }
 
 async function askGeminiBatch(args: {
-  brandName: string;
-  brandAliases: string[];
-  competitors: string[];
-  prompts: Array<{
-    runId: string;
-    text: string;
-  }>;
+  prompts: Array<{ runId: string; text: string }>;
 }) {
   const model = process.env.GEMINI_MODEL ?? "gemini-3.1-flash-lite";
 
@@ -129,8 +109,8 @@ async function askGeminiBatch(args: {
           },
         ],
         generationConfig: {
-          temperature: 0.3,
-          maxOutputTokens: 1400,
+          temperature: 0.7,
+          maxOutputTokens: 2200,
           response_mime_type: "application/json",
           response_schema: {
             type: "OBJECT",
@@ -240,16 +220,7 @@ export async function POST(request: Request, context: RouteContext) {
     );
   }
 
-  const { data: aliases } = await supabase
-    .from("brand_aliases")
-    .select("alias")
-    .eq("brand_id", brand.id);
-
-  const { data: competitors } = await supabase
-    .from("competitors")
-    .select("name")
-    .eq("brand_id", brand.id);
-
+ 
   const { data: runs, error: runsError } = await supabase
     .from("audit_runs")
     .select(
@@ -265,7 +236,7 @@ export async function POST(request: Request, context: RouteContext) {
     .eq("audit_id", audit.id)
     .in("status", ["pending", "running", "failed"])
     .order("created_at", { ascending: true })
-    .limit(3);
+    .limit(10);
 
   if (runsError) {
     return redirectTo(
@@ -336,11 +307,8 @@ export async function POST(request: Request, context: RouteContext) {
 
   try {
     const answers = await askGeminiBatch({
-      brandName: brand.name,
-      brandAliases: (aliases ?? []).map((item) => item.alias),
-      competitors: (competitors ?? []).map((item) => item.name),
-      prompts: promptsToRun,
-    });
+  prompts: promptsToRun,
+});
 
     const answerByRunId = new Map(
       answers.map((answer) => [answer.runId, answer.answer])
