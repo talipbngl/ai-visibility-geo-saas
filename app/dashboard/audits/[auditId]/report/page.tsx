@@ -212,9 +212,13 @@ export default async function AuditReportPage({ params }: AuditReportPageProps) 
   .eq("status", "completed")
   .order("created_at", { ascending: false });
 
+type CompetitorWebsiteSnapshotRow = NonNullable<
+  typeof competitorWebsiteSnapshots
+>[number];
+
 const latestCompetitorWebsiteSnapshotMap = new Map<
   string,
-  NonNullable<typeof competitorWebsiteSnapshots>[number]
+  CompetitorWebsiteSnapshotRow
 >();
 
 (competitorWebsiteSnapshots ?? []).forEach((snapshot) => {
