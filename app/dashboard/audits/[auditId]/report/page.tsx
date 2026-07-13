@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { WebsiteSignalSummary } from "@/features/website/components/WebsiteSignalSummary";
 import { CompetitorWebsiteComparison } from "@/features/website/components/CompetitorWebsiteComparison";
+import { ReportReadinessPanel } from "@/features/reports/components/ReportReadinessPanel";
 import { PrintReportButton } from "@/features/reports/components/PrintReportButton";
 import { createClient } from "@/lib/supabase/server";
 import { Badge } from "@/components/ui/badge";
@@ -240,6 +241,7 @@ const latestCompetitorWebsiteSnapshots = Array.from(
     created_at: snapshot.created_at,
   };
 });
+const competitorWebsiteSnapshotCount = latestCompetitorWebsiteSnapshots.length;
 
   const { data: score } = await supabase
     .from("audit_scores")
@@ -254,6 +256,7 @@ const latestCompetitorWebsiteSnapshots = Array.from(
     .select("id, category, title, description, priority, effort, impact")
     .eq("audit_id", audit.id)
     .order("created_at", { ascending: true });
+ const recommendationCount = recommendations?.length ?? 0;
 
   const { data: analyses } = await supabase
     .from("analyses")
@@ -410,6 +413,14 @@ const latestCompetitorWebsiteSnapshots = Array.from(
         <Badge variant="outline">{brand.language || "tr"}</Badge>
         <Badge variant="outline">Oluşturulma: {formatDate(audit.created_at)}</Badge>
       </div>
+      <ReportReadinessPanel
+  auditId={audit.id}
+  brandId={brand.id}
+  hasScore={Boolean(score)}
+  hasBrandWebsiteSnapshot={Boolean(websiteSnapshot)}
+  competitorWebsiteSnapshotCount={competitorWebsiteSnapshotCount}
+  recommendationCount={recommendationCount}
+/>
 
       {!score ? (
         <Card className="border-destructive shadow-sm">
