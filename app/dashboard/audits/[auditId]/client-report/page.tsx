@@ -4,7 +4,9 @@ import { notFound } from "next/navigation";
 import { PrintReportButton } from "@/features/reports/components/PrintReportButton";
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
-
+export const metadata = {
+  title: "AI Görünürlük Ön Teşhis Raporu",
+};
 type ClientReportPageProps = {
   params: Promise<{
     auditId: string;
@@ -130,6 +132,29 @@ function getBadgeColor(index: number) {
   ];
 
   return colors[index % colors.length];
+}
+function getPriorityText(value: string | null) {
+  if (value === "high") return "Yüksek";
+  if (value === "medium") return "Orta";
+  if (value === "low") return "Düşük";
+
+  return "Belirsiz";
+}
+
+function getImpactText(value: string | null) {
+  if (value === "high") return "Yüksek";
+  if (value === "medium") return "Orta";
+  if (value === "low") return "Düşük";
+
+  return "Belirsiz";
+}
+
+function getEffortText(value: string | null) {
+  if (value === "high") return "Yüksek";
+  if (value === "medium") return "Orta";
+  if (value === "low") return "Düşük";
+
+  return "Belirsiz";
 }
 
 function SectionTitle({
@@ -503,9 +528,8 @@ export default async function ClientReportPage({
           <PrintReportButton />
         </div>
 
-        <article className="space-y-8 rounded-[2rem] bg-white p-8 shadow-xl print:rounded-none print:p-0 print:shadow-none">
-          <section className="relative overflow-hidden rounded-[2rem] bg-slate-950 p-8 text-white print:break-after-page">
-            <div className="absolute right-0 top-0 h-64 w-64 rounded-full bg-blue-500/30 blur-3xl" />
+            <article className="client-report space-y-8 rounded-[2rem] bg-white p-8 shadow-xl print:rounded-none print:p-0 print:shadow-none">   
+            <section className="relative overflow-hidden rounded-[2rem] bg-slate-950 p-8 text-white">            <div className="absolute right-0 top-0 h-64 w-64 rounded-full bg-blue-500/30 blur-3xl" />
             <div className="absolute bottom-0 left-1/3 h-64 w-64 rounded-full bg-fuchsia-500/20 blur-3xl" />
 
             <div className="relative z-10 grid gap-10 lg:grid-cols-[1.2fr_0.8fr]">
@@ -563,7 +587,7 @@ export default async function ClientReportPage({
             </div>
           </section>
 
-          <section className="print:break-after-page">
+          <section>
             <SectionTitle
               eyebrow="01 - Yönetici Özeti"
               title="Karar verici özeti"
@@ -840,13 +864,13 @@ export default async function ClientReportPage({
                         {index + 1}. aksiyon
                       </span>
                       <span className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-medium text-indigo-700 ring-1 ring-indigo-200">
-                        Öncelik: {recommendation.priority}
+                        Öncelik: {getPriorityText(recommendation.priority)}
                       </span>
                       <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700 ring-1 ring-emerald-200">
-                        Etki: {recommendation.impact}
+                        Etki: {getImpactText(recommendation.impact)}
                       </span>
                       <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-medium text-amber-700 ring-1 ring-amber-200">
-                        Efor: {recommendation.effort}
+                        Efor: {getEffortText(recommendation.effort)}
                       </span>
                     </div>
 
@@ -884,8 +908,8 @@ export default async function ClientReportPage({
               description="Bu bölüm ham test sorularını ve markanın bu sorularda görünüp görünmediğini gösterir. Yönetici özeti için değil, detay inceleme içindir."
             />
 
-            <div className="grid gap-3">
-              {(analyses ?? []).slice(0, 12).map((analysis, index) => {
+            <div className="grid gap-3 lg:grid-cols-2">
+                    {(analyses ?? []).slice(0, 12).map((analysis, index) => {
                 const run = getNestedRun(analysis.audit_runs);
 
                 return (

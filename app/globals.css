@@ -187,3 +187,127 @@
     text-decoration: none;
   }
 }
+@media print {
+  .client-report {
+    font-size: 11px !important;
+    line-height: 1.45 !important;
+  }
+
+  .client-report .print\:break-after-page {
+    break-after: auto !important;
+    page-break-after: auto !important;
+  }
+
+  .client-report section {
+    break-inside: avoid-page;
+    page-break-inside: avoid;
+    margin-bottom: 18px !important;
+  }
+
+  .client-report .space-y-8 > :not([hidden]) ~ :not([hidden]) {
+    margin-top: 18px !important;
+  }
+
+  .client-report .space-y-6 > :not([hidden]) ~ :not([hidden]) {
+    margin-top: 12px !important;
+  }
+
+  .client-report .space-y-5 > :not([hidden]) ~ :not([hidden]) {
+    margin-top: 10px !important;
+  }
+
+  .client-report .space-y-4 > :not([hidden]) ~ :not([hidden]) {
+    margin-top: 8px !important;
+  }
+
+  .client-report .md\:grid-cols-4 {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  }
+
+  .client-report .md\:grid-cols-3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+
+  .client-report .lg\:grid-cols-3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+
+  .client-report .lg\:grid-cols-2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .client-report .p-8 {
+    padding: 18px !important;
+  }
+
+  .client-report .p-6 {
+    padding: 14px !important;
+  }
+
+  .client-report .p-5 {
+    padding: 12px !important;
+  }
+
+  .client-report .py-4 {
+    padding-top: 8px !important;
+    padding-bottom: 8px !important;
+  }
+
+  .client-report .px-5 {
+    padding-left: 10px !important;
+    padding-right: 10px !important;
+  }
+
+  .client-report h1,
+  .client-report .text-5xl {
+    font-size: 34px !important;
+    line-height: 1.1 !important;
+  }
+
+  .client-report h2,
+  .client-report .text-2xl {
+    font-size: 19px !important;
+    line-height: 1.25 !important;
+  }
+
+  .client-report .text-7xl {
+    font-size: 46px !important;
+    line-height: 1 !important;
+  }
+
+  .client-report .text-3xl {
+    font-size: 22px !important;
+    line-height: 1.1 !important;
+  }
+
+  .client-report .text-lg {
+    font-size: 14px !important;
+    line-height: 1.55 !important;
+  }
+
+  .client-report .rounded-\[2rem\],
+  .client-report .rounded-3xl {
+    border-radius: 18px !important;
+  }
+
+  .client-report table {
+    font-size: 10.5px !important;
+  }
+
+  .client-report thead {
+    display: table-header-group;
+  }
+
+  .client-report tr,
+  .client-report table,
+  .client-report .rounded-3xl,
+  .client-report .rounded-\[2rem\] {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .client-report a {
+    color: inherit !important;
+    text-decoration: none !important;
+  }
+}
