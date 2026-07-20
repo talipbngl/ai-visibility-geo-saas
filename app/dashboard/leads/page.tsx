@@ -19,18 +19,32 @@ import { isPlatformAdmin } from "@/lib/auth/platform-admin";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
-function formatDate(value: string | null) {
+type LeadsPageProps = {
+  searchParams: Promise<{
+    success?: string;
+    error?: string;
+  }>;
+};
+
+function formatDate(
+  value: string | null
+) {
   if (!value) {
     return "-";
   }
 
-  return new Intl.DateTimeFormat("tr-TR", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
+  return new Intl.DateTimeFormat(
+    "tr-TR",
+    {
+      dateStyle: "medium",
+      timeStyle: "short",
+    }
+  ).format(new Date(value));
 }
 
-function getStatusLabel(status: string) {
+function getStatusLabel(
+  status: string
+) {
   if (status === "new") {
     return "Yeni";
   }
@@ -54,16 +68,17 @@ function getStatusLabel(status: string) {
   return status;
 }
 
-function getStatusVariant(status: string) {
+function getStatusVariant(
+  status: string
+) {
   if (status === "new") {
     return "default" as const;
   }
 
-  if (status === "contacted") {
-    return "secondary" as const;
-  }
-
-  if (status === "qualified") {
+  if (
+    status === "contacted" ||
+    status === "qualified"
+  ) {
     return "secondary" as const;
   }
 
@@ -78,7 +93,11 @@ function getStatusVariant(status: string) {
   return "outline" as const;
 }
 
-export default async function LeadsPage() {
+export default async function LeadsPage({
+  searchParams,
+}: LeadsPageProps) {
+  const params = await searchParams;
+
   const supabase = await createClient();
 
   const {
@@ -93,27 +112,30 @@ export default async function LeadsPage() {
     redirect("/dashboard");
   }
 
-  const supabaseAdmin = createAdminClient();
+  const supabaseAdmin =
+    createAdminClient();
 
-  const { data: leads, error: leadsError } =
-    await supabaseAdmin
-      .from("lead_requests")
-      .select(
-        `
-        id,
-        name,
-        email,
-        company_name,
-        website_url,
-        industry,
-        message,
-        status,
-        created_at
-        `
-      )
-      .order("created_at", {
-        ascending: false,
-      });
+  const {
+    data: leads,
+    error: leadsError,
+  } = await supabaseAdmin
+    .from("lead_requests")
+    .select(
+      `
+      id,
+      name,
+      email,
+      company_name,
+      website_url,
+      industry,
+      message,
+      status,
+      created_at
+      `
+    )
+    .order("created_at", {
+      ascending: false,
+    });
 
   if (leadsError) {
     throw new Error(
@@ -121,7 +143,8 @@ export default async function LeadsPage() {
     );
   }
 
-  const totalLeadCount = leads?.length ?? 0;
+  const totalLeadCount =
+    leads?.length ?? 0;
 
   const newLeadCount =
     leads?.filter(
@@ -129,8 +152,11 @@ export default async function LeadsPage() {
     ).length ?? 0;
 
   const contactedLeadCount =
-    leads?.filter(
-      (lead) => lead.status === "contacted"
+    leads?.filter((lead) =>
+      [
+        "contacted",
+        "qualified",
+      ].includes(lead.status)
     ).length ?? 0;
 
   return (
@@ -141,7 +167,10 @@ export default async function LeadsPage() {
         description="Landing page üzerinden gelen AI görünürlük raporu taleplerini buradan takip edebilirsin."
         actions={
           <>
-            <Button asChild variant="outline">
+            <Button
+              asChild
+              variant="outline"
+            >
               <Link href="/request-report">
                 Talep formunu aç
               </Link>
@@ -155,6 +184,18 @@ export default async function LeadsPage() {
           </>
         }
       />
+
+      {params.success ? (
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+          {params.success}
+        </div>
+      ) : null}
+
+      {params.error ? (
+        <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          {params.error}
+        </div>
+      ) : null}
 
       <section className="grid gap-4 md:grid-cols-3">
         <MetricCard
@@ -170,8 +211,8 @@ export default async function LeadsPage() {
         />
 
         <MetricCard
-          title="İletişime Geçilen"
-          description="Takibe alınan talepler"
+          title="Takibe Alınan"
+          description="İletişim veya değerlendirme aşamasında"
           value={contactedLeadCount}
         />
       </section>
@@ -183,12 +224,14 @@ export default async function LeadsPage() {
           </CardTitle>
 
           <CardDescription>
-            En yeni talepler üstte görünür.
+            En yeni talepler üstte
+            görünür.
           </CardDescription>
         </CardHeader>
 
         <CardContent>
-          {leads && leads.length > 0 ? (
+          {leads &&
+          leads.length > 0 ? (
             <div className="space-y-4">
               {leads.map((lead) => (
                 <div
@@ -232,7 +275,8 @@ export default async function LeadsPage() {
                       </p>
 
                       <p className="mt-1 text-sm font-medium">
-                        {lead.company_name || "-"}
+                        {lead.company_name ||
+                          "-"}
                       </p>
                     </div>
 
@@ -242,7 +286,8 @@ export default async function LeadsPage() {
                       </p>
 
                       <p className="mt-1 text-sm font-medium">
-                        {lead.industry || "-"}
+                        {lead.industry ||
+                          "-"}
                       </p>
                     </div>
 
@@ -253,12 +298,16 @@ export default async function LeadsPage() {
 
                       {lead.website_url ? (
                         <a
-                          href={lead.website_url}
+                          href={
+                            lead.website_url
+                          }
                           target="_blank"
                           rel="noreferrer"
                           className="mt-1 block truncate text-sm font-medium underline underline-offset-4"
                         >
-                          {lead.website_url}
+                          {
+                            lead.website_url
+                          }
                         </a>
                       ) : (
                         <p className="mt-1 text-sm font-medium">
@@ -274,38 +323,93 @@ export default async function LeadsPage() {
                         Ek not
                       </p>
 
-                      <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                      <p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-muted-foreground">
                         {lead.message}
                       </p>
                     </div>
                   ) : null}
 
-                  <div className="mt-4 flex flex-wrap gap-2 border-t pt-4">
-                    <Button
-                      asChild
-                      variant="outline"
-                      size="sm"
-                    >
-                      <a href={`mailto:${lead.email}`}>
-                        Mail gönder
-                      </a>
-                    </Button>
-
-                    {lead.website_url ? (
+                  <div className="mt-4 flex flex-col gap-3 border-t pt-4 lg:flex-row lg:items-center lg:justify-between">
+                    <div className="flex flex-wrap gap-2">
                       <Button
                         asChild
                         variant="outline"
                         size="sm"
                       >
                         <a
-                          href={lead.website_url}
-                          target="_blank"
-                          rel="noreferrer"
+                          href={`mailto:${lead.email}`}
                         >
-                          Website aç
+                          Mail gönder
                         </a>
                       </Button>
-                    ) : null}
+
+                      {lead.website_url ? (
+                        <Button
+                          asChild
+                          variant="outline"
+                          size="sm"
+                        >
+                          <a
+                            href={
+                              lead.website_url
+                            }
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            Website aç
+                          </a>
+                        </Button>
+                      ) : null}
+                    </div>
+
+                    <form
+                      action={`/api/lead-requests/${lead.id}/status`}
+                      method="post"
+                      className="flex flex-col gap-2 sm:flex-row sm:items-center"
+                    >
+                      <label
+                        htmlFor={`lead-status-${lead.id}`}
+                        className="text-sm font-medium"
+                      >
+                        Durum
+                      </label>
+
+                      <select
+                        id={`lead-status-${lead.id}`}
+                        name="status"
+                        defaultValue={
+                          lead.status
+                        }
+                        className="h-9 rounded-md border bg-background px-3 text-sm shadow-sm"
+                      >
+                        <option value="new">
+                          Yeni
+                        </option>
+
+                        <option value="contacted">
+                          İletişime geçildi
+                        </option>
+
+                        <option value="qualified">
+                          Uygun lead
+                        </option>
+
+                        <option value="closed">
+                          Kapandı
+                        </option>
+
+                        <option value="rejected">
+                          Uygun değil
+                        </option>
+                      </select>
+
+                      <Button
+                        type="submit"
+                        size="sm"
+                      >
+                        Durumu kaydet
+                      </Button>
+                    </form>
                   </div>
                 </div>
               ))}

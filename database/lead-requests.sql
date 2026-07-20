@@ -10,18 +10,42 @@ create table if not exists public.lead_requests (
   created_at timestamptz not null default now(),
 
   constraint lead_requests_status_check
-    check (status in ('new', 'contacted', 'qualified', 'closed', 'rejected'))
+   
+    check (
+      status in (
+        'new',
+        'contacted',
+        'qualified',
+        'closed',
+        'rejected'
+      )
+    )
 );
 
-alter table public.lead_requests enable row level security;
+alter table public.lead_requests
+enable row level security;
 
-drop policy if exists "Anyone can create lead requests" on public.lead_requests;
+drop policy if exists
+"Anyone can create lead requests"
+on public.lead_requests;
 
-create policy "Anyone can create lead requests"
+create policy
+"Anyone can create lead requests"
 on public.lead_requests
 for insert
 to anon, authenticated
-with check (true);
-<Button asChild>
-  <Link href="/request-report">İlk raporu iste</Link>
-</Button>
+with check (
+  status = 'new'
+);
+
+revoke select, update, delete
+on table public.lead_requests
+from anon, authenticated;
+
+grant insert
+on table public.lead_requests
+to anon, authenticated;
+
+grant select, insert, update, delete
+on table public.lead_requests
+to service_role;
