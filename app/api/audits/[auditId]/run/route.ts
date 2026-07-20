@@ -57,23 +57,40 @@ type AnswerResult = {
   };
 };
 
+type ClaimedAuditRun = {
+  run_id: string | null;
+  prompt_text: string | null;
+};
+
 type RouteContext = {
   params: Promise<{
     auditId: string;
   }>;
 };
 
-function redirectTo(path: string, requestUrl: string) {
-  return NextResponse.redirect(new URL(path, requestUrl), {
-    status: 303,
-  });
+function redirectTo(
+  path: string,
+  requestUrl: string
+) {
+  return NextResponse.redirect(
+    new URL(path, requestUrl),
+    {
+      status: 303,
+    }
+  );
 }
 
 function isGroundingEnabled() {
-  return process.env.ENABLE_GEMINI_GROUNDING === "true";
+  return (
+    process.env.ENABLE_GEMINI_GROUNDING ===
+    "true"
+  );
 }
 
-function buildPrompt(promptText: string, groundingEnabled: boolean) {
+function buildPrompt(
+  promptText: string,
+  groundingEnabled: boolean
+) {
   if (groundingEnabled) {
     return `
 Sen Google Search ile desteklenen, güncel web sonuçlarını kullanabilen bağımsız bir AI asistansın.
@@ -117,7 +134,9 @@ ${promptText}
 `;
 }
 
-function extractText(data: GeminiGenerateContentResponse) {
+function extractText(
+  data: GeminiGenerateContentResponse
+) {
   return data.candidates?.[0]?.content?.parts
     ?.map((part) => part.text ?? "")
     .join("")
@@ -128,7 +147,8 @@ function extractCitations(
   data: GeminiGenerateContentResponse,
   groundingEnabled: boolean
 ) {
-  const groundingMetadata = data.candidates?.[0]?.groundingMetadata;
+  const groundingMetadata =
+    data.candidates?.[0]?.groundingMetadata;
 
   const sources =
     groundingMetadata?.groundingChunks
@@ -139,19 +159,26 @@ function extractCitations(
       .filter((source) => source.uri) ?? [];
 
   return {
-    webSearchQueries: groundingMetadata?.webSearchQueries ?? [],
+    webSearchQueries:
+      groundingMetadata?.webSearchQueries ?? [],
     sources,
     sourceCount: sources.length,
-    groundingSupports: groundingMetadata?.groundingSupports ?? [],
+    groundingSupports:
+      groundingMetadata?.groundingSupports ?? [],
     groundingEnabled,
   };
 }
 
-function getGeminiErrorMessage(error: unknown) {
+function getGeminiErrorMessage(
+  error: unknown
+) {
   const rawMessage =
-    error instanceof Error ? error.message : "Gemini cevabı alınamadı.";
+    error instanceof Error
+      ? error.message
+      : "Gemini cevabı alınamadı.";
 
-  const normalizedMessage = rawMessage.toLocaleLowerCase("tr-TR");
+  const normalizedMessage =
+    rawMessage.toLocaleLowerCase("tr-TR");
 
   if (
     normalizedMessage.includes("quota") ||
@@ -164,9 +191,15 @@ function getGeminiErrorMessage(error: unknown) {
   return rawMessage;
 }
 
-async function askGemini(promptText: string): Promise<AnswerResult> {
-  const model = process.env.GEMINI_MODEL ?? "gemini-3.1-flash-lite";
-  const groundingEnabled = isGroundingEnabled();
+async function askGemini(
+  promptText: string
+): Promise<AnswerResult> {
+  const model =
+    process.env.GEMINI_MODEL ??
+    "gemini-3.1-flash-lite";
+
+  const groundingEnabled =
+    isGroundingEnabled();
 
   const response = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`,
@@ -180,7 +213,10 @@ async function askGemini(promptText: string): Promise<AnswerResult> {
           {
             parts: [
               {
-                text: buildPrompt(promptText, groundingEnabled),
+                text: buildPrompt(
+                  promptText,
+                  groundingEnabled
+                ),
               },
             ],
           },
@@ -202,10 +238,14 @@ async function askGemini(promptText: string): Promise<AnswerResult> {
     }
   );
 
-  const data = (await response.json()) as GeminiGenerateContentResponse;
+  const data =
+    (await response.json()) as GeminiGenerateContentResponse;
 
   if (!response.ok) {
-    throw new Error(data.error?.message ?? "Gemini API isteği başarısız oldu.");
+    throw new Error(
+      data.error?.message ??
+        "Gemini API isteği başarısız oldu."
+    );
   }
 
   const answer = extractText(data);
@@ -213,7 +253,8 @@ async function askGemini(promptText: string): Promise<AnswerResult> {
   if (!answer) {
     throw new Error(
       `Gemini boş cevap döndürdü. Finish reason: ${
-        data.candidates?.[0]?.finishReason ?? "bilinmiyor"
+        data.candidates?.[0]?.finishReason ??
+        "bilinmiyor"
       }`
     );
   }
@@ -221,11 +262,17 @@ async function askGemini(promptText: string): Promise<AnswerResult> {
   return {
     answer,
     rawResponse: data,
-    citations: extractCitations(data, groundingEnabled),
+    citations: extractCitations(
+      data,
+      groundingEnabled
+    ),
   };
 }
 
-export async function POST(request: Request, context: RouteContext) {
+export async function POST(
+  request: Request,
+  context: RouteContext
+) {
   const { auditId } = await context.params;
 
   const supabase = await createClient();
@@ -235,7 +282,10 @@ export async function POST(request: Request, context: RouteContext) {
   } = await supabase.auth.getUser();
 
   if (!user) {
-    return redirectTo("/login", request.url);
+    return redirectTo(
+      "/login",
+      request.url
+    );
   }
 
   if (!process.env.GEMINI_API_KEY) {
@@ -247,7 +297,10 @@ export async function POST(request: Request, context: RouteContext) {
     );
   }
 
-  const { data: audit, error: auditError } = await supabase
+  const {
+    data: audit,
+    error: auditError,
+  } = await supabase
     .from("audits")
     .select("id, brand_id, status")
     .eq("id", auditId)
@@ -256,13 +309,17 @@ export async function POST(request: Request, context: RouteContext) {
   if (auditError || !audit) {
     return redirectTo(
       `/dashboard/audits?error=${encodeURIComponent(
-        auditError?.message ?? "Audit bulunamadı."
+        auditError?.message ??
+          "Audit bulunamadı."
       )}`,
       request.url
     );
   }
 
-  const { data: brand, error: brandError } = await supabase
+  const {
+    data: brand,
+    error: brandError,
+  } = await supabase
     .from("brands")
     .select("id, name")
     .eq("id", audit.brand_id)
@@ -271,108 +328,146 @@ export async function POST(request: Request, context: RouteContext) {
   if (brandError || !brand) {
     return redirectTo(
       `/dashboard/audits/${audit.id}?error=${encodeURIComponent(
-        brandError?.message ?? "Marka bulunamadı."
+        brandError?.message ??
+          "Marka bulunamadı."
       )}`,
       request.url
     );
   }
 
-  const runLimit = isGroundingEnabled() ? 1 : 5;
+  const runLimit =
+    isGroundingEnabled() ? 1 : 5;
 
-  const { data: runs, error: runsError } = await supabase
-    .from("audit_runs")
-    .select(
-      `
-      id,
-      prompt_id,
-      prompt_text_snapshot,
-      prompts (
-        id,
-        text
-      )
-    `
-    )
-    .eq("audit_id", audit.id)
-    .in("status", ["pending", "failed"])
-    .order("created_at", { ascending: true })
-    .limit(runLimit);
+  const {
+    data: claimedRunsData,
+    error: claimError,
+  } = await supabase.rpc(
+    "claim_audit_runs",
+    {
+      p_audit_id: audit.id,
+      p_limit: runLimit,
+    }
+  );
 
-  if (runsError) {
+  if (claimError) {
     return redirectTo(
       `/dashboard/audits/${audit.id}?error=${encodeURIComponent(
-        runsError.message
+        `Audit kayıtları başlatılamadı: ${claimError.message}`
       )}`,
       request.url
     );
   }
 
-  if (!runs || runs.length === 0) {
-    return redirectTo(`/dashboard/audits/${audit.id}`, request.url);
-  }
+  const claimedRuns =
+    (claimedRunsData ??
+      []) as ClaimedAuditRun[];
 
-  const promptsToRun = runs
+  const promptsToRun = claimedRuns
     .map((run) => {
-      const prompt = Array.isArray(run.prompts) ? run.prompts[0] : run.prompts;
-      const text = run.prompt_text_snapshot || prompt?.text;
+      const runId = String(
+        run.run_id ?? ""
+      );
 
-      if (!text) {
+      const text = String(
+        run.prompt_text ?? ""
+      ).trim();
+
+      if (!runId || !text) {
         return null;
       }
 
       return {
-        runId: run.id,
+        runId,
         text,
       };
     })
-    .filter((item): item is { runId: string; text: string } => item !== null);
+    .filter(
+      (
+        item
+      ): item is {
+        runId: string;
+        text: string;
+      } => item !== null
+    );
 
   if (promptsToRun.length === 0) {
     return redirectTo(
+      `/dashboard/audits/${audit.id}`,
+      request.url
+    );
+  }
+
+  const now = new Date().toISOString();
+
+  const {
+    error: startAuditError,
+  } = await supabase
+    .from("audits")
+    .update({
+      status: "running",
+      started_at: now,
+      completed_at: null,
+      error_message: null,
+    })
+    .eq("id", audit.id);
+
+  if (startAuditError) {
+    await supabase
+      .from("audit_runs")
+      .update({
+        status: "pending",
+        started_at: null,
+        completed_at: null,
+        error_message:
+          "Audit başlatılamadığı için tekrar beklemeye alındı.",
+      })
+      .in(
+        "id",
+        promptsToRun.map(
+          (prompt) => prompt.runId
+        )
+      );
+
+    return redirectTo(
       `/dashboard/audits/${audit.id}?error=${encodeURIComponent(
-        "Çalıştırılacak prompt metni bulunamadı."
+        startAuditError.message
       )}`,
       request.url
     );
   }
 
-  await supabase
-    .from("audits")
-    .update({
-      status: "running",
-      started_at: new Date().toISOString(),
-      error_message: null,
-    })
-    .eq("id", audit.id);
-
-  await supabase
-    .from("audit_runs")
-    .update({
-      status: "running",
-      started_at: new Date().toISOString(),
-      error_message: null,
-    })
-    .in(
-      "id",
-      promptsToRun.map((prompt) => prompt.runId)
-    );
-
   for (const prompt of promptsToRun) {
     try {
-      const result = await askGemini(prompt.text);
+      const result = await askGemini(
+        prompt.text
+      );
 
-      await supabase
+      const {
+        error: completeRunError,
+      } = await supabase
         .from("audit_runs")
         .update({
           status: "completed",
           raw_answer: result.answer,
-          raw_response_json: result.rawResponse,
-          citations_json: result.citations,
-          completed_at: new Date().toISOString(),
+          raw_response_json:
+            result.rawResponse,
+          citations_json:
+            result.citations,
+          completed_at:
+            new Date().toISOString(),
           error_message: null,
         })
-        .eq("id", prompt.runId);
+        .eq("id", prompt.runId)
+        .eq("status", "running");
+
+      if (completeRunError) {
+        throw new Error(
+          `Gemini cevabı kaydedilemedi: ${completeRunError.message}`
+        );
+      }
     } catch (error) {
-      const message = getGeminiErrorMessage(error);
+      const message =
+        getGeminiErrorMessage(error);
 
       await supabase
         .from("audit_runs")
@@ -381,53 +476,108 @@ export async function POST(request: Request, context: RouteContext) {
           error_message: message,
           completed_at: null,
         })
-        .eq("id", prompt.runId);
+        .eq("id", prompt.runId)
+        .eq("status", "running");
     }
   }
 
-  const { count: totalCompleted } = await supabase
+  const {
+    count: totalCompleted,
+  } = await supabase
     .from("audit_runs")
-    .select("id", { count: "exact", head: true })
+    .select("id", {
+      count: "exact",
+      head: true,
+    })
     .eq("audit_id", audit.id)
     .eq("status", "completed");
 
-  const { count: totalPending } = await supabase
+  const {
+    count: totalPending,
+  } = await supabase
     .from("audit_runs")
-    .select("id", { count: "exact", head: true })
+    .select("id", {
+      count: "exact",
+      head: true,
+    })
     .eq("audit_id", audit.id)
     .eq("status", "pending");
 
-  const { count: totalFailed } = await supabase
+  const {
+    count: totalRunning,
+  } = await supabase
     .from("audit_runs")
-    .select("id", { count: "exact", head: true })
+    .select("id", {
+      count: "exact",
+      head: true,
+    })
+    .eq("audit_id", audit.id)
+    .eq("status", "running");
+
+  const {
+    count: totalFailed,
+  } = await supabase
+    .from("audit_runs")
+    .select("id", {
+      count: "exact",
+      head: true,
+    })
     .eq("audit_id", audit.id)
     .eq("status", "failed");
 
-  const pendingCount = totalPending ?? 0;
-  const failedCount = totalFailed ?? 0;
-  const completedCount = totalCompleted ?? 0;
+  const pendingCount =
+    totalPending ?? 0;
+
+  const runningCount =
+    totalRunning ?? 0;
+
+  const failedCount =
+    totalFailed ?? 0;
+
+  const completedCount =
+    totalCompleted ?? 0;
+
+  const unfinishedCount =
+    pendingCount + runningCount;
 
   const nextStatus =
     failedCount > 0
       ? "failed"
-      : pendingCount > 0
+      : unfinishedCount > 0
         ? "running"
         : "completed";
+
+  const completedAt =
+    nextStatus === "completed"
+      ? new Date().toISOString()
+      : null;
+
+  let errorMessage: string | null =
+    null;
+
+  if (failedCount > 0) {
+    errorMessage =
+      `${failedCount} prompt çalıştırılırken hata aldı. ` +
+      "Detay için başarısız kayıtları kontrol et.";
+  } else if (unfinishedCount > 0) {
+    errorMessage =
+      `${unfinishedCount} prompt henüz tamamlanmadı. ` +
+      "Audit'i tekrar çalıştır.";
+  }
 
   await supabase
     .from("audits")
     .update({
       status: nextStatus,
-      completed_prompts: completedCount,
-      completed_at: nextStatus === "completed" ? new Date().toISOString() : null,
-      error_message:
-        failedCount > 0
-          ? `${failedCount} prompt çalıştırılırken hata aldı. Detay için başarısız kayıtları kontrol et.`
-          : pendingCount > 0
-            ? `${pendingCount} prompt henüz çalıştırılmadı. Audit'i tekrar çalıştır.`
-            : null,
+      completed_prompts:
+        completedCount,
+      completed_at: completedAt,
+      error_message: errorMessage,
     })
     .eq("id", audit.id);
 
-  return redirectTo(`/dashboard/audits/${audit.id}`, request.url);
+  return redirectTo(
+    `/dashboard/audits/${audit.id}`,
+    request.url
+  );
 }
