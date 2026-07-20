@@ -1,4 +1,8 @@
 import { getWebsiteKeywordPreset } from "@/lib/website-analysis/keyword-presets";
+import { assertPublicWebsiteUrl } from "@/lib/security/public-website-url";
+
+const MAX_REDIRECTS = 5;
+const MAX_HTML_BYTES = 2 * 1024 * 1024;
 
 export type SignalResult = {
   keyword: string;
@@ -189,30 +193,85 @@ function calculateContentScore({
   return Math.min(score, 100);
 }
 
+async function readTextWithLimit(response: Response) {
+  const declaredLength = Number(response.headers.get("content-length") ?? 0);
+
+  if (declaredLength > MAX_HTML_BYTES) {
+    throw new Error("Website içeriği izin verilen 2 MB sınırını aşıyor.");
+  }
+
+  if (!response.body) return "";
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let totalBytes = 0;
+  let text = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+
+    if (done) break;
+
+    totalBytes += value.byteLength;
+
+    if (totalBytes > MAX_HTML_BYTES) {
+      await reader.cancel();
+      throw new Error("Website içeriği izin verilen 2 MB sınırını aşıyor.");
+    }
+
+    text += decoder.decode(value, { stream: true });
+  }
+
+  return text + decoder.decode();
+}
+
 async function fetchWebsiteHtml(url: string) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 12_000);
 
   try {
-    const response = await fetch(url, {
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (compatible; AIVisibilityBot/1.0; +https://example.com)",
-        Accept: "text/html,application/xhtml+xml",
-      },
-      redirect: "follow",
-      signal: controller.signal,
-      cache: "no-store",
-    });
+    let currentUrl = (await assertPublicWebsiteUrl(url)).toString();
 
-    const contentType = response.headers.get("content-type") ?? "";
-    const html = await response.text();
+    for (
+      let redirectCount = 0;
+      redirectCount <= MAX_REDIRECTS;
+      redirectCount += 1
+    ) {
+      const response = await fetch(currentUrl, {
+        headers: {
+          "User-Agent":
+            "Mozilla/5.0 (compatible; AIVisibilityBot/1.0; +https://example.com)",
+          Accept: "text/html,application/xhtml+xml",
+        },
+        redirect: "manual",
+        signal: controller.signal,
+        cache: "no-store",
+      });
 
-    return {
-      response,
-      contentType,
-      html,
-    };
+      if (response.status >= 300 && response.status < 400) {
+        const location = response.headers.get("location");
+
+        if (!location) {
+          throw new Error("Website geçersiz bir yönlendirme cevabı döndürdü.");
+        }
+
+        if (redirectCount === MAX_REDIRECTS) {
+          throw new Error("Website çok fazla yönlendirme yaptı.");
+        }
+
+        currentUrl = (
+          await assertPublicWebsiteUrl(new URL(location, currentUrl).toString())
+        ).toString();
+        continue;
+      }
+
+      const contentType = response.headers.get("content-type") ?? "";
+      const html = await readTextWithLimit(response);
+
+      return { response, contentType, html };
+    }
+
+    throw new Error("Website yönlendirmesi tamamlanamadı.");
   } finally {
     clearTimeout(timeout);
   }

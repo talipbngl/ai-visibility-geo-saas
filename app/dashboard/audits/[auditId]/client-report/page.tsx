@@ -396,9 +396,6 @@ const { data: analyses } = await supabase
 
   const visibilityScore = Math.round(Number(score?.visibility_score ?? 0));
   const shareOfVoice = Math.round(Number(score?.share_of_voice ?? 0));
-  const positiveSentimentRate = Math.round(
-    Number(score?.positive_sentiment_rate ?? 0)
-  );
   const citationScore = Math.round(Number(score?.citation_score ?? 0));
   const averageRank = score?.average_rank ?? null;
 

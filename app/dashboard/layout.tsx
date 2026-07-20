@@ -1,28 +1,21 @@
 import Link from "next/link";
-import type { ReactNode } from "react";
 import { redirect } from "next/navigation";
+import type { ReactNode } from "react";
 
-import { createClient } from "@/lib/supabase/server";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { isPlatformAdmin } from "@/lib/auth/platform-admin";
+import { createClient } from "@/lib/supabase/server";
 
 type DashboardLayoutProps = {
   children: ReactNode;
 };
 
-const navigationItems = [
+const memberNavigationItems = [
   {
     label: "Genel Bakış",
     href: "/dashboard",
     description: "Ana panel",
-  },
-  {
-  href: "/dashboard/health",
-  label: "Sistem Kontrol",
-},
-  {
-    href: "/dashboard/leads",
-    label: "Talepler",
   },
   {
     label: "Markalar",
@@ -41,6 +34,19 @@ const navigationItems = [
   },
 ];
 
+const adminNavigationItems = [
+  {
+    label: "Sistem Kontrol",
+    href: "/dashboard/health",
+    description: "Deploy ve servis durumu",
+  },
+  {
+    label: "Talepler",
+    href: "/dashboard/leads",
+    description: "Public formdan gelen talepler",
+  },
+];
+
 export default async function DashboardLayout({
   children,
 }: DashboardLayoutProps) {
@@ -54,10 +60,19 @@ export default async function DashboardLayout({
     redirect("/login");
   }
 
+  const navigationItems = isPlatformAdmin(user.email)
+    ? [
+        memberNavigationItems[0]!,
+        ...adminNavigationItems,
+        ...memberNavigationItems.slice(1),
+      ]
+    : memberNavigationItems;
+
   async function signOut() {
     "use server";
 
     const supabase = await createClient();
+
     await supabase.auth.signOut();
 
     redirect("/login");
@@ -89,7 +104,10 @@ export default async function DashboardLayout({
                 href={item.href}
                 className="block rounded-xl border border-transparent px-4 py-3 transition hover:border-border hover:bg-muted/50"
               >
-                <p className="text-sm font-medium">{item.label}</p>
+                <p className="text-sm font-medium">
+                  {item.label}
+                </p>
+
                 <p className="mt-1 text-xs text-muted-foreground">
                   {item.description}
                 </p>
@@ -99,16 +117,25 @@ export default async function DashboardLayout({
 
           <div className="mt-auto space-y-4 rounded-2xl border bg-muted/20 p-4">
             <div>
-              <p className="text-xs text-muted-foreground">Oturum</p>
+              <p className="text-xs text-muted-foreground">
+                Oturum
+              </p>
+
               <p className="mt-1 truncate text-sm font-medium">
                 {user.email}
               </p>
             </div>
 
-            <Badge variant="secondary">Beta Panel</Badge>
+            <Badge variant="secondary">
+              Beta Panel
+            </Badge>
 
             <form action={signOut}>
-              <Button type="submit" variant="outline" className="w-full">
+              <Button
+                type="submit"
+                variant="outline"
+                className="w-full"
+              >
                 Çıkış yap
               </Button>
             </form>
@@ -119,12 +146,21 @@ export default async function DashboardLayout({
           <header className="sticky top-0 z-20 border-b bg-background/90 px-4 py-3 backdrop-blur md:hidden">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <p className="text-xs text-muted-foreground">AI Görünürlük</p>
-                <p className="font-semibold">Marka Takip Paneli</p>
+                <p className="text-xs text-muted-foreground">
+                  AI Görünürlük
+                </p>
+
+                <p className="font-semibold">
+                  Marka Takip Paneli
+                </p>
               </div>
 
               <form action={signOut}>
-                <Button type="submit" variant="outline" size="sm">
+                <Button
+                  type="submit"
+                  variant="outline"
+                  size="sm"
+                >
                   Çıkış
                 </Button>
               </form>
@@ -132,8 +168,15 @@ export default async function DashboardLayout({
 
             <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
               {navigationItems.map((item) => (
-                <Button key={item.href} asChild variant="outline" size="sm">
-                  <Link href={item.href}>{item.label}</Link>
+                <Button
+                  key={item.href}
+                  asChild
+                  variant="outline"
+                  size="sm"
+                >
+                  <Link href={item.href}>
+                    {item.label}
+                  </Link>
                 </Button>
               ))}
             </div>

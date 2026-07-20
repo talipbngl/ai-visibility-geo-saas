@@ -131,76 +131,123 @@ export default async function RequestReportPage({
               </Alert>
             ) : null}
 
-            <form action="/api/lead-requests" method="post" className="space-y-5">
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="name">Ad soyad *</Label>
-                  <Input
-                    id="name"
-                    name="name"
-                    placeholder="Adın Soyadın"
-                    required
-                  />
-                </div>
+            <form
+  action="/api/lead-requests"
+  method="post"
+  className="space-y-5"
+>
+  <div
+    className="sr-only"
+    aria-hidden="true"
+  >
+    <Label htmlFor="companyWebsite">
+      Şirket web adresi
+    </Label>
 
-                <div className="space-y-2">
-                  <Label htmlFor="email">E-posta *</Label>
-                  <Input
-                    id="email"
-                    name="email"
-                    type="email"
-                    placeholder="ornek@mail.com"
-                    required
-                  />
-                </div>
-              </div>
+    <Input
+      id="companyWebsite"
+      name="companyWebsite"
+      tabIndex={-1}
+      autoComplete="off"
+    />
+  </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="companyName">Marka / şirket adı</Label>
-                <Input
-                  id="companyName"
-                  name="companyName"
-                  placeholder="Nova Dental Klinik"
-                />
-              </div>
+  <div className="grid gap-4 md:grid-cols-2">
+    <div className="space-y-2">
+      <Label htmlFor="name">
+        Ad soyad *
+      </Label>
 
-              <div className="space-y-2">
-                <Label htmlFor="websiteUrl">Web sitesi</Label>
-                <Input
-                  id="websiteUrl"
-                  name="websiteUrl"
-                  placeholder="https://www.ornek.com"
-                />
-              </div>
+      <Input
+        id="name"
+        name="name"
+        placeholder="Adın Soyadın"
+        maxLength={120}
+        required
+      />
+    </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="industry">Sektör</Label>
-                <Input
-                  id="industry"
-                  name="industry"
-                  placeholder="Diş kliniği / Eğitim / E-ticaret"
-                />
-              </div>
+    <div className="space-y-2">
+      <Label htmlFor="email">
+        E-posta *
+      </Label>
 
-              <div className="space-y-2">
-                <Label htmlFor="message">Ek not</Label>
-                <Textarea
-                  id="message"
-                  name="message"
-                  rows={5}
-                  placeholder="Rakipler, hedef şehir, özel istekler..."
-                />
-              </div>
+      <Input
+        id="email"
+        name="email"
+        type="email"
+        placeholder="ornek@mail.com"
+        maxLength={254}
+        required
+      />
+    </div>
+  </div>
 
-              <Button type="submit" className="w-full">
-                Rapor talebi gönder
-              </Button>
+  <div className="space-y-2">
+    <Label htmlFor="companyName">
+      Marka / şirket adı
+    </Label>
 
-              <p className="text-center text-xs text-muted-foreground">
-                Formu göndererek rapor talebin için iletişime geçilmesini kabul
-                etmiş olursun.
-              </p>
-            </form>
+    <Input
+      id="companyName"
+      name="companyName"
+      placeholder="Nova Dental Klinik"
+      maxLength={120}
+    />
+  </div>
+
+  <div className="space-y-2">
+    <Label htmlFor="websiteUrl">
+      Web sitesi
+    </Label>
+
+    <Input
+      id="websiteUrl"
+      name="websiteUrl"
+      placeholder="https://www.ornek.com"
+      maxLength={2048}
+    />
+  </div>
+
+  <div className="space-y-2">
+    <Label htmlFor="industry">
+      Sektör
+    </Label>
+
+    <Input
+      id="industry"
+      name="industry"
+      placeholder="Diş kliniği / Eğitim / E-ticaret"
+      maxLength={100}
+    />
+  </div>
+
+  <div className="space-y-2">
+    <Label htmlFor="message">
+      Ek not
+    </Label>
+
+    <Textarea
+      id="message"
+      name="message"
+      rows={5}
+      placeholder="Rakipler, hedef şehir, özel istekler..."
+      maxLength={2000}
+    />
+  </div>
+
+  <Button
+    type="submit"
+    className="w-full"
+  >
+    Rapor talebi gönder
+  </Button>
+
+  <p className="text-center text-xs text-muted-foreground">
+    Formu göndererek rapor talebin için iletişime
+    geçilmesini kabul etmiş olursun.
+  </p>
+</form>
           </CardContent>
         </Card>
       </section>

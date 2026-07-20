@@ -1,6 +1,6 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 
-import { createClient } from "@/lib/supabase/server";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -10,11 +10,22 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { MetricCard, PageHeader } from "@/features/ui/components";
+import {
+  MetricCard,
+  PageHeader,
+} from "@/features/ui/components";
+import { isPlatformAdmin } from "@/lib/auth/platform-admin";
+import { createClient } from "@/lib/supabase/server";
 
 function getCheckBadge(isOk: boolean) {
   return (
-    <Badge variant={isOk ? "default" : "destructive"}>
+    <Badge
+      variant={
+        isOk
+          ? "default"
+          : "destructive"
+      }
+    >
       {isOk ? "Hazır" : "Eksik"}
     </Badge>
   );
@@ -23,54 +34,98 @@ function getCheckBadge(isOk: boolean) {
 export default async function HealthPage() {
   const supabase = await createClient();
 
-  const hasAppUrl = Boolean(process.env.NEXT_PUBLIC_APP_URL);
-const hasSupabaseUrl = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL);
-const hasSupabaseKey = Boolean(process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY);
-const hasSupabaseSecret = Boolean(process.env.SUPABASE_SECRET_KEY);
-const hasGeminiKey = Boolean(process.env.GEMINI_API_KEY);
-const hasGeminiModel = Boolean(process.env.GEMINI_MODEL);
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect("/login");
+  }
+
+  if (!isPlatformAdmin(user.email)) {
+    redirect("/dashboard");
+  }
+
+  const hasAppUrl = Boolean(
+    process.env.NEXT_PUBLIC_APP_URL
+  );
+
+  const hasSupabaseUrl = Boolean(
+    process.env.NEXT_PUBLIC_SUPABASE_URL
+  );
+
+  const hasSupabaseKey = Boolean(
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+  );
+
+  const hasSupabaseSecret = Boolean(
+    process.env.SUPABASE_SECRET_KEY
+  );
+
+  const hasGeminiKey = Boolean(
+    process.env.GEMINI_API_KEY
+  );
+
+  const hasGeminiModel = Boolean(
+    process.env.GEMINI_MODEL
+  );
 
   const { count: brandCount } = await supabase
     .from("brands")
-    .select("id", { count: "exact", head: true });
+    .select("id", {
+      count: "exact",
+      head: true,
+    });
 
   const { count: auditCount } = await supabase
     .from("audits")
-    .select("id", { count: "exact", head: true });
+    .select("id", {
+      count: "exact",
+      head: true,
+    });
 
   const { count: scoreCount } = await supabase
     .from("audit_scores")
-    .select("id", { count: "exact", head: true });
+    .select("id", {
+      count: "exact",
+      head: true,
+    });
 
   const envChecks = [
     {
-  title: "App URL",
-  description: "Local ve production ortamında uygulamanın ana adresini belirler.",
-  isOk: hasAppUrl,
-},
+      title: "App URL",
+      description:
+        "Local ve production ortamında uygulamanın ana adresini belirler.",
+      isOk: hasAppUrl,
+    },
     {
       title: "Supabase URL",
-      description: "Frontend ve server bağlantısı için gerekli.",
+      description:
+        "Frontend ve server bağlantısı için gerekli.",
       isOk: hasSupabaseUrl,
     },
     {
       title: "Supabase Publishable Key",
-      description: "Tarayıcı tarafı Supabase işlemleri için gerekli.",
+      description:
+        "Tarayıcı tarafı Supabase işlemleri için gerekli.",
       isOk: hasSupabaseKey,
     },
     {
       title: "Supabase Secret Key",
-      description: "Server tarafı güvenli işlemler için gerekli.",
+      description:
+        "Server tarafı güvenli işlemler için gerekli.",
       isOk: hasSupabaseSecret,
     },
     {
       title: "Gemini API Key",
-      description: "AI cevaplarını üretmek için gerekli.",
+      description:
+        "AI cevaplarını üretmek için gerekli.",
       isOk: hasGeminiKey,
     },
     {
       title: "Gemini Model",
-      description: "Kullanılacak Gemini model adını belirler.",
+      description:
+        "Kullanılacak Gemini model adını belirler.",
       isOk: hasGeminiModel,
     },
   ];
@@ -78,30 +133,40 @@ const hasGeminiModel = Boolean(process.env.GEMINI_MODEL);
   const dataChecks = [
     {
       title: "En az 1 marka",
-      description: "Demo veya gerçek ölçüm için marka oluşturulmuş olmalı.",
+      description:
+        "Demo veya gerçek ölçüm için marka oluşturulmuş olmalı.",
       isOk: (brandCount ?? 0) > 0,
       actionHref: "/dashboard/brands/new",
       actionLabel: "Marka ekle",
     },
     {
       title: "En az 1 ölçüm",
-      description: "AI görünürlük raporu için ölçüm oluşturulmuş olmalı.",
+      description:
+        "AI görünürlük raporu için ölçüm oluşturulmuş olmalı.",
       isOk: (auditCount ?? 0) > 0,
       actionHref: "/dashboard/brands",
       actionLabel: "Markalara git",
     },
     {
       title: "En az 1 analiz skoru",
-      description: "Satış demosu için tamamlanmış bir rapor olması iyi olur.",
+      description:
+        "Satış demosu için tamamlanmış bir rapor olması iyi olur.",
       isOk: (scoreCount ?? 0) > 0,
       actionHref: "/dashboard/audits",
       actionLabel: "Ölçümlere git",
     },
   ];
 
-  const allEnvReady = envChecks.every((check) => check.isOk);
-  const allDataReady = dataChecks.every((check) => check.isOk);
-  const isMvpReady = allEnvReady && allDataReady;
+  const allEnvReady = envChecks.every(
+    (check) => check.isOk
+  );
+
+  const allDataReady = dataChecks.every(
+    (check) => check.isOk
+  );
+
+  const isMvpReady =
+    allEnvReady && allDataReady;
 
   return (
     <div className="space-y-6">
@@ -111,12 +176,19 @@ const hasGeminiModel = Boolean(process.env.GEMINI_MODEL);
         description="Deploy ve satış demosu öncesi temel sistem parçalarının hazır olup olmadığını buradan kontrol edebilirsin."
         actions={
           <>
-            <Button asChild variant="outline">
-              <Link href="/dashboard">Dashboard’a dön</Link>
+            <Button
+              asChild
+              variant="outline"
+            >
+              <Link href="/dashboard">
+                Dashboard’a dön
+              </Link>
             </Button>
 
             <Button asChild>
-              <Link href="/demo-report">Public demo rapor</Link>
+              <Link href="/demo-report">
+                Public demo rapor
+              </Link>
             </Button>
           </>
         }
@@ -144,7 +216,11 @@ const hasGeminiModel = Boolean(process.env.GEMINI_MODEL);
         <MetricCard
           title="MVP Durumu"
           description="Demo/satış hazırlığı"
-          value={isMvpReady ? "Hazır" : "Eksik"}
+          value={
+            isMvpReady
+              ? "Hazır"
+              : "Eksik"
+          }
         />
       </section>
 
@@ -161,24 +237,38 @@ const hasGeminiModel = Boolean(process.env.GEMINI_MODEL);
               ? "MVP demo için hazır görünüyor"
               : "MVP için tamamlanması gerekenler var"}
           </CardTitle>
+
           <CardDescription>
-            Bu kontrol teknik doğrulama içindir. Satışa çıkmadan önce bir gerçek
-            marka ile uçtan uca test yapman yine gerekli.
+            Bu kontrol teknik doğrulama içindir. Satışa
+            çıkmadan önce gerçek bir marka ile uçtan uca
+            test yapman yine gerekli.
           </CardDescription>
         </CardHeader>
 
         <CardContent>
           <div className="flex flex-wrap gap-2">
-            <Button asChild variant="outline">
-              <Link href="/dashboard/brands/new">Yeni marka ekle</Link>
+            <Button
+              asChild
+              variant="outline"
+            >
+              <Link href="/dashboard/brands/new">
+                Yeni marka ekle
+              </Link>
             </Button>
 
-            <Button asChild variant="outline">
-              <Link href="/dashboard/audits">Ölçümleri kontrol et</Link>
+            <Button
+              asChild
+              variant="outline"
+            >
+              <Link href="/dashboard/audits">
+                Ölçümleri kontrol et
+              </Link>
             </Button>
 
             <Button asChild>
-              <Link href="/dashboard/demo-report">Dashboard demo rapor</Link>
+              <Link href="/dashboard/demo-report">
+                Dashboard demo rapor
+              </Link>
             </Button>
           </div>
         </CardContent>
@@ -187,10 +277,14 @@ const hasGeminiModel = Boolean(process.env.GEMINI_MODEL);
       <section className="grid gap-6 lg:grid-cols-2">
         <Card className="shadow-sm">
           <CardHeader>
-            <CardTitle>Ortam değişkenleri</CardTitle>
+            <CardTitle>
+              Ortam değişkenleri
+            </CardTitle>
+
             <CardDescription>
-              API key ve bağlantı ayarlarının varlığını kontrol eder. Değerleri
-              güvenlik için göstermez.
+              API key ve bağlantı ayarlarının varlığını
+              kontrol eder. Değerleri güvenlik için
+              göstermez.
             </CardDescription>
           </CardHeader>
 
@@ -201,13 +295,18 @@ const hasGeminiModel = Boolean(process.env.GEMINI_MODEL);
                 className="flex items-start justify-between gap-4 rounded-xl border p-4"
               >
                 <div>
-                  <p className="font-medium">{check.title}</p>
+                  <p className="font-medium">
+                    {check.title}
+                  </p>
+
                   <p className="mt-1 text-sm leading-6 text-muted-foreground">
                     {check.description}
                   </p>
                 </div>
 
-                {getCheckBadge(check.isOk)}
+                {getCheckBadge(
+                  check.isOk
+                )}
               </div>
             ))}
           </CardContent>
@@ -215,9 +314,13 @@ const hasGeminiModel = Boolean(process.env.GEMINI_MODEL);
 
         <Card className="shadow-sm">
           <CardHeader>
-            <CardTitle>Demo veri kontrolü</CardTitle>
+            <CardTitle>
+              Demo veri kontrolü
+            </CardTitle>
+
             <CardDescription>
-              Satış demosu için gereken minimum ürün verilerini kontrol eder.
+              Satış demosu için gereken minimum ürün
+              verilerini kontrol eder.
             </CardDescription>
           </CardHeader>
 
@@ -229,19 +332,34 @@ const hasGeminiModel = Boolean(process.env.GEMINI_MODEL);
               >
                 <div className="flex items-start justify-between gap-4">
                   <div>
-                    <p className="font-medium">{check.title}</p>
+                    <p className="font-medium">
+                      {check.title}
+                    </p>
+
                     <p className="mt-1 text-sm leading-6 text-muted-foreground">
                       {check.description}
                     </p>
                   </div>
 
-                  {getCheckBadge(check.isOk)}
+                  {getCheckBadge(
+                    check.isOk
+                  )}
                 </div>
 
                 {!check.isOk ? (
                   <div className="mt-3">
-                    <Button asChild variant="outline" size="sm">
-                      <Link href={check.actionHref}>{check.actionLabel}</Link>
+                    <Button
+                      asChild
+                      variant="outline"
+                      size="sm"
+                    >
+                      <Link
+                        href={
+                          check.actionHref
+                        }
+                      >
+                        {check.actionLabel}
+                      </Link>
                     </Button>
                   </div>
                 ) : null}
