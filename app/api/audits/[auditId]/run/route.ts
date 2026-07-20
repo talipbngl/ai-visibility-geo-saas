@@ -86,7 +86,25 @@ function isGroundingEnabled() {
     "true"
   );
 }
+function getDailyGeminiPromptLimit() {
+  const configuredLimit = Number(
+    process.env
+      .DAILY_GEMINI_PROMPT_LIMIT ??
+      50
+  );
 
+  if (
+    !Number.isInteger(configuredLimit) ||
+    configuredLimit < 1
+  ) {
+    return 50;
+  }
+
+  return Math.min(
+    configuredLimit,
+    500
+  );
+}
 function buildPrompt(
   promptText: string,
   groundingEnabled: boolean
@@ -338,7 +356,7 @@ export async function POST(
   const runLimit =
     isGroundingEnabled() ? 1 : 5;
 
-  const {
+   const {
     data: claimedRunsData,
     error: claimError,
   } = await supabase.rpc(
@@ -346,6 +364,8 @@ export async function POST(
     {
       p_audit_id: audit.id,
       p_limit: runLimit,
+      p_daily_limit:
+        getDailyGeminiPromptLimit(),
     }
   );
 
