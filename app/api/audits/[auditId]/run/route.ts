@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-
+import { fetchWithTimeout } from "@/lib/gemini/fetch-with-timeout";
 import { createClient } from "@/lib/supabase/server";
 
 type GeminiGroundingChunk = {
@@ -201,7 +201,7 @@ async function askGemini(
   const groundingEnabled =
     isGroundingEnabled();
 
-  const response = await fetch(
+  const response = await fetchWithTimeout(
     `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`,
     {
       method: "POST",
