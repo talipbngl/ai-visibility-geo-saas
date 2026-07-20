@@ -399,6 +399,7 @@ const { data: analyses } = await supabase
   const positiveSentimentRate = Math.round(
     Number(score?.positive_sentiment_rate ?? 0)
   );
+  const citationScore = Math.round(Number(score?.citation_score ?? 0));
   const averageRank = score?.average_rank ?? null;
 
   const visibleAnalyses =
@@ -623,17 +624,17 @@ const { data: analyses } = await supabase
                 tone="green"
               />
 
-              <MetricBox
-                label="Olumlu Ton"
-                value={`${positiveSentimentRate}%`}
-                helper="Olumlu marka bahsi oranı"
-                tone="orange"
-              />
+             <MetricBox
+                    label="Kaynak Skoru"
+                    value={`${citationScore}/100`}
+                    helper="Grounding kaynak kullanım gücü"
+                    tone="orange"
+                    />
             </div>
             <div className="mt-6 rounded-3xl border border-slate-200 bg-slate-50 p-5">
             <h3 className="font-semibold text-slate-950">Skorlar nasıl okunmalı?</h3>
 
-            <div className="mt-3 grid gap-3 text-sm leading-6 text-slate-600 md:grid-cols-3">
+            <div className="mt-3 grid gap-3 text-sm leading-6 text-slate-600 md:grid-cols-4">
                 <p>
                 <span className="font-semibold text-slate-950">
                     AI Görünürlük Skoru:
@@ -657,6 +658,13 @@ const { data: analyses } = await supabase
                 Marka cevapta geçtiğinde rakiplere göre yaklaşık kaçıncı sırada
                 göründüğünü gösterir.
                 </p>
+                <p>
+  <span className="font-semibold text-slate-950">
+    Kaynak Skoru:
+  </span>{" "}
+  Gemini grounding çıktısında web kaynakları dönüp dönmediğini ve markanın
+  kendi web sitesinin kaynaklar arasında yer alıp almadığını gösterir.
+</p>
             </div>
             </div>
 

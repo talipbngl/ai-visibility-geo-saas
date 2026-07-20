@@ -264,35 +264,35 @@ const competitorWebsiteSnapshotCount = latestCompetitorWebsiteSnapshots.length;
   .order("created_at", { ascending: true });
  const recommendationCount = recommendations?.length ?? 0;
 
-  const { data: analyses } = await supabase
-    .from("analyses")
-    .select(
-      `
-      id,
-      brand_mentioned,
-      brand_rank,
-      brand_sentiment,
-      competitors_json,
-      summary,
-      risk_notes_json,
-      opportunity_notes_json,
-      audit_runs!inner (
-        id,
-        audit_id,
-        audit_run_id,
-        prompt_text_snapshot,
-        prompt_intent_snapshot,
-        prompt_priority_snapshot,
-        prompts (
-          id,
-          text,
-          intent,
-          priority
-        )
-      )
+const { data: analyses } = await supabase
+  .from("analyses")
+  .select(
     `
+    id,
+    audit_run_id,
+    brand_mentioned,
+    brand_rank,
+    brand_sentiment,
+    competitors_json,
+    summary,
+    risk_notes_json,
+    opportunity_notes_json,
+    audit_runs!inner (
+      id,
+      audit_id,
+      prompt_text_snapshot,
+      prompt_intent_snapshot,
+      prompt_priority_snapshot,
+      prompts (
+        id,
+        text,
+        intent,
+        priority
+      )
     )
-    .eq("audit_runs.audit_id", audit.id);
+  `
+  )
+  .eq("audit_runs.audit_id", audit.id);
 
   const visibilityScore = Number(score?.visibility_score ?? 0);
   const roundedVisibilityScore = Math.round(visibilityScore);

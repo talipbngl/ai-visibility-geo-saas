@@ -26,8 +26,8 @@ type CompetitorRecord = {
 type CompletedRunRecord = {
   id: string;
   raw_answer: string | null;
+  citations_json: unknown;
 };
-
 type MentionResult = {
   name: string;
   mentioned: boolean;
@@ -136,6 +136,10 @@ function analyzeAnswer(args: {
   brandName: string;
   brandAliases: string[];
   competitors: CompetitorRecord[];
+  citationSources: Array<{
+    uri: string;
+    title: string;
+  }>;
 }) {
   const brandTerms = uniqueStrings([args.brandName, ...args.brandAliases]);
 
@@ -247,7 +251,7 @@ function analyzeAnswer(args: {
     brand_rank: brandRank,
     brand_sentiment: brandSentiment,
     competitors_json: rankedCompetitors,
-    sources_json: [],
+    sources_json: args.citationSources,
     summary,
     risk_notes_json: riskNotes,
     opportunity_notes_json: opportunityNotes,
@@ -380,7 +384,7 @@ export async function POST(request: Request, context: RouteContext) {
 
   const { data: brand, error: brandError } = await supabase
     .from("brands")
-    .select("id, name")
+    .select("id, name, website_url")
     .eq("id", audit.brand_id)
     .maybeSingle();
 
@@ -420,8 +424,8 @@ export async function POST(request: Request, context: RouteContext) {
 
   const { data: runsData, error: runsError } = await supabase
     .from("audit_runs")
-    .select("id, raw_answer")
-    .eq("audit_id", audit.id)
+    .select("id, raw_answer, citations_json")
+        .eq("audit_id", audit.id)
     .eq("status", "completed");
 
   if (runsError) {
@@ -446,19 +450,22 @@ export async function POST(request: Request, context: RouteContext) {
     );
   }
 
-  const analyses = completedRuns.map((run) => {
-    const result = analyzeAnswer({
-      answer: run.raw_answer ?? "",
-      brandName: brand.name,
-      brandAliases,
-      competitors,
-    });
+const analyses = completedRuns.map((run) => {
+  const citationSources = getCitationSources(run.citations_json);
 
-    return {
-      audit_run_id: run.id,
-      ...result,
-    };
+  const result = analyzeAnswer({
+    answer: run.raw_answer ?? "",
+    brandName: brand.name,
+    brandAliases,
+    competitors,
+    citationSources,
   });
+
+  return {
+    audit_run_id: run.id,
+    ...result,
+  };
+});
 
   const { error: analysesError } = await supabase
     .from("analyses")
@@ -557,7 +564,69 @@ export async function POST(request: Request, context: RouteContext) {
   const opportunityScore = round(
     (competitorOnlyOpportunityCount / totalAnalyzed) * 100
   );
+  const brandHostname = getHostname(brand.website_url);
 
+const sourcedRunCount = completedRuns.filter(
+  (run) => getCitationSources(run.citations_json).length > 0
+).length;
+
+const brandSourceRunCount = completedRuns.filter((run) =>
+  getCitationSources(run.citations_json).some((source) =>
+    sourceMatchesHostname(source.uri, brandHostname)
+  )
+).length;
+
+const citationScore = round(
+  ((sourcedRunCount / totalAnalyzed) * 70) +
+    ((brandSourceRunCount / totalAnalyzed) * 30)
+);
+function getCitationSources(value: unknown) {
+  if (!value || typeof value !== "object") return [];
+
+  const data = value as {
+    sources?: Array<{
+      uri?: string;
+      title?: string;
+    }>;
+  };
+
+  if (!Array.isArray(data.sources)) return [];
+
+  return data.sources
+    .map((source) => ({
+      uri: String(source.uri ?? ""),
+      title: String(source.title ?? ""),
+    }))
+    .filter((source) => source.uri);
+}
+
+function getHostname(value: string | null) {
+  if (!value) return null;
+
+  try {
+    const url = new URL(
+      value.startsWith("http://") || value.startsWith("https://")
+        ? value
+        : `https://${value}`
+    );
+
+    return url.hostname.replace(/^www\./, "");
+  } catch {
+    return null;
+  }
+}
+
+function sourceMatchesHostname(sourceUri: string, hostname: string | null) {
+  if (!hostname) return false;
+
+  try {
+    const sourceHostname = new URL(sourceUri).hostname.replace(/^www\./, "");
+
+    return sourceHostname === hostname || sourceHostname.endsWith(`.${hostname}`);
+  } catch {
+    return false;
+  }
+}
   const { error: scoreError } = await supabase.from("audit_scores").upsert(
     {
       audit_id: audit.id,
@@ -565,7 +634,7 @@ export async function POST(request: Request, context: RouteContext) {
       share_of_voice: shareOfVoice,
       average_rank: averageRank,
       positive_sentiment_rate: positiveSentimentRate,
-      citation_score: 0,
+      citation_score: citationScore,
       competitor_gap_score: competitorGapScore,
       opportunity_score: opportunityScore,
     },
