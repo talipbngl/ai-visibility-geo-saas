@@ -25,7 +25,7 @@ const memberNavigationItems = [
   {
     label: "Ölçümler",
     href: "/dashboard/audits",
-    description: "Audit ve raporlar",
+    description: "Ölçümler ve raporlar",
   },
   {
     label: "Ayarlar",
@@ -36,14 +36,14 @@ const memberNavigationItems = [
 
 const adminNavigationItems = [
   {
-    label: "Sistem Kontrol",
+    label: "Sistem Kontrolü",
     href: "/dashboard/health",
-    description: "Deploy ve servis durumu",
+    description: "Yayın ve servis durumu",
   },
   {
-    label: "Talepler",
+    label: "Rapor Talepleri",
     href: "/dashboard/leads",
-    description: "Public formdan gelen talepler",
+    description: "Herkese açık formdan gelen talepler",
   },
 ];
 
@@ -127,7 +127,7 @@ export default async function DashboardLayout({
             </div>
 
             <Badge variant="secondary">
-              Beta Panel
+              Beta sürümü
             </Badge>
 
             <form action={signOut}>

@@ -1,39 +1,60 @@
-export function getStatusLabel(status: string) {
+export function getStatusLabel(status: string | null | undefined) {
+  if (!status) return "Durum belirtilmedi";
+
   const labels: Record<string, string> = {
     pending: "Bekliyor",
+    queued: "Sırada",
     running: "Çalışıyor",
+    processing: "İşleniyor",
     completed: "Tamamlandı",
+    partial: "Kısmen tamamlandı",
     failed: "Başarısız",
+    cancelled: "İptal edildi",
+    canceled: "İptal edildi",
+    draft: "Taslak",
+    active: "Aktif",
+    inactive: "Pasif",
+    archived: "Arşivlendi",
+    new: "Yeni",
+    contacted: "İletişime geçildi",
+    qualified: "Uygun",
+    closed: "Kapatıldı",
+    rejected: "Reddedildi",
+    stale: "Zaman aşımına uğradı",
   };
 
-  return labels[status] ?? status;
+  return labels[status.toLowerCase()] ?? "Bilinmeyen durum";
 }
 
-export function getIntentLabel(intent: string) {
+export function getIntentLabel(intent: string | null | undefined) {
+  if (!intent) return "Niyet belirtilmedi";
+
   const labels: Record<string, string> = {
     buying_intent: "Satın Alma Niyeti",
     comparison: "Karşılaştırma",
     local_recommendation: "Yerel Öneri",
-    problem_solution: "Problem / Çözüm",
+    problem_solution: "Sorun ve Çözüm",
     alternative_search: "Alternatif Arama",
     budget_friendly: "Uygun Fiyat",
-    premium_choice: "Premium Tercih",
-    trust_reputation: "Güven / İtibar",
+    premium_choice: "Üst Segment Tercih",
+    trust_reputation: "Güven ve İtibar",
   };
 
-  return labels[intent] ?? intent;
+  return labels[intent.toLowerCase()] ?? "Diğer";
 }
 
-export function getSentimentLabel(sentiment: string | null) {
+export function getSentimentLabel(sentiment: string | null | undefined) {
   if (!sentiment) return "-";
 
   const labels: Record<string, string> = {
     positive: "Olumlu",
     neutral: "Nötr",
     negative: "Olumsuz",
+    mixed: "Karma",
+    unknown: "Belirsiz",
   };
 
-  return labels[sentiment] ?? sentiment;
+  return labels[sentiment.toLowerCase()] ?? "Belirsiz";
 }
 
 export function getPriorityLabel(priority: number | null | undefined) {
@@ -47,11 +68,39 @@ export function getPriorityLabel(priority: number | null | undefined) {
     5: "Çok Yüksek",
   };
 
-  return labels[priority] ?? String(priority);
+  return labels[priority] ?? "Belirtilmedi";
 }
 
-export function getRecommendationPriorityLabel(priority: string | null) {
-  if (!priority) return "-";
+export function getRecommendationPriorityLabel(
+  priority: string | null | undefined
+) {
+  if (!priority) return "Belirtilmedi";
+
+  const labels: Record<string, string> = {
+    low: "Düşük",
+    medium: "Orta",
+    high: "Yüksek",
+    critical: "Kritik",
+  };
+
+  return labels[priority.toLowerCase()] ?? "Belirtilmedi";
+}
+
+export function getImpactLabel(impact: string | null | undefined) {
+  if (!impact) return "Belirtilmedi";
+
+  const labels: Record<string, string> = {
+    low: "Düşük",
+    medium: "Orta",
+    high: "Yüksek",
+    critical: "Kritik",
+  };
+
+  return labels[impact.toLowerCase()] ?? "Belirtilmedi";
+}
+
+export function getEffortLabel(effort: string | null | undefined) {
+  if (!effort) return "Belirtilmedi";
 
   const labels: Record<string, string> = {
     low: "Düşük",
@@ -59,49 +108,25 @@ export function getRecommendationPriorityLabel(priority: string | null) {
     high: "Yüksek",
   };
 
-  return labels[priority] ?? priority;
+  return labels[effort.toLowerCase()] ?? "Belirtilmedi";
 }
 
-export function getImpactLabel(impact: string | null) {
-  if (!impact) return "-";
+export function getCategoryLabel(category: string | null | undefined) {
+  if (!category) return "Kategori belirtilmedi";
 
   const labels: Record<string, string> = {
-    low: "Düşük",
-    medium: "Orta",
-    high: "Yüksek",
-  };
-
-  return labels[impact] ?? impact;
-}
-
-export function getEffortLabel(effort: string | null) {
-  if (!effort) return "-";
-
-  const labels: Record<string, string> = {
-    low: "Düşük",
-    medium: "Orta",
-    high: "Yüksek",
-  };
-
-  return labels[effort] ?? effort;
-}
-
-export function getCategoryLabel(category: string | null) {
-  if (!category) return "-";
-  if (category === "website") return "Website";
-if (category === "content") return "İçerik";
-if (category === "trust") return "Güven";
-if (category === "competitor") return "Rakip";
-if (category === "measurement") return "Takip";
-
-  const labels: Record<string, string> = {
+    website: "Web Sitesi",
     content: "İçerik",
+    trust: "Güven",
     competitor: "Rakip",
+    measurement: "Ölçüm",
     authority: "Otorite",
     brand: "Marka",
-    geo: "AI Görünürlük",
+    geo: "AI Görünürlüğü",
     monitoring: "Takip",
+    technical: "Teknik",
+    seo: "Arama Motoru Optimizasyonu",
   };
 
-  return labels[category] ?? category;
+  return labels[category.toLowerCase()] ?? "Diğer";
 }
