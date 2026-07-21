@@ -16,13 +16,57 @@ function getSafeNext(nextPath: string) {
   return nextPath;
 }
 
+function redirectWithError(message: string): never {
+  redirect(`/login?error=${encodeURIComponent(message)}`);
+}
+
+function getLoginErrorMessage(message: string) {
+  const normalizedMessage = message.toLowerCase();
+
+  if (
+    normalizedMessage.includes("invalid login credentials") ||
+    normalizedMessage.includes("invalid credentials")
+  ) {
+    return "E-posta adresi veya şifre hatalı.";
+  }
+
+  if (
+    normalizedMessage.includes("email not confirmed") ||
+    normalizedMessage.includes("email_not_confirmed")
+  ) {
+    return "E-posta adresiniz henüz doğrulanmamış. Gelen kutunuzu kontrol edin.";
+  }
+
+  if (
+    normalizedMessage.includes("rate limit") ||
+    normalizedMessage.includes("too many requests")
+  ) {
+    return "Çok fazla giriş denemesi yapıldı. Biraz bekleyip tekrar deneyin.";
+  }
+
+  if (
+    normalizedMessage.includes("user is disabled") ||
+    normalizedMessage.includes("user banned")
+  ) {
+    return "Bu hesap geçici olarak kullanıma kapatılmış.";
+  }
+
+  return "Giriş yapılamadı. Bilgilerinizi kontrol edip tekrar deneyin.";
+}
+
 export async function loginAction(formData: FormData) {
   const email = getString(formData, "email").toLowerCase();
   const password = getString(formData, "password");
-  const nextPath = getSafeNext(getString(formData, "next") || "/dashboard");
+  const nextPath = getSafeNext(
+    getString(formData, "next") || "/dashboard"
+  );
 
   if (!email || !password) {
-    redirect("/login?error=Email ve şifre zorunlu.");
+    redirectWithError("E-posta adresi ve şifre zorunludur.");
+  }
+
+  if (!email.includes("@") || !email.includes(".")) {
+    redirectWithError("Geçerli bir e-posta adresi girin.");
   }
 
   const supabase = await createClient();
@@ -33,7 +77,7 @@ export async function loginAction(formData: FormData) {
   });
 
   if (error) {
-    redirect(`/login?error=${encodeURIComponent(error.message)}`);
+    redirectWithError(getLoginErrorMessage(error.message));
   }
 
   const { error: workspaceError } = await supabase.rpc(
@@ -41,7 +85,9 @@ export async function loginAction(formData: FormData) {
   );
 
   if (workspaceError) {
-    redirect(`/login?error=${encodeURIComponent(workspaceError.message)}`);
+    redirectWithError(
+      "Hesabınıza giriş yapıldı ancak çalışma alanınız hazırlanamadı. Lütfen tekrar deneyin."
+    );
   }
 
   redirect(nextPath);

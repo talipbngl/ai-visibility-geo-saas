@@ -16,7 +16,7 @@ function redirectWithLoginMessage(message: string): never {
   redirect(`/login?message=${encodeURIComponent(message)}`);
 }
 
-function getAuthErrorMessage(message: string) {
+function getRegisterErrorMessage(message: string) {
   const normalizedMessage = message.toLowerCase();
 
   if (
@@ -24,25 +24,40 @@ function getAuthErrorMessage(message: string) {
     normalizedMessage.includes("user already registered") ||
     normalizedMessage.includes("already exists")
   ) {
-    return "Bu email adresiyle daha önce kayıt olunmuş. Giriş yapmayı deneyin.";
+    return "Bu e-posta adresiyle daha önce kayıt olunmuş. Giriş yapmayı deneyin.";
   }
 
   if (
-    normalizedMessage.includes("password") &&
-    normalizedMessage.includes("characters")
+    normalizedMessage.includes("weak password") ||
+    normalizedMessage.includes("password should be at least") ||
+    (normalizedMessage.includes("password") &&
+      normalizedMessage.includes("characters"))
   ) {
     return "Şifre yeterince güçlü değil. En az 6 karakter kullanın.";
   }
 
-  if (normalizedMessage.includes("invalid email")) {
-    return "Geçerli bir email adresi giriniz.";
+  if (
+    normalizedMessage.includes("invalid email") ||
+    normalizedMessage.includes("email address is invalid")
+  ) {
+    return "Geçerli bir e-posta adresi girin.";
   }
 
-  if (normalizedMessage.includes("rate limit")) {
-    return "Çok fazla deneme yapıldı. Biraz bekleyip tekrar deneyin.";
+  if (
+    normalizedMessage.includes("rate limit") ||
+    normalizedMessage.includes("too many requests")
+  ) {
+    return "Çok fazla kayıt denemesi yapıldı. Biraz bekleyip tekrar deneyin.";
   }
 
-  return message || "Kayıt sırasında bilinmeyen bir hata oluştu.";
+  if (
+    normalizedMessage.includes("signup is disabled") ||
+    normalizedMessage.includes("signups not allowed")
+  ) {
+    return "Yeni hesap oluşturma işlemi şu anda kullanılamıyor.";
+  }
+
+  return "Kayıt işlemi tamamlanamadı. Bilgilerinizi kontrol edip tekrar deneyin.";
 }
 
 export async function registerAction(formData: FormData) {
@@ -51,23 +66,27 @@ export async function registerAction(formData: FormData) {
   const password = getString(formData, "password");
 
   if (!fullName) {
-    redirectWithError("Tam ad giriniz.");
+    redirectWithError("Adınızı ve soyadınızı girin.");
+  }
+
+  if (fullName.length < 2) {
+    redirectWithError("Ad ve soyad en az 2 karakter olmalıdır.");
   }
 
   if (!email) {
-    redirectWithError("Email giriniz.");
+    redirectWithError("E-posta adresinizi girin.");
   }
 
   if (!email.includes("@") || !email.includes(".")) {
-    redirectWithError("Geçerli bir email adresi giriniz.");
+    redirectWithError("Geçerli bir e-posta adresi girin.");
   }
 
   if (!password) {
-    redirectWithError("Şifre giriniz.");
+    redirectWithError("Şifrenizi girin.");
   }
 
   if (password.length < 6) {
-    redirectWithError("Şifre en az 6 karakter olmalı.");
+    redirectWithError("Şifre en az 6 karakter olmalıdır.");
   }
 
   const supabase = await createClient();
@@ -83,7 +102,7 @@ export async function registerAction(formData: FormData) {
   });
 
   if (signUpError) {
-    redirectWithError(getAuthErrorMessage(signUpError.message));
+    redirectWithError(getRegisterErrorMessage(signUpError.message));
   }
 
   if (data.session) {
@@ -93,7 +112,7 @@ export async function registerAction(formData: FormData) {
 
     if (workspaceError) {
       redirectWithError(
-        `Hesap oluşturuldu ama çalışma alanı hazırlanamadı: ${workspaceError.message}`
+        "Hesap oluşturuldu ancak çalışma alanı hazırlanamadı. Lütfen giriş yapmayı deneyin."
       );
     }
 
@@ -101,6 +120,6 @@ export async function registerAction(formData: FormData) {
   }
 
   redirectWithLoginMessage(
-    "Kayıt oluşturuldu. Email onayı gerekiyorsa onaylayıp giriş yapınız."
+    "Kaydınız oluşturuldu. E-posta doğrulaması gerekiyorsa gelen kutunuza gönderilen bağlantıyı açıp giriş yapın."
   );
 }
