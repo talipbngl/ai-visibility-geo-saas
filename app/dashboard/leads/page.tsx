@@ -54,7 +54,7 @@ function getStatusLabel(
   }
 
   if (status === "qualified") {
-    return "Uygun lead";
+    return "Uygun müşteri adayı";
   }
 
   if (status === "closed") {
@@ -65,8 +65,7 @@ function getStatusLabel(
     return "Uygun değil";
   }
 
-  return status;
-}
+return "Bilinmeyen durum";}
 
 function getStatusVariant(
   status: string
@@ -138,10 +137,12 @@ export default async function LeadsPage({
     });
 
   if (leadsError) {
-    throw new Error(
-      `Rapor talepleri alınamadı: ${leadsError.message}`
-    );
-  }
+  console.error("Rapor talepleri alınamadı:", leadsError);
+
+  throw new Error(
+    "Rapor talepleri şu anda alınamıyor. Lütfen daha sonra tekrar deneyin."
+  );
+}
 
   const totalLeadCount =
     leads?.length ?? 0;
@@ -164,7 +165,7 @@ export default async function LeadsPage({
       <PageHeader
         eyebrow="Talepler"
         title="Rapor talepleri"
-        description="Landing page üzerinden gelen AI görünürlük raporu taleplerini buradan takip edebilirsin."
+description="Tanıtım sayfasından gelen AI görünürlük raporu taleplerini buradan takip edebilirsiniz."
         actions={
           <>
             <Button
@@ -178,7 +179,7 @@ export default async function LeadsPage({
 
             <Button asChild>
               <Link href="/demo-report">
-                Public demo rapor
+               Herkese açık örnek rapor
               </Link>
             </Button>
           </>
@@ -293,7 +294,7 @@ export default async function LeadsPage({
 
                     <div className="rounded-xl border bg-muted/20 p-3">
                       <p className="text-xs text-muted-foreground">
-                        Website
+                        Web sitesi
                       </p>
 
                       {lead.website_url ? (
@@ -339,7 +340,7 @@ export default async function LeadsPage({
                         <a
                           href={`mailto:${lead.email}`}
                         >
-                          Mail gönder
+                          E-posta gönder
                         </a>
                       </Button>
 
@@ -356,7 +357,7 @@ export default async function LeadsPage({
                             target="_blank"
                             rel="noreferrer"
                           >
-                            Website aç
+                            Web sitesini aç
                           </a>
                         </Button>
                       ) : null}
@@ -391,7 +392,7 @@ export default async function LeadsPage({
                         </option>
 
                         <option value="qualified">
-                          Uygun lead
+                          Uygun müşteri adayı
                         </option>
 
                         <option value="closed">
@@ -417,7 +418,7 @@ export default async function LeadsPage({
           ) : (
             <EmptyState
               title="Henüz talep yok"
-              description="Landing page’deki rapor talep formu doldurulunca talepler burada görünecek."
+description="Landing page’deki rapor talep formu doldurulunca talepler burada görünecek."
               action={
                 <Button asChild>
                   <Link href="/request-report">

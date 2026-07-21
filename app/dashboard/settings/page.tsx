@@ -353,10 +353,8 @@ export default async function SettingsPage() {
               </CardTitle>
 
               <CardDescription className="mt-1">
-                Workspace için bugün
-                kullanılan AI prompt
-                hakkı.
-              </CardDescription>
+  Çalışma alanında bugün kullanılan yapay zekâ işlem hakkı.
+</CardDescription>
             </div>
 
             <Badge
@@ -374,8 +372,7 @@ export default async function SettingsPage() {
         <CardContent className="space-y-5">
           {usageError ? (
             <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
-              Kullanım bilgisi
-              alınamadı: {usageError}
+              Kullanım bilgisi geçici olarak alınamadı. Lütfen sayfayı yenileyip tekrar deneyin.
             </div>
           ) : null}
 
@@ -424,7 +421,7 @@ export default async function SettingsPage() {
             <div className="grid gap-3 sm:grid-cols-3">
               <div className="rounded-xl border p-4">
                 <p className="text-sm text-muted-foreground">
-                  Audit cevapları
+                  Ölçüm cevapları
                 </p>
 
                 <p className="mt-1 text-xl font-semibold">
@@ -436,7 +433,7 @@ export default async function SettingsPage() {
 
               <div className="rounded-xl border p-4">
                 <p className="text-sm text-muted-foreground">
-                  Prompt üretimi
+                  Test sorusu üretimi
                 </p>
 
                 <p className="mt-1 text-xl font-semibold">
@@ -532,7 +529,7 @@ export default async function SettingsPage() {
 
             <div className="rounded-xl border p-4">
               <p className="text-sm text-muted-foreground">
-                Kullanıcı ID
+                Kullanıcı kimliği
               </p>
 
               <p className="mt-1 break-all text-sm font-medium">
@@ -562,15 +559,14 @@ export default async function SettingsPage() {
             </CardTitle>
 
             <CardDescription>
-              Markaların ve ölçümlerin
-              bağlı olduğu workspace.
+              Markaların ve ölçümlerin bağlı olduğu çalışma alanı.
             </CardDescription>
           </CardHeader>
 
           <CardContent className="space-y-4">
             <div className="rounded-xl border p-4">
               <p className="text-sm text-muted-foreground">
-                Workspace adı
+                Çalışma alanı adı
               </p>
 
               <p className="mt-1 font-medium">
@@ -581,7 +577,7 @@ export default async function SettingsPage() {
 
             <div className="rounded-xl border p-4">
               <p className="text-sm text-muted-foreground">
-                Slug
+                Sistem kısa adı
               </p>
 
               <p className="mt-1 font-medium">
@@ -604,7 +600,7 @@ export default async function SettingsPage() {
 
             <div className="rounded-xl border bg-muted/20 p-4">
               <p className="font-medium">
-                MVP durumu
+                Kullanım yapısı
               </p>
 
               <p className="mt-1 text-sm leading-6 text-muted-foreground">
@@ -640,8 +636,7 @@ export default async function SettingsPage() {
                 </p>
 
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Auth, veritabanı ve
-                  RLS bağlantısı.
+                  Kimlik doğrulama, veritabanı ve erişim bağlantısı.
                 </p>
               </div>
 
@@ -657,8 +652,7 @@ export default async function SettingsPage() {
                 </p>
 
                 <p className="mt-1 text-sm text-muted-foreground">
-                  AI cevapları ve test
-                  sorusu üretimi.
+                  Yapay zekâ cevapları ve test sorusu üretimi.
                 </p>
               </div>
 
@@ -694,15 +688,14 @@ export default async function SettingsPage() {
             </CardTitle>
 
             <CardDescription>
-              MVP için kritik güvenlik
-              noktaları.
+              Uygulama için önemli güvenlik kontrolleri.
             </CardDescription>
           </CardHeader>
 
           <CardContent className="space-y-3">
             <div className="rounded-xl border p-4">
               <p className="font-medium">
-                Environment dosyası
+                Ortam değişkenleri dosyası
               </p>
 
               <p className="mt-1 text-sm leading-6 text-muted-foreground">
@@ -717,10 +710,7 @@ export default async function SettingsPage() {
               </p>
 
               <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                API key değerleri
-                gösterilmez. Yalnızca
-                tanımlı olup olmadığı
-                kontrol edilir.
+               API anahtarı değerleri gösterilmez. Yalnızca tanımlı olup olmadığı kontrol edilir.
               </p>
             </div>
 

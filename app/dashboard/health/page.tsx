@@ -105,25 +105,25 @@ export default async function HealthPage() {
       isOk: hasSupabaseUrl,
     },
     {
-      title: "Supabase Publishable Key",
+      title: "Supabase yayınlanabilir anahtarı",
       description:
         "Tarayıcı tarafı Supabase işlemleri için gerekli.",
       isOk: hasSupabaseKey,
     },
     {
-      title: "Supabase Secret Key",
+title: "Supabase gizli anahtarı",
       description:
-        "Server tarafı güvenli işlemler için gerekli.",
+        "Sunucu tarafındaki güvenli işlemler için gerekli.",
       isOk: hasSupabaseSecret,
     },
     {
-      title: "Gemini API Key",
+      title: "Gemini API anahtarı",
       description:
         "AI cevaplarını üretmek için gerekli.",
       isOk: hasGeminiKey,
     },
     {
-      title: "Gemini Model",
+      title: "Gemini Modeli",
       description:
         "Kullanılacak Gemini model adını belirler.",
       isOk: hasGeminiModel,
@@ -134,7 +134,7 @@ export default async function HealthPage() {
     {
       title: "En az 1 marka",
       description:
-        "Demo veya gerçek ölçüm için marka oluşturulmuş olmalı.",
+        "Örnek veya gerçek bir ölçüm için en az bir marka oluşturulmalı.",
       isOk: (brandCount ?? 0) > 0,
       actionHref: "/dashboard/brands/new",
       actionLabel: "Marka ekle",
@@ -150,7 +150,7 @@ export default async function HealthPage() {
     {
       title: "En az 1 analiz skoru",
       description:
-        "Satış demosu için tamamlanmış bir rapor olması iyi olur.",
+        "Ürün sunumu için en az bir tamamlanmış rapor bulunmalı.",
       isOk: (scoreCount ?? 0) > 0,
       actionHref: "/dashboard/audits",
       actionLabel: "Ölçümlere git",
@@ -171,28 +171,25 @@ export default async function HealthPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Sistem Kontrol"
-        title="MVP hazırlık kontrolü"
-        description="Deploy ve satış demosu öncesi temel sistem parçalarının hazır olup olmadığını buradan kontrol edebilirsin."
-        actions={
-          <>
-            <Button
-              asChild
-              variant="outline"
-            >
-              <Link href="/dashboard">
-                Dashboard’a dön
-              </Link>
-            </Button>
+  eyebrow="Sistem Kontrolü"
+  title="Yayın hazırlık kontrolü"
+  description="Uygulamayı yayına almadan önce temel sistem parçalarının ve örnek verilerin hazır olup olmadığını kontrol edin."
+  actions={
+    <>
+      <Button asChild variant="outline">
+        <Link href="/dashboard">
+          Panele dön
+        </Link>
+      </Button>
 
-            <Button asChild>
-              <Link href="/demo-report">
-                Public demo rapor
-              </Link>
-            </Button>
-          </>
-        }
-      />
+      <Button asChild>
+        <Link href="/demo-report">
+          Herkese açık örnek rapor
+        </Link>
+      </Button>
+    </>
+  }
+/>
 
       <section className="grid gap-4 md:grid-cols-4">
         <MetricCard
@@ -203,7 +200,7 @@ export default async function HealthPage() {
 
         <MetricCard
           title="Ölçüm"
-          description="Oluşturulan audit"
+          description="Oluşturulan ölçüm"
           value={auditCount ?? 0}
         />
 
@@ -214,8 +211,8 @@ export default async function HealthPage() {
         />
 
         <MetricCard
-          title="MVP Durumu"
-          description="Demo/satış hazırlığı"
+          title="Yayın Durumu"
+description="Sistem ve veri hazırlığı"
           value={
             isMvpReady
               ? "Hazır"
@@ -233,9 +230,9 @@ export default async function HealthPage() {
       >
         <CardHeader>
           <CardTitle>
-            {isMvpReady
-              ? "MVP demo için hazır görünüyor"
-              : "MVP için tamamlanması gerekenler var"}
+           {isMvpReady
+  ? "Sistem yayına hazır görünüyor"
+  : "Yayından önce tamamlanması gerekenler var"}
           </CardTitle>
 
           <CardDescription>
@@ -267,7 +264,7 @@ export default async function HealthPage() {
 
             <Button asChild>
               <Link href="/dashboard/demo-report">
-                Dashboard demo rapor
+               Panelde örnek rapor
               </Link>
             </Button>
           </div>
@@ -282,9 +279,7 @@ export default async function HealthPage() {
             </CardTitle>
 
             <CardDescription>
-              API key ve bağlantı ayarlarının varlığını
-              kontrol eder. Değerleri güvenlik için
-              göstermez.
+              API anahtarlarının ve bağlantı ayarlarının varlığını kontrol eder. Gizli değerleri göstermez.
             </CardDescription>
           </CardHeader>
 
@@ -315,12 +310,11 @@ export default async function HealthPage() {
         <Card className="shadow-sm">
           <CardHeader>
             <CardTitle>
-              Demo veri kontrolü
+              Örnek veri kontrolü
             </CardTitle>
 
             <CardDescription>
-              Satış demosu için gereken minimum ürün
-              verilerini kontrol eder.
+              Ürün sunumu ve uçtan uca test için gereken temel verileri kontrol eder.
             </CardDescription>
           </CardHeader>
 
