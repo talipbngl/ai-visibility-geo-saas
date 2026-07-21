@@ -450,7 +450,7 @@ Cevap formatı:
   let outputText: string | undefined;
 
   try {
-    const model = process.env.GEMINI_MODEL ?? "gemini-3.5-flash-lite";
+    const model = process.env.GEMINI_MODEL ?? "gemini-3.1-flash-lite";
 
     const geminiResponse = await fetchWithTimeout(
       `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`,

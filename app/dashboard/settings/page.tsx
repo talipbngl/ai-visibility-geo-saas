@@ -21,7 +21,16 @@ type GeminiUsage = {
   daily_remaining: number;
   resets_at: string;
 };
+type GeminiUsageBreakdown = {
+  auditPrompt: number;
+  promptGeneration: number;
+  competitorGeneration: number;
+};
 
+type GeminiUsageBreakdownRow = {
+  operation: string;
+  usage_count: number;
+};
 function formatDate(
   value: string | null | undefined
 ) {
@@ -162,7 +171,11 @@ export default async function SettingsPage() {
 
   let usageError: string | null =
     null;
-
+  let usageBreakdown: GeminiUsageBreakdown = {
+    auditPrompt: 0,
+    promptGeneration: 0,
+    competitorGeneration: 0,
+  };
   if (activeWorkspace) {
     const {
       data: usageData,
@@ -202,6 +215,52 @@ export default async function SettingsPage() {
             firstUsage.resets_at ?? "",
         };
       }
+    }
+        const {
+      data: breakdownData,
+      error: breakdownError,
+    } = await supabase.rpc(
+      "get_workspace_gemini_usage_breakdown",
+      {
+        p_workspace_id:
+          activeWorkspace.id,
+      }
+    );
+
+    if (breakdownError) {
+      usageError = usageError
+        ? `${usageError} | ${breakdownError.message}`
+        : breakdownError.message;
+    } else {
+      const rows =
+        (breakdownData ??
+          []) as GeminiUsageBreakdownRow[];
+
+      usageBreakdown = {
+        auditPrompt: Number(
+          rows.find(
+            (row) =>
+              row.operation ===
+              "audit_prompt"
+          )?.usage_count ?? 0
+        ),
+
+        promptGeneration: Number(
+          rows.find(
+            (row) =>
+              row.operation ===
+              "prompt_generation"
+          )?.usage_count ?? 0
+        ),
+
+        competitorGeneration: Number(
+          rows.find(
+            (row) =>
+              row.operation ===
+              "competitor_generation"
+          )?.usage_count ?? 0
+        ),
+      };
     }
   }
 
@@ -357,7 +416,49 @@ export default async function SettingsPage() {
               </p>
             </div>
           </div>
+                     <div className="space-y-3">
+            <p className="text-sm font-medium">
+              Kullanım dağılımı
+            </p>
 
+            <div className="grid gap-3 sm:grid-cols-3">
+              <div className="rounded-xl border p-4">
+                <p className="text-sm text-muted-foreground">
+                  Audit cevapları
+                </p>
+
+                <p className="mt-1 text-xl font-semibold">
+                  {
+                    usageBreakdown.auditPrompt
+                  }
+                </p>
+              </div>
+
+              <div className="rounded-xl border p-4">
+                <p className="text-sm text-muted-foreground">
+                  Prompt üretimi
+                </p>
+
+                <p className="mt-1 text-xl font-semibold">
+                  {
+                    usageBreakdown.promptGeneration
+                  }
+                </p>
+              </div>
+
+              <div className="rounded-xl border p-4">
+                <p className="text-sm text-muted-foreground">
+                  Rakip üretimi
+                </p>
+
+                <p className="mt-1 text-xl font-semibold">
+                  {
+                    usageBreakdown.competitorGeneration
+                  }
+                </p>
+              </div>
+            </div>
+          </div>
           <div>
             <div className="mb-2 flex items-center justify-between gap-4 text-sm">
               <span className="text-muted-foreground">
