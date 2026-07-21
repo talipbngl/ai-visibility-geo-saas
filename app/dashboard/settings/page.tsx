@@ -1,6 +1,5 @@
 import Link from "next/link";
 
-import { createClient } from "@/lib/supabase/server";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -10,32 +9,83 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { MetricCard, PageHeader } from "@/features/ui/components";
+import {
+  MetricCard,
+  PageHeader,
+} from "@/features/ui/components";
+import { createClient } from "@/lib/supabase/server";
 
-function formatDate(value: string | null | undefined) {
-  if (!value) return "-";
+type GeminiUsage = {
+  daily_used: number;
+  daily_limit: number;
+  daily_remaining: number;
+  resets_at: string;
+};
 
-  return new Intl.DateTimeFormat("tr-TR", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
+function formatDate(
+  value: string | null | undefined
+) {
+  if (!value) {
+    return "-";
+  }
+
+  return new Intl.DateTimeFormat(
+    "tr-TR",
+    {
+      dateStyle: "medium",
+      timeStyle: "short",
+    }
+  ).format(new Date(value));
 }
 
-function maskEmail(email: string | undefined) {
-  if (!email) return "-";
+function maskEmail(
+  email: string | undefined
+) {
+  if (!email) {
+    return "-";
+  }
 
-  const [name, domain] = email.split("@");
+  const [name, domain] =
+    email.split("@");
 
-  if (!name || !domain) return email;
+  if (!name || !domain) {
+    return email;
+  }
 
-  const visibleName = name.slice(0, 2);
-  const maskedName = `${visibleName}${"*".repeat(Math.max(name.length - 2, 3))}`;
+  const visibleName =
+    name.slice(0, 2);
+
+  const maskedName =
+    `${visibleName}${"*".repeat(
+      Math.max(name.length - 2, 3)
+    )}`;
 
   return `${maskedName}@${domain}`;
 }
 
+function getDailyGeminiPromptLimit() {
+  const configuredLimit = Number(
+    process.env
+      .DAILY_GEMINI_PROMPT_LIMIT ??
+      50
+  );
+
+  if (
+    !Number.isInteger(configuredLimit) ||
+    configuredLimit < 1
+  ) {
+    return 50;
+  }
+
+  return Math.min(
+    configuredLimit,
+    500
+  );
+}
+
 export default async function SettingsPage() {
-  const supabase = await createClient();
+  const supabase =
+    await createClient();
 
   const {
     data: { user },
@@ -44,37 +94,143 @@ export default async function SettingsPage() {
   const { data: profile } = user
     ? await supabase
         .from("profiles")
-        .select("id, email, full_name, created_at")
+        .select(
+          "id, email, full_name, created_at"
+        )
         .eq("id", user.id)
         .maybeSingle()
     : { data: null };
 
-  const { data: workspaces } = await supabase
-    .from("workspaces")
-    .select("id, name, slug, created_at")
-    .order("created_at", { ascending: true })
-    .limit(5);
+  const { data: workspaces } =
+    await supabase
+      .from("workspaces")
+      .select(
+        "id, name, slug, created_at"
+      )
+      .order("created_at", {
+        ascending: true,
+      })
+      .limit(5);
 
-  const activeWorkspace = workspaces?.[0];
+  const activeWorkspace =
+    workspaces?.[0];
 
-  const { count: brandCount } = await supabase
-    .from("brands")
-    .select("id", { count: "exact", head: true });
+  const [
+    brandResult,
+    auditResult,
+    promptResult,
+    competitorResult,
+  ] = await Promise.all([
+    supabase
+      .from("brands")
+      .select("id", {
+        count: "exact",
+        head: true,
+      }),
 
-  const { count: auditCount } = await supabase
-    .from("audits")
-    .select("id", { count: "exact", head: true });
+    supabase
+      .from("audits")
+      .select("id", {
+        count: "exact",
+        head: true,
+      }),
 
-  const { count: promptCount } = await supabase
-    .from("prompts")
-    .select("id", { count: "exact", head: true });
+    supabase
+      .from("prompts")
+      .select("id", {
+        count: "exact",
+        head: true,
+      }),
 
-  const { count: competitorCount } = await supabase
-    .from("competitors")
-    .select("id", { count: "exact", head: true });
+    supabase
+      .from("competitors")
+      .select("id", {
+        count: "exact",
+        head: true,
+      }),
+  ]);
 
-  const hasGeminiKey = Boolean(process.env.GEMINI_API_KEY);
-  const geminiModel = process.env.GEMINI_MODEL ?? "gemini-3.1-flash-lite";
+  const dailyLimit =
+    getDailyGeminiPromptLimit();
+
+  let geminiUsage: GeminiUsage = {
+    daily_used: 0,
+    daily_limit: dailyLimit,
+    daily_remaining: dailyLimit,
+    resets_at: "",
+  };
+
+  let usageError: string | null =
+    null;
+
+  if (activeWorkspace) {
+    const {
+      data: usageData,
+      error,
+    } = await supabase.rpc(
+      "get_workspace_gemini_usage",
+      {
+        p_workspace_id:
+          activeWorkspace.id,
+        p_daily_limit: dailyLimit,
+      }
+    );
+
+    if (error) {
+      usageError = error.message;
+    } else {
+      const firstUsage = (
+        usageData ?? []
+      )[0] as
+        | GeminiUsage
+        | undefined;
+
+      if (firstUsage) {
+        geminiUsage = {
+          daily_used: Number(
+            firstUsage.daily_used ?? 0
+          ),
+          daily_limit: Number(
+            firstUsage.daily_limit ??
+              dailyLimit
+          ),
+          daily_remaining: Number(
+            firstUsage.daily_remaining ??
+              dailyLimit
+          ),
+          resets_at:
+            firstUsage.resets_at ?? "",
+        };
+      }
+    }
+  }
+
+  const usagePercentage =
+    geminiUsage.daily_limit > 0
+      ? Math.min(
+          Math.round(
+            (geminiUsage.daily_used /
+              geminiUsage.daily_limit) *
+              100
+          ),
+          100
+        )
+      : 0;
+
+  const usageBarColor =
+    usagePercentage >= 90
+      ? "bg-destructive"
+      : usagePercentage >= 70
+        ? "bg-amber-500"
+        : "bg-emerald-500";
+
+  const hasGeminiKey = Boolean(
+    process.env.GEMINI_API_KEY
+  );
+
+  const geminiModel =
+    process.env.GEMINI_MODEL ??
+    "gemini-3.1-flash-lite";
 
   return (
     <div className="space-y-6">
@@ -83,8 +239,13 @@ export default async function SettingsPage() {
         title="Hesap ve çalışma alanı"
         description="Hesap bilgilerini, çalışma alanı özetini ve sistem durumunu buradan kontrol edebilirsin."
         actions={
-          <Button asChild variant="outline">
-            <Link href="/dashboard">Panele dön</Link>
+          <Button
+            asChild
+            variant="outline"
+          >
+            <Link href="/dashboard">
+              Panele dön
+            </Link>
           </Button>
         }
       />
@@ -93,63 +254,201 @@ export default async function SettingsPage() {
         <MetricCard
           title="Markalar"
           description="Takip edilen toplam marka"
-          value={brandCount ?? 0}
+          value={
+            brandResult.count ?? 0
+          }
         />
 
         <MetricCard
           title="Rakipler"
           description="Tanımlanan toplam rakip"
-          value={competitorCount ?? 0}
+          value={
+            competitorResult.count ??
+            0
+          }
         />
 
         <MetricCard
           title="Test Soruları"
           description="Oluşturulan toplam soru"
-          value={promptCount ?? 0}
+          value={
+            promptResult.count ?? 0
+          }
         />
 
         <MetricCard
           title="Ölçümler"
           description="Başlatılan toplam ölçüm"
-          value={auditCount ?? 0}
+          value={
+            auditResult.count ?? 0
+          }
         />
       </section>
 
-      <section className="grid gap-6 lg:grid-cols-[1fr_1fr]">
+      <Card className="border-primary/20 shadow-sm">
+        <CardHeader>
+          <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
+            <div>
+              <CardTitle>
+                Günlük Gemini Kullanımı
+              </CardTitle>
+
+              <CardDescription className="mt-1">
+                Workspace için bugün
+                kullanılan AI prompt
+                hakkı.
+              </CardDescription>
+            </div>
+
+            <Badge
+              variant={
+                usagePercentage >= 90
+                  ? "destructive"
+                  : "secondary"
+              }
+            >
+              %{usagePercentage} kullanıldı
+            </Badge>
+          </div>
+        </CardHeader>
+
+        <CardContent className="space-y-5">
+          {usageError ? (
+            <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
+              Kullanım bilgisi
+              alınamadı: {usageError}
+            </div>
+          ) : null}
+
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="rounded-xl border bg-muted/20 p-4">
+              <p className="text-sm text-muted-foreground">
+                Bugün kullanılan
+              </p>
+
+              <p className="mt-1 text-2xl font-semibold">
+                {
+                  geminiUsage.daily_used
+                }
+              </p>
+            </div>
+
+            <div className="rounded-xl border bg-muted/20 p-4">
+              <p className="text-sm text-muted-foreground">
+                Kalan hak
+              </p>
+
+              <p className="mt-1 text-2xl font-semibold">
+                {
+                  geminiUsage.daily_remaining
+                }
+              </p>
+            </div>
+
+            <div className="rounded-xl border bg-muted/20 p-4">
+              <p className="text-sm text-muted-foreground">
+                Günlük limit
+              </p>
+
+              <p className="mt-1 text-2xl font-semibold">
+                {
+                  geminiUsage.daily_limit
+                }
+              </p>
+            </div>
+          </div>
+
+          <div>
+            <div className="mb-2 flex items-center justify-between gap-4 text-sm">
+              <span className="text-muted-foreground">
+                Kullanım oranı
+              </span>
+
+              <span className="font-medium">
+                {geminiUsage.daily_used} /{" "}
+                {geminiUsage.daily_limit}
+              </span>
+            </div>
+
+            <div className="h-3 overflow-hidden rounded-full bg-muted">
+              <div
+                className={`h-full rounded-full transition-all ${usageBarColor}`}
+                style={{
+                  width: `${usagePercentage}%`,
+                }}
+              />
+            </div>
+          </div>
+
+          <p className="text-sm text-muted-foreground">
+            Limit UTC gece yarısında
+            yenilenir
+            {geminiUsage.resets_at
+              ? ` (${formatDate(
+                  geminiUsage.resets_at
+                )})`
+              : "."}
+          </p>
+        </CardContent>
+      </Card>
+
+      <section className="grid gap-6 lg:grid-cols-2">
         <Card className="shadow-sm">
           <CardHeader>
-            <CardTitle>Hesap Bilgileri</CardTitle>
+            <CardTitle>
+              Hesap Bilgileri
+            </CardTitle>
+
             <CardDescription>
-              Oturum açan kullanıcı bilgileri.
+              Oturum açan kullanıcı
+              bilgileri.
             </CardDescription>
           </CardHeader>
 
           <CardContent className="space-y-4">
             <div className="rounded-xl border p-4">
-              <p className="text-sm text-muted-foreground">E-posta</p>
+              <p className="text-sm text-muted-foreground">
+                E-posta
+              </p>
+
               <p className="mt-1 font-medium">
-                {profile?.email ?? user?.email ?? "-"}
+                {profile?.email ??
+                  user?.email ??
+                  "-"}
               </p>
             </div>
 
             <div className="rounded-xl border p-4">
-              <p className="text-sm text-muted-foreground">Görünen ad</p>
+              <p className="text-sm text-muted-foreground">
+                Görünen ad
+              </p>
+
               <p className="mt-1 font-medium">
-                {profile?.full_name || "Henüz eklenmedi"}
+                {profile?.full_name ||
+                  "Henüz eklenmedi"}
               </p>
             </div>
 
             <div className="rounded-xl border p-4">
-              <p className="text-sm text-muted-foreground">Kullanıcı ID</p>
+              <p className="text-sm text-muted-foreground">
+                Kullanıcı ID
+              </p>
+
               <p className="mt-1 break-all text-sm font-medium">
                 {user?.id ?? "-"}
               </p>
             </div>
 
             <div className="rounded-xl border p-4">
-              <p className="text-sm text-muted-foreground">Kayıt tarihi</p>
+              <p className="text-sm text-muted-foreground">
+                Kayıt tarihi
+              </p>
+
               <p className="mt-1 font-medium">
-                {formatDate(profile?.created_at ?? user?.created_at)}
+                {formatDate(
+                  profile?.created_at ??
+                    user?.created_at
+                )}
               </p>
             </div>
           </CardContent>
@@ -157,116 +456,181 @@ export default async function SettingsPage() {
 
         <Card className="shadow-sm">
           <CardHeader>
-            <CardTitle>Çalışma Alanı</CardTitle>
+            <CardTitle>
+              Çalışma Alanı
+            </CardTitle>
+
             <CardDescription>
-              Markaların ve ölçümlerin bağlı olduğu workspace bilgisi.
+              Markaların ve ölçümlerin
+              bağlı olduğu workspace.
             </CardDescription>
           </CardHeader>
 
           <CardContent className="space-y-4">
             <div className="rounded-xl border p-4">
-              <p className="text-sm text-muted-foreground">Workspace adı</p>
+              <p className="text-sm text-muted-foreground">
+                Workspace adı
+              </p>
+
               <p className="mt-1 font-medium">
-                {activeWorkspace?.name ?? "Varsayılan çalışma alanı"}
+                {activeWorkspace?.name ??
+                  "Varsayılan çalışma alanı"}
               </p>
             </div>
 
             <div className="rounded-xl border p-4">
-              <p className="text-sm text-muted-foreground">Slug</p>
+              <p className="text-sm text-muted-foreground">
+                Slug
+              </p>
+
               <p className="mt-1 font-medium">
-                {activeWorkspace?.slug ?? "-"}
+                {activeWorkspace?.slug ??
+                  "-"}
               </p>
             </div>
 
             <div className="rounded-xl border p-4">
-              <p className="text-sm text-muted-foreground">Oluşturulma</p>
+              <p className="text-sm text-muted-foreground">
+                Oluşturulma
+              </p>
+
               <p className="mt-1 font-medium">
-                {formatDate(activeWorkspace?.created_at)}
+                {formatDate(
+                  activeWorkspace?.created_at
+                )}
               </p>
             </div>
 
             <div className="rounded-xl border bg-muted/20 p-4">
-              <p className="font-medium">Not</p>
+              <p className="font-medium">
+                MVP durumu
+              </p>
+
               <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                Workspace düzenleme, ekip üyeleri ve rol yönetimi production
-                aşamasında eklenecek. Şu an tek kullanıcı odaklı MVP akışı
-                kullanılıyor.
+                Şu anda tek kullanıcı
+                odaklı çalışma alanı
+                kullanılıyor. Ekip ve rol
+                yönetimi sonraki aşamada
+                genişletilecek.
               </p>
             </div>
           </CardContent>
         </Card>
       </section>
 
-      <section className="grid gap-6 lg:grid-cols-[1fr_1fr]">
+      <section className="grid gap-6 lg:grid-cols-2">
         <Card className="shadow-sm">
           <CardHeader>
-            <CardTitle>Sistem Durumu</CardTitle>
+            <CardTitle>
+              Sistem Durumu
+            </CardTitle>
+
             <CardDescription>
-              Uygulamanın çalışması için kritik servislerin kısa kontrolü.
+              Kritik servislerin kısa
+              kontrolü.
             </CardDescription>
           </CardHeader>
 
           <CardContent className="space-y-3">
             <div className="flex items-center justify-between gap-3 rounded-xl border p-4">
               <div>
-                <p className="font-medium">Supabase</p>
+                <p className="font-medium">
+                  Supabase
+                </p>
+
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Auth, veritabanı ve RLS bağlantısı.
+                  Auth, veritabanı ve
+                  RLS bağlantısı.
                 </p>
               </div>
 
-              <Badge variant="secondary">Aktif</Badge>
+              <Badge variant="secondary">
+                Aktif
+              </Badge>
             </div>
 
             <div className="flex items-center justify-between gap-3 rounded-xl border p-4">
               <div>
-                <p className="font-medium">Gemini API</p>
+                <p className="font-medium">
+                  Gemini API
+                </p>
+
                 <p className="mt-1 text-sm text-muted-foreground">
-                  AI cevapları ve test sorusu üretimi için kullanılır.
+                  AI cevapları ve test
+                  sorusu üretimi.
                 </p>
               </div>
 
-              <Badge variant={hasGeminiKey ? "secondary" : "destructive"}>
-                {hasGeminiKey ? "Tanımlı" : "Eksik"}
+              <Badge
+                variant={
+                  hasGeminiKey
+                    ? "secondary"
+                    : "destructive"
+                }
+              >
+                {hasGeminiKey
+                  ? "Tanımlı"
+                  : "Eksik"}
               </Badge>
             </div>
 
             <div className="rounded-xl border p-4">
-              <p className="text-sm text-muted-foreground">Aktif model</p>
-              <p className="mt-1 font-medium">{geminiModel}</p>
+              <p className="text-sm text-muted-foreground">
+                Aktif model
+              </p>
+
+              <p className="mt-1 font-medium">
+                {geminiModel}
+              </p>
             </div>
           </CardContent>
         </Card>
 
         <Card className="shadow-sm">
           <CardHeader>
-            <CardTitle>Güvenlik Notları</CardTitle>
+            <CardTitle>
+              Güvenlik Notları
+            </CardTitle>
+
             <CardDescription>
-              MVP için dikkat edilmesi gereken temel noktalar.
+              MVP için kritik güvenlik
+              noktaları.
             </CardDescription>
           </CardHeader>
 
           <CardContent className="space-y-3">
             <div className="rounded-xl border p-4">
-              <p className="font-medium">Environment dosyası</p>
+              <p className="font-medium">
+                Environment dosyası
+              </p>
+
               <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                <code>.env.local</code> dosyası GitHub’a gönderilmemeli. API
-                keyler sadece local ve deploy ortamında tutulmalı.
+                <code>.env.local</code>{" "}
+                GitHub’a gönderilmemeli.
               </p>
             </div>
 
             <div className="rounded-xl border p-4">
-              <p className="font-medium">Gizli bilgiler</p>
+              <p className="font-medium">
+                Gizli bilgiler
+              </p>
+
               <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                Bu sayfada API key değerleri gösterilmez. Sadece tanımlı olup
-                olmadığı kontrol edilir.
+                API key değerleri
+                gösterilmez. Yalnızca
+                tanımlı olup olmadığı
+                kontrol edilir.
               </p>
             </div>
 
             <div className="rounded-xl border p-4">
-              <p className="font-medium">Kullanıcı e-postası</p>
+              <p className="font-medium">
+                Kullanıcı e-postası
+              </p>
+
               <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                Maskeli görünüm örneği: {maskEmail(user?.email)}
+                Maskeli görünüm:{" "}
+                {maskEmail(user?.email)}
               </p>
             </div>
           </CardContent>
