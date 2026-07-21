@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import { forgotPasswordAction } from "@/features/auth/actions/forgot-password.action";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -11,7 +12,10 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-
+export const metadata: Metadata = {
+  title: "Şifremi Unuttum",
+  description: "Hesabınız için şifre sıfırlama bağlantısı isteyin.",
+};
 type ForgotPasswordPageProps = {
   searchParams: Promise<{
     error?: string;
@@ -30,7 +34,7 @@ export default async function ForgotPasswordPage({
         <CardHeader>
           <CardTitle>Şifremi unuttum</CardTitle>
           <CardDescription>
-            Email adresini yaz, şifre sıfırlama bağlantısı gönderelim.
+            E-posta adresinizi girin, şifre sıfırlama bağlantısını gönderelim.
           </CardDescription>
         </CardHeader>
 
@@ -49,12 +53,12 @@ export default async function ForgotPasswordPage({
 
           <form action={forgotPasswordAction} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email">E-posta</Label>
               <Input
                 id="email"
                 name="email"
                 type="email"
-                placeholder="ornek@email.com"
+                placeholder="ornek@firma.com"
                 autoComplete="email"
                 required
               />
@@ -66,7 +70,7 @@ export default async function ForgotPasswordPage({
           </form>
 
           <p className="mt-4 text-center text-sm text-muted-foreground">
-            Şifreni hatırladın mı?{" "}
+            Şifrenizi hatırladınız mı?{" "}
             <Link href="/login" className="font-medium text-foreground">
               Giriş yap
             </Link>

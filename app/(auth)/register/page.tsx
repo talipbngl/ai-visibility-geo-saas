@@ -1,5 +1,5 @@
 import Link from "next/link";
-
+import type { Metadata } from "next";
 import { registerAction } from "@/features/auth/actions/register.action";
 import { Button } from "@/components/ui/button";
 import {
@@ -18,7 +18,10 @@ type RegisterPageProps = {
     message?: string;
   }>;
 };
-
+export const metadata: Metadata = {
+  title: "Hesap Oluştur",
+  description: "AI görünürlük panelini kullanmak için ücretsiz hesap oluşturun.",
+};
 export default async function RegisterPage({
   searchParams,
 }: RegisterPageProps) {
@@ -30,7 +33,7 @@ export default async function RegisterPage({
         <CardHeader className="space-y-2">
           <CardTitle className="text-2xl">Hesap oluştur</CardTitle>
           <CardDescription>
-            AI görünürlük panelini kullanmak için kayıt oluştur.
+            AI görünürlük panelini kullanmaya başlamak için ücretsiz hesabınızı oluşturun.
           </CardDescription>
         </CardHeader>
 
@@ -49,24 +52,24 @@ export default async function RegisterPage({
 
           <form action={registerAction} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="fullName">Ad Soyad</Label>
+              <Label htmlFor="fullName">Ad ve soyad</Label>
               <Input
                 id="fullName"
                 name="fullName"
                 type="text"
-                placeholder="Ad Soyad"
+                placeholder="Adınızı ve soyadınızı girin"
                 autoComplete="name"
                 required
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email">E-posta</Label>
               <Input
                 id="email"
                 name="email"
                 type="email"
-                placeholder="ornek@email.com"
+                placeholder="ornek@firma.com"
                 autoComplete="email"
                 required
               />
@@ -91,7 +94,7 @@ export default async function RegisterPage({
           </form>
 
           <p className="text-center text-sm text-muted-foreground">
-            Zaten hesabın var mı?{" "}
+            Zaten hesabınız var mı?{" "}
             <Link
               href="/login"
               className="font-medium text-foreground underline underline-offset-4"

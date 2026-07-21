@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import { loginAction } from "@/features/auth/actions/login.action";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -19,7 +20,10 @@ type LoginPageProps = {
     next?: string;
   }>;
 };
-
+export const metadata: Metadata = {
+  title: "Giriş Yap",
+  description: "AI görünürlük paneli hesabınıza giriş yapın.",
+};
 export default async function LoginPage({ searchParams }: LoginPageProps) {
   const params = await searchParams;
 
@@ -29,7 +33,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
         <CardHeader>
           <CardTitle>Giriş yap</CardTitle>
           <CardDescription>
-            Markalarının AI görünürlüğünü takip etmek için giriş yap.
+            Markalarınızın yapay zekâ cevaplarındaki görünürlüğünü takip etmek için giriş yapın.
           </CardDescription>
         </CardHeader>
 
@@ -50,12 +54,12 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
             <input type="hidden" name="next" value={params.next ?? "/dashboard"} />
 
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email">E-posta</Label>
               <Input
                 id="email"
                 name="email"
                 type="email"
-                placeholder="ornek@email.com"
+                placeholder="ornek@firma.com"
                 autoComplete="email"
                 required
               />
@@ -67,7 +71,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
                 id="password"
                 name="password"
                 type="password"
-                placeholder="Şifren"
+                placeholder="Şifrenizi girin"
                 autoComplete="current-password"
                 required
               />
