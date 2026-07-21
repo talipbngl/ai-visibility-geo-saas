@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { fetchWithTimeout } from "@/lib/gemini/fetch-with-timeout";
 
 import { createClient } from "@/lib/supabase/server";
 
@@ -216,7 +217,7 @@ export async function POST(request: Request, context: RouteContext) {
   const { data: brand, error: brandError } = await supabase
     .from("brands")
     .select(
-      "id, name, website_url, industry, country, language, description, target_audience, primary_offer"
+      "id, name, workspace_id, website_url, industry, country, language, description, target_audience, primary_offer"
     )
     .eq("id", brandId)
     .maybeSingle();
@@ -254,12 +255,39 @@ export async function POST(request: Request, context: RouteContext) {
     existingCompetitorNames,
   });
 
+    const {
+    error: usageError,
+  } = await supabase.rpc(
+    "consume_gemini_usage",
+    {
+      p_workspace_id:
+        brand.workspace_id,
+      p_operation:
+        "competitor_generation",
+      p_daily_limit:
+        Number(
+          process.env
+            .DAILY_GEMINI_PROMPT_LIMIT ??
+            50
+        ) || 50,
+    }
+  );
+
+  if (usageError) {
+    return redirectTo(
+      `/dashboard/brands/${brand.id}/competitors?error=${encodeURIComponent(
+        usageError.message
+      )}`,
+      request.url
+    );
+  }
+
   let outputText: string | undefined;
 
   try {
     const model = process.env.GEMINI_MODEL ?? "gemini-3.1-flash-lite";
 
-    const geminiResponse = await fetch(
+    const geminiResponse = await fetchWithTimeout(
       `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`,
       {
         method: "POST",

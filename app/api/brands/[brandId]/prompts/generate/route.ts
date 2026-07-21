@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-
+import { fetchWithTimeout } from "@/lib/gemini/fetch-with-timeout";
 import { createClient } from "@/lib/supabase/server";
 
 const generatedPromptSchema = z.object({
@@ -251,6 +251,7 @@ export async function POST(request: Request, context: RouteContext) {
       `
       id,
       name,
+      workspace_id,
       website_url,
       industry,
       country,
@@ -420,13 +421,38 @@ Cevap formatı:
   ]
 }
 `;
+    const {
+    error: usageError,
+  } = await supabase.rpc(
+    "consume_gemini_usage",
+    {
+      p_workspace_id:
+        brand.workspace_id,
+      p_operation:
+        "prompt_generation",
+      p_daily_limit:
+        Number(
+          process.env
+            .DAILY_GEMINI_PROMPT_LIMIT ??
+            50
+        ) || 50,
+    }
+  );
 
+  if (usageError) {
+    return redirectTo(
+      `/dashboard/brands/${brandId}/prompts?error=${encodeURIComponent(
+        usageError.message
+      )}`,
+      request.url
+    );
+  }
   let outputText: string | undefined;
 
   try {
-    const model = process.env.GEMINI_MODEL ?? "gemini-3.5-flash";
+    const model = process.env.GEMINI_MODEL ?? "gemini-3.5-flash-lite";
 
-    const geminiResponse = await fetch(
+    const geminiResponse = await fetchWithTimeout(
       `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`,
       {
         method: "POST",
