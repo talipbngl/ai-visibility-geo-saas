@@ -1,6 +1,6 @@
 import { assertPublicWebsiteUrl } from "@/lib/security/public-website-url";
 import { getWebsiteKeywordPreset } from "@/lib/website-analysis/keyword-presets";
-
+import { crawlLinkedPages } from "@/lib/website-analysis/crawl-linked-pages";
 const MAX_REDIRECTS = 5;
 const MAX_HTML_BYTES = 2 * 1024 * 1024;
 const MAX_STORED_TEXT_LENGTH = 30_000;
@@ -36,7 +36,17 @@ export type TechnicalSignals = {
   hasContactLink: boolean;
   hasAboutLink: boolean;
   hasPrivacyLink: boolean;
+pagesAnalyzed: number;
+pagesFailed: number;
+pagesBlockedByRobots: number;
+robotsTxtChecked: boolean;
+analyzedPages: Array<{
+  url: string;
+  title: string | null;
+  wordCount: number;
+}>;
   headingOrderValid: boolean;
+  pagesDiscovered: number;
 };
 
 export type CategoryScores = {
@@ -583,6 +593,12 @@ function createEmptyTechnicalSignals(): TechnicalSignals {
     hasContactLink: false,
     hasAboutLink: false,
     hasPrivacyLink: false,
+    pagesDiscovered: 0,
+pagesAnalyzed: 0,
+pagesFailed: 0,
+pagesBlockedByRobots: 0,
+robotsTxtChecked: false,
+analyzedPages: [],
     headingOrderValid: false,
   };
 }
@@ -763,26 +779,39 @@ export async function analyzeWebsite({
     const h1 = extractTagTexts(html, "h1");
     const h2 = extractTagTexts(html, "h2");
 
-    const fullExtractedText = stripHtml(html);
-    const extractedText = fullExtractedText.slice(
-      0,
-      MAX_STORED_TEXT_LENGTH
-    );
+    const homepageText = stripHtml(html);
 
-    const searchableText = normalizeText(
-      [
-        title,
-        metaDescription,
-        h1.join(" "),
-        h2.join(" "),
-        fullExtractedText.slice(0, MAX_SEARCHABLE_TEXT_LENGTH),
-      ]
-        .filter(Boolean)
-        .join(" ")
-    );
+const linkedPageCrawl = await crawlLinkedPages({
+  homepageHtml: html,
+  homepageUrl: finalUrl,
+});
+
+const combinedText = [
+  homepageText,
+  ...linkedPageCrawl.pages.map((page) => page.text),
+]
+  .filter(Boolean)
+  .join(" ");
+
+const extractedText = combinedText.slice(
+  0,
+  MAX_STORED_TEXT_LENGTH
+);
+
+const searchableText = normalizeText(
+  [
+    title,
+    metaDescription,
+    h1.join(" "),
+    h2.join(" "),
+    combinedText.slice(0, MAX_SEARCHABLE_TEXT_LENGTH),
+  ]
+    .filter(Boolean)
+    .join(" ")
+);
 
     const keywordPreset = getWebsiteKeywordPreset(industry);
-    const wordCount = getWordCount(fullExtractedText);
+    const wordCount = getWordCount(combinedText);
 
     const serviceSignals = getSignals(
       searchableText,
@@ -852,6 +881,28 @@ export async function analyzeWebsite({
       ...imageSignals,
       ...linkSignals,
       headingOrderValid: extractHeadingOrderValidity(html),
+      pagesDiscovered:
+  linkedPageCrawl.discoveredPageCount + 1,
+pagesAnalyzed:
+  linkedPageCrawl.analyzedPageCount + 1,
+pagesFailed:
+  linkedPageCrawl.failedPageCount,
+pagesBlockedByRobots:
+  linkedPageCrawl.blockedByRobotsCount,
+robotsTxtChecked:
+  linkedPageCrawl.robotsChecked,
+analyzedPages: [
+  {
+    url: finalUrl,
+    title,
+    wordCount: getWordCount(homepageText),
+  },
+  ...linkedPageCrawl.pages.map((page) => ({
+    url: page.url,
+    title: page.title,
+    wordCount: page.wordCount,
+  })),
+],
     };
 
     const categoryScores = calculateCategoryScores({

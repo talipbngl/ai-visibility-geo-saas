@@ -149,6 +149,10 @@ export function WebsiteAnalysisSummary({
     technicalSignals,
     "internalLinkCount"
   );
+  const pagesAnalyzed = Math.max(
+  getNumber(technicalSignals, "pagesAnalyzed"),
+  1
+);
 
   const schemaTypes = getStringArray(
     technicalSignals,
@@ -283,6 +287,12 @@ export function WebsiteAnalysisSummary({
     .slice(0, 5);
 
   const strengths: Strength[] = [];
+  if (pagesAnalyzed >= 3) {
+  strengths.push({
+    title: "Birden fazla sayfa incelendi",
+    description: `${pagesAnalyzed} sayfadaki içerik ve güven sinyalleri birlikte değerlendirildi.`,
+  });
+}
 
   if (technicalScore >= 70) {
     strengths.push({
@@ -512,7 +522,16 @@ export function WebsiteAnalysisSummary({
           </CardDescription>
         </CardHeader>
 
-        <CardContent className="grid gap-4 md:grid-cols-3">
+        <CardContent className="grid gap-4 md:grid-cols-4">
+            <div className="rounded-xl border p-4">
+  <p className="text-sm text-muted-foreground">
+    İncelenen sayfa
+  </p>
+
+  <p className="mt-1 text-xl font-semibold">
+    {pagesAnalyzed}
+  </p>
+</div>
           <div className="rounded-xl border p-4">
             <p className="text-sm text-muted-foreground">
               Kelime sayısı
