@@ -92,18 +92,22 @@ export async function POST(
       word_count: result.wordCount,
       service_signals_json: result.serviceSignals,
       trust_signals_json: result.trustSignals,
+      technical_signals_json: result.technicalSignals,
+      category_scores_json: result.categoryScores,
       content_score: result.contentScore,
       error_message: result.errorMessage,
     });
 
-  if (insertError) {
-    return redirectTo(
-      `/dashboard/brands/${brand.id}/website?error=${encodeURIComponent(
-        insertError.message
-      )}`,
-      request.url
-    );
-  }
+        if (insertError) {
+        console.error("Web sitesi analiz sonucu kaydedilemedi:", insertError);
+
+        return redirectTo(
+          `/dashboard/brands/${brand.id}/website?error=${encodeURIComponent(
+            "Analiz tamamlandı ancak sonuçlar kaydedilemedi."
+          )}`,
+          request.url
+        );
+      }
 
   revalidatePath(`/dashboard/brands/${brand.id}/website`);
   revalidatePath(`/dashboard/brands/${brand.id}`);
