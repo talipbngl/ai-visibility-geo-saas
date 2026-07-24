@@ -418,7 +418,7 @@ description="Tanıtım sayfasından gelen AI görünürlük raporu taleplerini b
           ) : (
             <EmptyState
               title="Henüz talep yok"
-description="Landing page’deki rapor talep formu doldurulunca talepler burada görünecek."
+                description="Landing page’deki rapor talep formu doldurulunca talepler burada görünecek."
               action={
                 <Button asChild>
                   <Link href="/request-report">

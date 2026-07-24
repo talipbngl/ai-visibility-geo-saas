@@ -6,7 +6,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-
+import { WebsiteContentOpportunities } from "@/features/website/components/WebsiteContentOpportunities";
 type WebsiteAnalysisSummaryProps = {
   categoryScoresValue: unknown;
   technicalSignalsValue: unknown;
@@ -513,7 +513,17 @@ export function WebsiteAnalysisSummary({
           </CardContent>
         </Card>
       </section>
-
+      <WebsiteContentOpportunities
+        technicalSignalsValue={
+            technicalSignalsValue
+        }
+        serviceSignalsValue={
+            serviceSignalsValue
+        }
+        trustSignalsValue={
+            trustSignalsValue
+        }
+        />
       <Card className="shadow-sm">
         <CardHeader>
           <CardTitle>Kısa içerik özeti</CardTitle>
