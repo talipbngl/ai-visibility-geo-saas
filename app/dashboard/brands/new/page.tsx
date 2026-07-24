@@ -29,8 +29,8 @@ export default async function NewBrandPage({
     <div className="space-y-6">
       <PageHeader
         eyebrow="Yeni Marka"
-        title="AI görünürlük ölçümü için marka ekle"
-        description="Marka bilgileri; test sorusu üretimi, rakip analizi ve rapor yorumları için kullanılır. Ne kadar net bilgi girersen analiz o kadar anlamlı olur."
+        title="AI görünürlük ölçümü için marka ekleyin"
+        description="Marka bilgileri test sorusu üretimi, rakip analizi ve rapor yorumlarında kullanılır. Bilgiler ne kadar açıklayıcı olursa analiz sonuçları o kadar anlamlı olur."
         actions={
           <Button asChild variant="outline">
             <Link href="/dashboard/brands">Markalara dön</Link>
@@ -59,21 +59,21 @@ export default async function NewBrandPage({
               <div className="rounded-xl border bg-background/80 p-4">
                 <p className="font-medium">1. Marka profilini oluştur</p>
                 <p className="mt-1 text-muted-foreground">
-                  Marka adı, website, sektör ve hedef kitle bilgisini gir.
+                  Marka adı, web sitesi, sektör ve hedef kitle bilgilerini girin.
                 </p>
               </div>
 
               <div className="rounded-xl border bg-background/80 p-4">
                 <p className="font-medium">2. Rakipleri ekle</p>
                 <p className="mt-1 text-muted-foreground">
-                  AI cevaplarında hangi markalarla karşılaştırılacağını belirle.
+                  Yapay zekâ cevaplarında karşılaştırılacak rakipleri belirleyin.
                 </p>
               </div>
 
               <div className="rounded-xl border bg-background/80 p-4">
                 <p className="font-medium">3. Ölçüm başlat</p>
                 <p className="mt-1 text-muted-foreground">
-                  Test sorularını üret, AI cevaplarını analiz et ve raporu gör.
+                  Test sorularını üretin, yapay zekâ cevaplarını analiz edin ve raporu görüntüleyin.
                 </p>
               </div>
             </div>
@@ -82,7 +82,7 @@ export default async function NewBrandPage({
 
         <Card className="shadow-sm">
           <CardHeader>
-            <CardTitle>Marka Profili</CardTitle>
+            <CardTitle>Marka profili</CardTitle>
             <CardDescription>
               Zorunlu alan yalnızca marka adı. Diğer alanlar analiz kalitesini
               artırır.
