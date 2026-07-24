@@ -19,6 +19,9 @@ export type TechnicalSignals = {
   robotsDirective: string | null;
   indexable: boolean;
   htmlLanguage: string | null;
+  sitemapFound: boolean;
+  sitemapUrl: string | null;
+  sitemapPageCount: number;
   hasViewport: boolean;
   hasFavicon: boolean;
   hasManifest: boolean;
@@ -594,6 +597,9 @@ function createEmptyTechnicalSignals(): TechnicalSignals {
     hasAboutLink: false,
     hasPrivacyLink: false,
     pagesDiscovered: 0,
+    sitemapFound: false,
+sitemapUrl: null,
+sitemapPageCount: 0,
 pagesAnalyzed: 0,
 pagesFailed: 0,
 pagesBlockedByRobots: 0,
@@ -891,6 +897,14 @@ pagesBlockedByRobots:
   linkedPageCrawl.blockedByRobotsCount,
 robotsTxtChecked:
   linkedPageCrawl.robotsChecked,
+
+sitemapFound:
+  linkedPageCrawl.sitemapFound,
+sitemapUrl:
+  linkedPageCrawl.sitemapUrl,
+sitemapPageCount:
+  linkedPageCrawl.sitemapPageCount,
+
 analyzedPages: [
   {
     url: finalUrl,

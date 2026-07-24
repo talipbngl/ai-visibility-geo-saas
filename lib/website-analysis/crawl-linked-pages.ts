@@ -1,5 +1,5 @@
 import { assertPublicWebsiteUrl } from "@/lib/security/public-website-url";
-
+import { discoverSitemapPages } from "@/lib/website-analysis/discover-sitemap-pages";
 const MAX_LINKED_PAGES = 5;
 const MAX_REDIRECTS = 3;
 const MAX_PAGE_BYTES = 512 * 1024;
@@ -22,6 +22,9 @@ export type LinkedPageCrawlResult = {
   blockedByRobotsCount: number;
   robotsChecked: boolean;
   pages: CrawledPage[];
+  sitemapFound: boolean;
+  sitemapUrl: string | null;
+  sitemapPageCount: number;
 };
 
 function normalizeHostname(hostname: string) {
@@ -463,17 +466,19 @@ async function fetchRobotsRules(
       requireHtml: false,
     });
 
-    return {
-      checked: true,
-      rules: parseRobotsDisallowRules(
+        return {
+    checked: true,
+    rules: parseRobotsDisallowRules(
         result.text
-      ),
+    ),
+    robotsText: result.text,
     };
   } catch {
     return {
-      checked: false,
-      rules: [] as string[],
-    };
+  checked: false,
+  rules: [] as string[],
+  robotsText: null,
+};
   }
 }
 
@@ -515,14 +520,71 @@ export async function crawlLinkedPages({
   homepageUrl: string;
   homepageHtml: string;
 }): Promise<LinkedPageCrawlResult> {
-  const candidates = extractCandidateUrls(
+  const homepageCandidates =
+  extractCandidateUrls(
     homepageHtml,
     homepageUrl
   );
 
-  const robots = await fetchRobotsRules(
-    homepageUrl
+const robots = await fetchRobotsRules(
+  homepageUrl
+);
+
+const sitemap =
+  await discoverSitemapPages({
+    homepageUrl,
+    robotsText: robots.robotsText,
+  });
+
+const mergedCandidates = new Map<
+  string,
+  {
+    url: string;
+    score: number;
+  }
+>();
+
+for (const candidate of homepageCandidates) {
+  mergedCandidates.set(
+    candidate.url,
+    candidate
   );
+}
+
+for (const sitemapUrl of sitemap.urls) {
+  try {
+    const url = new URL(sitemapUrl);
+
+    if (shouldSkipUrl(url)) continue;
+
+    const candidate = {
+      url: sitemapUrl,
+      score: getPagePriority(url) + 5,
+    };
+
+    const existing =
+      mergedCandidates.get(sitemapUrl);
+
+    if (
+      !existing ||
+      candidate.score > existing.score
+    ) {
+      mergedCandidates.set(
+        sitemapUrl,
+        candidate
+      );
+    }
+  } catch {
+    // Geçersiz sitemap adresleri atlanır.
+  }
+}
+
+const candidates = Array.from(
+  mergedCandidates.values()
+).sort(
+  (first, second) =>
+    second.score - first.score
+);
 
   const allowedCandidates = candidates.filter(
     (candidate) =>
@@ -571,6 +633,9 @@ export async function crawlLinkedPages({
   }
 
   return {
+    sitemapFound: sitemap.found,
+sitemapUrl: sitemap.sitemapUrl,
+sitemapPageCount: sitemap.pageCount,
     discoveredPageCount: candidates.length,
     analyzedPageCount: pages.length,
     failedPageCount:
