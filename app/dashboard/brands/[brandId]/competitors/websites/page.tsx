@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { createClient } from "@/lib/supabase/server";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -12,6 +11,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { EmptyState, MetricCard, PageHeader } from "@/features/ui/components";
+import { CompetitorScoreComparison } from "@/features/website/components/CompetitorScoreComparison";
+import { createClient } from "@/lib/supabase/server";
 
 type CompetitorWebsitesPageProps = {
   params: Promise<{
@@ -20,12 +21,6 @@ type CompetitorWebsitesPageProps = {
   searchParams: Promise<{
     error?: string;
   }>;
-};
-
-type Signal = {
-  keyword: string;
-  count: number;
-  found: boolean;
 };
 
 function formatDate(value: string | null) {
@@ -37,22 +32,29 @@ function formatDate(value: string | null) {
   }).format(new Date(value));
 }
 
-function toSignalArray(value: unknown): Signal[] {
-  if (!Array.isArray(value)) return [];
+function toRecord(value: unknown): Record<string, unknown> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return {};
+  }
 
-  return value
-    .map((item) => {
-      if (!item || typeof item !== "object") return null;
+  return value as Record<string, unknown>;
+}
 
-      const signal = item as Partial<Signal>;
+function getNumber(value: unknown, key: string) {
+  const record = toRecord(value);
+  const number = Number(record[key] ?? 0);
 
-      return {
-        keyword: String(signal.keyword ?? ""),
-        count: Number(signal.count ?? 0),
-        found: Boolean(signal.found),
-      };
-    })
-    .filter((item): item is Signal => Boolean(item?.keyword));
+  if (!Number.isFinite(number)) return 0;
+
+  return Math.max(0, Math.round(number));
+}
+
+function hasDetailedScores(value: unknown) {
+  const record = toRecord(value);
+
+  return ["technical", "structure", "content", "trust"].some((key) =>
+    Number.isFinite(Number(record[key]))
+  );
 }
 
 export default async function CompetitorWebsitesPage({
@@ -61,12 +63,11 @@ export default async function CompetitorWebsitesPage({
 }: CompetitorWebsitesPageProps) {
   const { brandId } = await params;
   const query = await searchParams;
-
   const supabase = await createClient();
 
   const { data: brand } = await supabase
     .from("brands")
-    .select("id, name, industry")
+    .select("id, name")
     .eq("id", brandId)
     .maybeSingle();
 
@@ -80,54 +81,89 @@ export default async function CompetitorWebsitesPage({
     .eq("brand_id", brand.id)
     .order("created_at", { ascending: true });
 
-  const { data: snapshots } = await supabase
-    .from("competitor_website_snapshots")
-    .select(
-      "id, competitor_id, website_url, status, http_status, title, meta_description, word_count, service_signals_json, trust_signals_json, content_score, error_message, created_at"
-    )
-    .eq("brand_id", brand.id)
-    .order("created_at", { ascending: false });
+  const [{ data: competitorSnapshots }, { data: brandSnapshots }] =
+    await Promise.all([
+      supabase
+        .from("competitor_website_snapshots")
+        .select(
+          `
+          id,
+          competitor_id,
+          website_url,
+          title,
+          technical_signals_json,
+          category_scores_json,
+          content_score,
+          created_at
+          `
+        )
+        .eq("brand_id", brand.id)
+        .eq("status", "completed")
+        .order("created_at", { ascending: false }),
 
-  const latestSnapshotByCompetitorId = new Map<string, NonNullable<typeof snapshots>[number]>();
+      supabase
+        .from("brand_website_snapshots")
+        .select(
+          `
+          id,
+          category_scores_json,
+          content_score,
+          created_at
+          `
+        )
+        .eq("brand_id", brand.id)
+        .eq("status", "completed")
+        .order("created_at", { ascending: false })
+        .limit(1),
+    ]);
 
-  (snapshots ?? []).forEach((snapshot) => {
+  const latestSnapshotByCompetitorId = new Map<
+    string,
+    NonNullable<typeof competitorSnapshots>[number]
+  >();
+
+  (competitorSnapshots ?? []).forEach((snapshot) => {
     if (!latestSnapshotByCompetitorId.has(snapshot.competitor_id)) {
-      latestSnapshotByCompetitorId.set(snapshot.competitor_id, snapshot);
+      latestSnapshotByCompetitorId.set(
+        snapshot.competitor_id,
+        snapshot
+      );
     }
   });
 
-  const analyzedCompetitorCount = latestSnapshotByCompetitorId.size;
+  const latestBrandSnapshot = brandSnapshots?.[0] ?? null;
+  const analyzedSnapshots = Array.from(
+    latestSnapshotByCompetitorId.values()
+  );
+
+  const detailedSnapshots = analyzedSnapshots.filter((snapshot) =>
+    hasDetailedScores(snapshot.category_scores_json)
+  );
 
   const averageCompetitorScore =
-    analyzedCompetitorCount > 0
+    detailedSnapshots.length > 0
       ? Math.round(
-          Array.from(latestSnapshotByCompetitorId.values()).reduce(
-            (sum, snapshot) => sum + Number(snapshot.content_score ?? 0),
+          detailedSnapshots.reduce(
+            (sum, snapshot) =>
+              sum +
+              getNumber(snapshot.category_scores_json, "overall"),
             0
-          ) / analyzedCompetitorCount
+          ) / detailedSnapshots.length
         )
       : 0;
 
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Rakip Website Analizi"
-        title={`${brand.name} rakip website karşılaştırması`}
-        description="Rakiplerin web sitelerindeki temel içerik, hizmet ve güven sinyallerini analiz et. Bu bölüm rapordaki rakip kıyasını güçlendirir."
+        eyebrow="Rakip web sitesi analizi"
+        title={`${brand.name} rakip karşılaştırması`}
+        description="Markanızın teknik, yapısal, içerik ve güven puanlarını rakiplerle karşılaştırın."
         actions={
-          <>
-            <Button asChild variant="outline">
-              <Link href={`/dashboard/brands/${brand.id}/competitors`}>
-                Rakiplere dön
-              </Link>
-            </Button>
-
-            <Button asChild variant="outline">
-              <Link href={`/dashboard/brands/${brand.id}/website`}>
-                Marka website analizi
-              </Link>
-            </Button>
-          </>
+          <Button asChild variant="outline">
+            <Link href={`/dashboard/brands/${brand.id}/competitors`}>
+              Rakiplere dön
+            </Link>
+          </Button>
         }
       />
 
@@ -141,30 +177,64 @@ export default async function CompetitorWebsitesPage({
 
       <section className="grid gap-4 md:grid-cols-3">
         <MetricCard
-          title="Rakip Sayısı"
-          description="Kayıtlı rakip"
+          title="Kayıtlı rakip"
+          description="Karşılaştırılabilecek rakipler"
           value={competitors?.length ?? 0}
         />
 
         <MetricCard
-          title="Analiz Edilen"
-          description="Website analizi yapılan rakip"
-          value={analyzedCompetitorCount}
+          title="Analiz edilen"
+          description="Güncel analizi bulunan rakipler"
+          value={analyzedSnapshots.length}
         />
 
         <MetricCard
-          title="Ortalama Rakip Skoru"
-          description="Website içerik sinyali"
-          value={analyzedCompetitorCount > 0 ? `${averageCompetitorScore}/100` : "-"}
+          title="Rakip ortalaması"
+          description="Genel web sitesi puanı"
+          value={
+            detailedSnapshots.length > 0
+              ? `${averageCompetitorScore}/100`
+              : "-"
+          }
         />
       </section>
 
+      <CompetitorScoreComparison
+        brandName={brand.name}
+        brandScoresValue={
+          latestBrandSnapshot?.category_scores_json ?? null
+        }
+        competitors={(competitors ?? [])
+          .map((competitor) => {
+            const snapshot = latestSnapshotByCompetitorId.get(
+              competitor.id
+            );
+
+            if (!snapshot) return null;
+
+            return {
+              id: competitor.id,
+              name: competitor.name,
+              scoresValue: snapshot.category_scores_json,
+            };
+          })
+          .filter(
+            (
+              competitor
+            ): competitor is {
+              id: string;
+              name: string;
+              scoresValue: unknown;
+            } => competitor !== null
+          )}
+      />
+
       <Card className="shadow-sm">
         <CardHeader>
-          <CardTitle>Rakip Website Kartları</CardTitle>
+          <CardTitle>Rakip analizleri</CardTitle>
           <CardDescription>
-            Her rakip için website analizi başlatabilir ve son sonucu
-            görebilirsin.
+            Eski analizlerde kategori puanları yoksa analizi yeniden
+            çalıştırın.
           </CardDescription>
         </CardHeader>
 
@@ -172,48 +242,80 @@ export default async function CompetitorWebsitesPage({
           {competitors && competitors.length > 0 ? (
             <div className="space-y-4">
               {competitors.map((competitor) => {
-                const snapshot = latestSnapshotByCompetitorId.get(competitor.id);
+                const snapshot =
+                  latestSnapshotByCompetitorId.get(competitor.id);
 
-                const serviceSignals = snapshot
-                  ? toSignalArray(snapshot.service_signals_json)
-                  : [];
-
-                const trustSignals = snapshot
-                  ? toSignalArray(snapshot.trust_signals_json)
-                  : [];
-
-                const foundServiceSignals = serviceSignals.filter(
-                  (signal) => signal.found
+                const detailed = hasDetailedScores(
+                  snapshot?.category_scores_json
                 );
 
-                const foundTrustSignals = trustSignals.filter(
-                  (signal) => signal.found
-                );
+                const scoreItems = snapshot
+                  ? [
+                      {
+                        label: "Teknik",
+                        value: getNumber(
+                          snapshot.category_scores_json,
+                          "technical"
+                        ),
+                      },
+                      {
+                        label: "Yapı",
+                        value: getNumber(
+                          snapshot.category_scores_json,
+                          "structure"
+                        ),
+                      },
+                      {
+                        label: "İçerik",
+                        value: getNumber(
+                          snapshot.category_scores_json,
+                          "content"
+                        ),
+                      },
+                      {
+                        label: "Güven",
+                        value: getNumber(
+                          snapshot.category_scores_json,
+                          "trust"
+                        ),
+                      },
+                    ]
+                  : [];
+
+                const pagesAnalyzed = snapshot
+                  ? Math.max(
+                      getNumber(
+                        snapshot.technical_signals_json,
+                        "pagesAnalyzed"
+                      ),
+                      1
+                    )
+                  : 0;
 
                 return (
                   <div
                     key={competitor.id}
-                    className="rounded-xl border p-4 transition-colors hover:bg-muted/30"
+                    className="rounded-xl border p-4"
                   >
                     <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-start">
                       <div>
                         <div className="flex flex-wrap items-center gap-2">
-                          <p className="font-medium">{competitor.name}</p>
+                          <p className="font-medium">
+                            {competitor.name}
+                          </p>
 
-                          {snapshot ? (
-                            <Badge
-                              variant={
-                                snapshot.status === "completed"
-                                  ? "secondary"
-                                  : "destructive"
-                              }
-                            >
-                              {snapshot.status === "completed"
-                                ? "Analiz edildi"
-                                : "Hatalı"}
+                          {detailed ? (
+                            <Badge variant="secondary">
+                              Analiz hazır
+                            </Badge>
+                          ) : snapshot ? (
+                            <Badge variant="outline">
+                              Yeniden analiz edilmeli
                             </Badge>
                           ) : (
-                            <Badge variant="outline">Analiz yok</Badge>
+                            <Badge variant="outline">
+                              Analiz yok
+                            </Badge>
                           )}
                         </div>
 
@@ -228,15 +330,9 @@ export default async function CompetitorWebsitesPage({
                           </a>
                         ) : (
                           <p className="mt-1 text-sm text-muted-foreground">
-                            Website URL yok
+                            Web sitesi adresi bulunmuyor.
                           </p>
                         )}
-
-                        {competitor.description ? (
-                          <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
-                            {competitor.description}
-                          </p>
-                        ) : null}
                       </div>
 
                       <form
@@ -245,115 +341,51 @@ export default async function CompetitorWebsitesPage({
                       >
                         <Button
                           type="submit"
-                          variant="outline"
+                          variant={snapshot ? "outline" : "default"}
                           disabled={!competitor.website_url}
                         >
-                          Website analiz et
+                          {snapshot
+                            ? "Yeniden analiz et"
+                            : "Analizi başlat"}
                         </Button>
                       </form>
                     </div>
 
-                    {snapshot ? (
-                      <div className="mt-4 space-y-4 border-t pt-4">
-                        <section className="grid gap-4 md:grid-cols-4">
-                          <div className="rounded-xl border bg-muted/20 p-4">
-                            <p className="text-sm text-muted-foreground">
-                              Website Skoru
+                    {snapshot && detailed ? (
+                      <div className="mt-4 border-t pt-4">
+                        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+                          <div className="rounded-lg bg-primary/5 p-3">
+                            <p className="text-xs text-muted-foreground">
+                              Genel puan
                             </p>
-                            <p className="mt-1 text-2xl font-semibold">
-                              {Math.round(Number(snapshot.content_score ?? 0))}
+                            <p className="mt-1 text-lg font-semibold">
+                              {getNumber(
+                                snapshot.category_scores_json,
+                                "overall"
+                              )}
                               /100
                             </p>
                           </div>
 
-                          <div className="rounded-xl border bg-muted/20 p-4">
-                            <p className="text-sm text-muted-foreground">
-                              Kelime Sayısı
-                            </p>
-                            <p className="mt-1 text-2xl font-semibold">
-                              {snapshot.word_count ?? 0}
-                            </p>
-                          </div>
-
-                          <div className="rounded-xl border bg-muted/20 p-4">
-                            <p className="text-sm text-muted-foreground">
-                              Hizmet Sinyali
-                            </p>
-                            <p className="mt-1 text-2xl font-semibold">
-                              {foundServiceSignals.length}
-                            </p>
-                          </div>
-
-                          <div className="rounded-xl border bg-muted/20 p-4">
-                            <p className="text-sm text-muted-foreground">
-                              Güven Sinyali
-                            </p>
-                            <p className="mt-1 text-2xl font-semibold">
-                              {foundTrustSignals.length}
-                            </p>
-                          </div>
-                        </section>
-
-                        <div className="grid gap-4 lg:grid-cols-2">
-                          <div className="rounded-xl border p-4">
-                            <p className="text-sm font-medium">
-                              Bulunan sektör / hizmet sinyalleri
-                            </p>
-
-                            {foundServiceSignals.length > 0 ? (
-                              <div className="mt-3 flex flex-wrap gap-2">
-                                {foundServiceSignals.map((signal) => (
-                                  <Badge key={signal.keyword} variant="secondary">
-                                    {signal.keyword}: {signal.count}
-                                  </Badge>
-                                ))}
-                              </div>
-                            ) : (
-                              <p className="mt-2 text-sm text-muted-foreground">
-                                Hizmet sinyali tespit edilemedi.
+                          {scoreItems.map((item) => (
+                            <div
+                              key={item.label}
+                              className="rounded-lg bg-muted/30 p-3"
+                            >
+                              <p className="text-xs text-muted-foreground">
+                                {item.label}
                               </p>
-                            )}
-                          </div>
-
-                          <div className="rounded-xl border p-4">
-                            <p className="text-sm font-medium">
-                              Bulunan güven sinyalleri
-                            </p>
-
-                            {foundTrustSignals.length > 0 ? (
-                              <div className="mt-3 flex flex-wrap gap-2">
-                                {foundTrustSignals.map((signal) => (
-                                  <Badge key={signal.keyword} variant="secondary">
-                                    {signal.keyword}: {signal.count}
-                                  </Badge>
-                                ))}
-                              </div>
-                            ) : (
-                              <p className="mt-2 text-sm text-muted-foreground">
-                                Güven sinyali tespit edilemedi.
+                              <p className="mt-1 text-lg font-semibold">
+                                {item.value}/100
                               </p>
-                            )}
-                          </div>
+                            </div>
+                          ))}
                         </div>
 
-                        <div className="rounded-xl border bg-background p-4">
-                          <p className="text-sm font-medium">Son analiz</p>
-                          <p className="mt-1 text-sm text-muted-foreground">
-                            {formatDate(snapshot.created_at)}
-                          </p>
-
-                          {snapshot.error_message ? (
-                            <p className="mt-2 text-sm text-destructive">
-                              {snapshot.error_message}
-                            </p>
-                          ) : null}
-
-                          {snapshot.title ? (
-                            <p className="mt-2 text-sm text-muted-foreground">
-                              Title: {snapshot.title}
-                            </p>
-                          ) : null}
-                        </div>
+                        <p className="mt-3 text-sm text-muted-foreground">
+                          {pagesAnalyzed} sayfa incelendi · Son analiz:{" "}
+                          {formatDate(snapshot.created_at)}
+                        </p>
                       </div>
                     ) : null}
                   </div>
@@ -363,10 +395,12 @@ export default async function CompetitorWebsitesPage({
           ) : (
             <EmptyState
               title="Henüz rakip yok"
-              description="Rakip website analizi yapabilmek için önce rakip eklemelisin."
+              description="Karşılaştırma yapabilmek için önce en az bir rakip ekleyin."
               action={
                 <Button asChild>
-                  <Link href={`/dashboard/brands/${brand.id}/competitors`}>
+                  <Link
+                    href={`/dashboard/brands/${brand.id}/competitors`}
+                  >
                     Rakip ekle
                   </Link>
                 </Button>
