@@ -24,7 +24,6 @@ export async function POST(
   { params }: CompetitorWebsiteAnalysisRouteProps
 ) {
   const { competitorId } = await params;
-
   const supabase = await createClient();
 
   const { data: competitor, error: competitorError } = await supabase
@@ -34,9 +33,11 @@ export async function POST(
     .maybeSingle();
 
   if (competitorError || !competitor) {
+    console.error("Rakip bilgisi alınamadı:", competitorError);
+
     return redirectTo(
       `/dashboard/brands?error=${encodeURIComponent(
-        competitorError?.message ?? "Rakip bulunamadı."
+        "Rakip bulunamadı veya bu rakibe erişilemiyor."
       )}`,
       request.url
     );
@@ -49,20 +50,23 @@ export async function POST(
     .maybeSingle();
 
   if (brandError || !brand) {
+    console.error("Rakibe bağlı marka alınamadı:", brandError);
+
     return redirectTo(
       `/dashboard/brands?error=${encodeURIComponent(
-        brandError?.message ?? "Marka bulunamadı."
+        "Rakibin bağlı olduğu marka bulunamadı."
       )}`,
       request.url
     );
   }
 
+  const resultsPath = `/dashboard/brands/${competitor.brand_id}/competitors/websites`;
   const websiteUrl = normalizeWebsiteUrl(competitor.website_url);
 
   if (!websiteUrl) {
     return redirectTo(
-      `/dashboard/brands/${competitor.brand_id}/competitors/websites?error=${encodeURIComponent(
-        "Bu rakip için website URL bulunamadı."
+      `${resultsPath}?error=${encodeURIComponent(
+        "Bu rakip için web sitesi adresi bulunamadı."
       )}`,
       request.url
     );
@@ -73,16 +77,16 @@ export async function POST(
 
     if (!["http:", "https:"].includes(parsedUrl.protocol)) {
       return redirectTo(
-        `/dashboard/brands/${competitor.brand_id}/competitors/websites?error=${encodeURIComponent(
-          "Sadece http veya https website adresleri analiz edilebilir."
+        `${resultsPath}?error=${encodeURIComponent(
+          "Sadece HTTP veya HTTPS web sitesi adresleri analiz edilebilir."
         )}`,
         request.url
       );
     }
   } catch {
     return redirectTo(
-      `/dashboard/brands/${competitor.brand_id}/competitors/websites?error=${encodeURIComponent(
-        "Website URL geçerli değil."
+      `${resultsPath}?error=${encodeURIComponent(
+        "Web sitesi adresi geçerli değil."
       )}`,
       request.url
     );
@@ -108,33 +112,39 @@ export async function POST(
       word_count: result.wordCount,
       service_signals_json: result.serviceSignals,
       trust_signals_json: result.trustSignals,
+      technical_signals_json: result.technicalSignals,
+      category_scores_json: result.categoryScores,
       content_score: result.contentScore,
       error_message: result.errorMessage,
     });
 
   if (insertError) {
+    console.error(
+      "Rakip web sitesi analiz sonucu kaydedilemedi:",
+      insertError
+    );
+
     return redirectTo(
-      `/dashboard/brands/${competitor.brand_id}/competitors/websites?error=${encodeURIComponent(
-        insertError.message
+      `${resultsPath}?error=${encodeURIComponent(
+        "Analiz tamamlandı ancak sonuçlar kaydedilemedi."
       )}`,
       request.url
     );
   }
 
-  revalidatePath(`/dashboard/brands/${competitor.brand_id}/competitors`);
-  revalidatePath(`/dashboard/brands/${competitor.brand_id}/competitors/websites`);
+  revalidatePath(
+    `/dashboard/brands/${competitor.brand_id}/competitors`
+  );
+  revalidatePath(resultsPath);
 
   if (result.status === "failed") {
     return redirectTo(
-      `/dashboard/brands/${competitor.brand_id}/competitors/websites?error=${encodeURIComponent(
-        result.errorMessage ?? "Rakip website analiz edilemedi."
+      `${resultsPath}?error=${encodeURIComponent(
+        "Rakibin web sitesi analiz edilemedi. Adresi kontrol edip tekrar deneyin."
       )}`,
       request.url
     );
   }
 
-  return redirectTo(
-    `/dashboard/brands/${competitor.brand_id}/competitors/websites`,
-    request.url
-  );
+  return redirectTo(resultsPath, request.url);
 }

@@ -15,9 +15,12 @@ create table if not exists public.competitor_website_snapshots (
   word_count integer not null default 0,
 
   service_signals_json jsonb not null default '[]'::jsonb,
-  trust_signals_json jsonb not null default '[]'::jsonb,
+trust_signals_json jsonb not null default '[]'::jsonb,
 
-  content_score numeric not null default 0,
+technical_signals_json jsonb not null default '{}'::jsonb,
+category_scores_json jsonb not null default '{}'::jsonb,
+
+content_score numeric not null default 0,
   error_message text,
 
   created_at timestamptz not null default now(),
