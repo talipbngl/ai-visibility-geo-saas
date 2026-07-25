@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { EmptyState, PageHeader } from "@/features/ui/components";
+import { BrandSectionNav } from "@/features/brands/components/BrandSectionNav";
 
 type CompetitorsPageProps = {
   params: Promise<{
@@ -73,52 +74,31 @@ export default async function CompetitorsPage({
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Rakip Yönetimi"
-        title={`${brand.name} rakipleri`}
-        description="AI cevaplarında markanı hangi rakiplerle karşılaştıracağımızı burada belirliyoruz. İlk ölçüm için 3-5 rakip eklemek iyi bir başlangıçtır."
-        actions={
-          <>
-          <Button asChild variant="outline">
-            <Link href={`/dashboard/brands/${brand.id}/competitors/websites`}>
-                    Rakip website analizi
-                  </Link>
-            </Button>
-            <Button asChild variant="outline">
-              <Link href={`/dashboard/brands/${brand.id}`}>
-                Marka detayına dön
-              </Link>
-            </Button>
-              <form
-                action={`/api/brands/${brand.id}/competitors/generate`}
-                method="post"
-              >
-                <input type="hidden" name="competitorCount" value="8" />
+  eyebrow="Rakipler"
+  title={`${brand.name} rakipleri`}
+  description="AI cevaplarında markayla karşılaştırılacak rakipleri yönetin."
+  actions={
+    <Button asChild>
+      <Link
+        href={`/dashboard/brands/${brand.id}/prompts`}
+      >
+        Test Sorularına Geç
+      </Link>
+    </Button>
+  }
+/>
 
-                <Button type="submit" variant="outline">
-                  AI ile rakip öner ve ekle
-                </Button>
-              </form>
-            <Button asChild>
-              <Link href={`/dashboard/brands/${brand.id}/prompts`}>
-                Test sorularına geç
-              </Link>
-            </Button>
-          </>
-        }
-      />
+<BrandSectionNav
+  brandId={brand.id}
+  active="competitors"
+/>
 
       {query.error ? (
         <Alert variant="destructive">
           <AlertDescription>{query.error}</AlertDescription>
         </Alert>
       ) : null}
-      {query.error ? (
-  <Card className="border-destructive shadow-sm">
-    <CardContent className="pt-6 text-sm text-destructive">
-      {query.error}
-    </CardContent>
-  </Card>
-) : null}
+      
 
 {query.message ? (
   <Card className="border-primary/30 bg-primary/5 shadow-sm">
@@ -127,7 +107,44 @@ export default async function CompetitorsPage({
     </CardContent>
   </Card>
 ) : null}
+<div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-muted/20 p-3">
+  <p className="text-sm text-muted-foreground">
+    Rakip eklemek için manuel formu veya AI önerisini kullanabilirsiniz.
+  </p>
 
+  <div className="flex flex-wrap gap-2">
+    <Button
+      asChild
+      variant="outline"
+      size="sm"
+    >
+      <Link
+        href={`/dashboard/brands/${brand.id}/competitors/websites`}
+      >
+        Rakip Sitelerini Analiz Et
+      </Link>
+    </Button>
+
+    <form
+      action={`/api/brands/${brand.id}/competitors/generate`}
+      method="post"
+    >
+      <input
+        type="hidden"
+        name="competitorCount"
+        value="5"
+      />
+
+      <Button
+        type="submit"
+        variant="outline"
+        size="sm"
+      >
+        AI ile 5 Rakip Öner
+      </Button>
+    </form>
+  </div>
+</div>
       <section className="grid gap-6 lg:grid-cols-[420px_1fr]">
         <Card className="shadow-sm">
           <CardHeader>

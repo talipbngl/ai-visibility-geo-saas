@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/server";
+import { BrandSectionNav } from "@/features/brands/components/BrandSectionNav";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -102,50 +103,60 @@ export default async function BrandDetailPage({
         .eq("audit_id", latestAudit.id)
         .maybeSingle()
     : { data: null };
-
+  const nextStep =
+    (competitorCount ?? 0) === 0
+      ? {
+          label: "Rakipleri ekle",
+          href: `/dashboard/brands/${brand.id}/competitors`,
+        }
+      : (promptCount ?? 0) === 0
+        ? {
+            label: "Test sorularını hazırla",
+            href: `/dashboard/brands/${brand.id}/prompts`,
+          }
+        : !latestAudit
+          ? {
+              label: "İlk ölçümü başlat",
+              href: `/dashboard/brands/${brand.id}/prompts`,
+            }
+          : latestScore
+            ? {
+                label: "Son raporu görüntüle",
+                href: `/dashboard/audits/${latestAudit.id}/report`,
+              }
+            : {
+                label: "Ölçüme devam et",
+                href: `/dashboard/audits/${latestAudit.id}`,
+              };
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Marka Detayı"
-        title={brand.name}
-        description="Bu markanın rakiplerini, test sorularını, ölçüm geçmişini ve son AI görünürlük raporunu buradan yönet."
-        actions={
-          <>
-            <Button asChild variant="outline">
-              <Link href="/dashboard/brands">Markalara dön</Link>
-            </Button>
-           
-             <Button asChild variant="outline">
-              <Link href={`/dashboard/brands/${brand.id}/edit`}>
-                     Düzenle
-                  </Link>
-                    </Button>
-                    <Button asChild variant="outline">
-  <Link href={`/dashboard/brands/${brand.id}/website`}>
-    Website analizi
-  </Link>
-</Button>
+  eyebrow="Marka Çalışma Alanı"
+  title={brand.name}
+  description="Markanın analiz sürecini yönetin ve sıradaki adımı tamamlayın."
+  actions={
+    <>
+      <Button asChild variant="outline">
+        <Link
+          href={`/dashboard/brands/${brand.id}/edit`}
+        >
+          Marka Bilgilerini Düzenle
+        </Link>
+      </Button>
 
-            <Button asChild variant="outline">
-              <Link href={`/dashboard/brands/${brand.id}/history`}>
-                Ölçüm geçmişi
-              </Link>
-            </Button>
+      <Button asChild>
+        <Link href={nextStep.href}>
+          {nextStep.label}
+        </Link>
+      </Button>
+    </>
+  }
+/>
 
-            <Button asChild variant="outline">
-              <Link href={`/dashboard/brands/${brand.id}/competitors`}>
-                Rakipler
-              </Link>
-            </Button>
-
-            <Button asChild>
-              <Link href={`/dashboard/brands/${brand.id}/prompts`}>
-                Test soruları
-              </Link>
-            </Button>
-          </>
-        }
-      />
+<BrandSectionNav
+  brandId={brand.id}
+  active="overview"
+/>
 
       {query.error ? (
         <Alert variant="destructive">
