@@ -6,9 +6,9 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { WebsiteContentOpportunities } from "@/features/website/components/WebsiteContentOpportunities";
-type WebsiteAnalysisSummaryProps = {
-  categoryScoresValue: unknown;
+import { buildWebsiteContentOpportunities } from "@/features/website/components/WebsiteContentOpportunities";
+
+type WebsiteAnalysisSummaryProps = {  categoryScoresValue: unknown;
   technicalSignalsValue: unknown;
   headingsValue: unknown;
   serviceSignalsValue: unknown;
@@ -23,8 +23,8 @@ type Issue = {
   description: string;
   priority: "Yüksek" | "Orta" | "Düşük";
   affectedPages?: string[];
+  action?: string;
 };
-
 type Strength = {
   title: string;
   description: string;
@@ -588,20 +588,45 @@ if (thinPages.length > 0) {
       priority: "Düşük",
     });
   }
+const contentOpportunities =
+  buildWebsiteContentOpportunities({
+    technicalSignalsValue,
+    serviceSignalsValue,
+    trustSignalsValue,
+  });
 
-  const priorityOrder = {
-    Yüksek: 3,
-    Orta: 2,
-    Düşük: 1,
-  };
+const unifiedActions: Issue[] = [
+  ...issues,
+  ...contentOpportunities.map(
+    (opportunity) => ({
+      title: opportunity.title,
+      description: opportunity.evidence,
+      action: opportunity.action,
+      priority: opportunity.priority,
+    })
+  ),
+];
 
-  const importantIssues = issues
-    .sort(
-      (first, second) =>
-        priorityOrder[second.priority] -
-        priorityOrder[first.priority]
-    )
-    .slice(0, 5);
+const priorityOrder = {
+  Yüksek: 3,
+  Orta: 2,
+  Düşük: 1,
+};
+
+const importantIssues = unifiedActions
+  .filter(
+    (action, index, allActions) =>
+      allActions.findIndex(
+        (candidate) =>
+          candidate.title === action.title
+      ) === index
+  )
+  .sort(
+    (first, second) =>
+      priorityOrder[second.priority] -
+      priorityOrder[first.priority]
+  )
+  .slice(0, 5);
 
   const strengths: Strength[] = [];
   if (pagesAnalyzed >= 3) {
@@ -750,15 +775,15 @@ if (thinPages.length > 0) {
       </Card>
 
       <section className="grid gap-6 lg:grid-cols-[1.3fr_0.7fr]">
-        <Card className="shadow-sm">
-          <CardHeader>
-            <CardTitle>Öncelikli iyileştirmeler</CardTitle>
-            <CardDescription>
-              Önce ele alınması gereken en önemli konular.
-            </CardDescription>
-          </CardHeader>
+              <Card className="shadow-sm">
+                <CardHeader>
+                  <CardTitle>Öncelikli aksiyonlar</CardTitle>
+                  <CardDescription>
+                    Teknik ve içerik analizinden çıkan en önemli beş adım.
+                  </CardDescription>
+                </CardHeader>
 
-          <CardContent>
+                <CardContent>
             {importantIssues.length > 0 ? (
               <div className="space-y-3">
                 {importantIssues.map((issue, index) => (
@@ -785,6 +810,15 @@ if (thinPages.length > 0) {
                     <p className="mt-1 text-sm leading-6 text-muted-foreground">
                       {issue.description}
                     </p>
+                    {issue.action ? (
+                        <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                          <span className="font-medium text-foreground">
+                            Yapılacak:{" "}
+                          </span>
+
+                          {issue.action}
+                        </p>
+                      ) : null}
                     {issue.affectedPages &&
                       issue.affectedPages.length > 0 ? (
                         <div className="mt-3 border-t pt-3">
@@ -925,17 +959,6 @@ if (thinPages.length > 0) {
     </div>
   </CardContent>
 </Card>
-      <WebsiteContentOpportunities
-        technicalSignalsValue={
-            technicalSignalsValue
-        }
-        serviceSignalsValue={
-            serviceSignalsValue
-        }
-        trustSignalsValue={
-            trustSignalsValue
-        }
-        />
       <Card className="shadow-sm">
         <CardHeader>
           <CardTitle>Kısa içerik özeti</CardTitle>

@@ -1,18 +1,3 @@
-import { Badge } from "@/components/ui/badge";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-
-type WebsiteContentOpportunitiesProps = {
-  technicalSignalsValue: unknown;
-  serviceSignalsValue: unknown;
-  trustSignalsValue: unknown;
-};
-
 type Signal = {
   keyword: string;
   found: boolean;
@@ -28,11 +13,17 @@ type ContentPageType =
   | "pricing"
   | "other";
 
-type Opportunity = {
+export type WebsiteContentOpportunity = {
   title: string;
   evidence: string;
   action: string;
   priority: "Yüksek" | "Orta";
+};
+
+type BuildWebsiteContentOpportunitiesParams = {
+  technicalSignalsValue: unknown;
+  serviceSignalsValue: unknown;
+  trustSignalsValue: unknown;
 };
 
 const validContentTypes = new Set<ContentPageType>([
@@ -106,19 +97,11 @@ function toContentTypes(
   );
 }
 
-function getPriorityVariant(
-  priority: Opportunity["priority"]
-) {
-  return priority === "Yüksek"
-    ? ("destructive" as const)
-    : ("secondary" as const);
-}
-
-export function WebsiteContentOpportunities({
+export function buildWebsiteContentOpportunities({
   technicalSignalsValue,
   serviceSignalsValue,
   trustSignalsValue,
-}: WebsiteContentOpportunitiesProps) {
+}: BuildWebsiteContentOpportunitiesParams) {
   const technicalSignals = toRecord(
     technicalSignalsValue
   );
@@ -169,7 +152,7 @@ export function WebsiteContentOpportunities({
       .map((signal) => signal.keyword)
       .join(", ");
 
-  const opportunities: Opportunity[] = [];
+  const opportunities: WebsiteContentOpportunity[] = [];
 
   if (
     !contentTypes.has("service") ||
@@ -214,8 +197,7 @@ export function WebsiteContentOpportunities({
 
   if (!contentTypes.has("guide")) {
     opportunities.push({
-      title:
-        "Rehber içerikler oluşturun",
+      title: "Rehber içerikler oluşturun",
       evidence:
         "İncelenen sayfalarda araştırma yapan kullanıcıları bilgilendiren belirgin bir rehber içeriği bulunamadı.",
       action:
@@ -241,8 +223,7 @@ export function WebsiteContentOpportunities({
     !contentTypes.has("contact")
   ) {
     opportunities.push({
-      title:
-        "Kurumsal bilgileri tamamlayın",
+      title: "Kurumsal bilgileri tamamlayın",
       evidence:
         "Hakkımızda veya iletişim bilgilerinden en az biri yeterince görünür değil.",
       action:
@@ -256,79 +237,9 @@ export function WebsiteContentOpportunities({
     Orta: 1,
   };
 
-  const selectedOpportunities =
-    opportunities
-      .sort(
-        (first, second) =>
-          priorityOrder[second.priority] -
-          priorityOrder[first.priority]
-      )
-      .slice(0, 3);
-
-  return (
-    <Card className="shadow-sm">
-      <CardHeader>
-        <CardTitle>
-          Öncelikli içerik fırsatları
-        </CardTitle>
-
-        <CardDescription>
-          İncelenen sayfalara göre uygulanabilecek en önemli üç öneri.
-        </CardDescription>
-      </CardHeader>
-
-      <CardContent>
-        {selectedOpportunities.length > 0 ? (
-          <div className="space-y-3">
-            {selectedOpportunities.map(
-              (opportunity, index) => (
-                <div
-                  key={opportunity.title}
-                  className="rounded-xl border p-4"
-                >
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Badge variant="outline">
-                      {index + 1}
-                    </Badge>
-
-                    <Badge
-                      variant={getPriorityVariant(
-                        opportunity.priority
-                      )}
-                    >
-                      {opportunity.priority} öncelik
-                    </Badge>
-                  </div>
-
-                  <p className="mt-3 font-medium">
-                    {opportunity.title}
-                  </p>
-
-                  <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                    {opportunity.evidence}
-                  </p>
-
-                  <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                    <span className="font-medium text-foreground">
-                      Yapılacak:{" "}
-                    </span>
-
-                    {opportunity.action}
-                  </p>
-                </div>
-              )
-            )}
-          </div>
-        ) : (
-          <p className="text-sm leading-6 text-muted-foreground">
-            İncelenen sayfalarda önemli bir içerik boşluğu tespit edilmedi.
-          </p>
-        )}
-
-        <p className="mt-4 text-xs leading-5 text-muted-foreground">
-          Sonuçlar yalnızca taranabilen sayfalara dayanır.
-        </p>
-      </CardContent>
-    </Card>
+  return opportunities.sort(
+    (first, second) =>
+      priorityOrder[second.priority] -
+      priorityOrder[first.priority]
   );
 }
