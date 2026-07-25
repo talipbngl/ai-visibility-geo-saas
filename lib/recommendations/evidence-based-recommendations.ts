@@ -34,6 +34,7 @@ type BrandWebsiteSnapshotInput = {
   content_score: number | null;
   service_signals_json: unknown;
   trust_signals_json: unknown;
+  technical_signals_json: unknown;
 } | null;
 
 type CompetitorWebsiteSnapshotInput = {
@@ -41,6 +42,7 @@ type CompetitorWebsiteSnapshotInput = {
   content_score: number | null;
   service_signals_json: unknown;
   trust_signals_json: unknown;
+  technical_signals_json: unknown;
 };
 
 export type EvidenceRecommendation = {
@@ -66,7 +68,113 @@ type CompetitorVisibility = {
   mentioned: boolean;
   rank: number | null;
 };
+type ContentType =
+  | "service"
+  | "about"
+  | "contact"
+  | "faq"
+  | "guide"
+  | "comparison"
+  | "pricing";
 
+type ContentCoverage = {
+  checked: boolean;
+  types: Set<ContentType>;
+};
+
+const contentTypes =
+  new Set<ContentType>([
+    "service",
+    "about",
+    "contact",
+    "faq",
+    "guide",
+    "comparison",
+    "pricing",
+  ]);
+
+const contentTypeLabels: Record<
+  ContentType,
+  string
+> = {
+  service: "Ürün veya hizmet",
+  about: "Kurumsal",
+  contact: "İletişim",
+  faq: "Sık sorulan sorular",
+  guide: "Rehber",
+  comparison: "Karşılaştırma",
+  pricing: "Fiyatlandırma",
+};
+
+const contentTypePriority: Record<
+  ContentType,
+  number
+> = {
+  faq: 7,
+  guide: 6,
+  comparison: 5,
+  service: 4,
+  pricing: 3,
+  about: 2,
+  contact: 1,
+};
+function toRecord(
+  value: unknown
+): Record<string, unknown> {
+  if (
+    !value ||
+    typeof value !== "object" ||
+    Array.isArray(value)
+  ) {
+    return {};
+  }
+
+  return value as Record<string, unknown>;
+}
+
+function getContentCoverage(
+  value: unknown
+): ContentCoverage {
+  const technicalSignals =
+    toRecord(value);
+
+  const rawTypes =
+    technicalSignals.contentTypesFound;
+
+  if (!Array.isArray(rawTypes)) {
+    return {
+      checked: false,
+      types: new Set<ContentType>(),
+    };
+  }
+
+  const types = new Set(
+    rawTypes.filter(
+      (item): item is ContentType =>
+        typeof item === "string" &&
+        contentTypes.has(
+          item as ContentType
+        )
+    )
+  );
+
+  if (
+    technicalSignals.hasAboutLink === true
+  ) {
+    types.add("about");
+  }
+
+  if (
+    technicalSignals.hasContactLink === true
+  ) {
+    types.add("contact");
+  }
+
+  return {
+    checked: true,
+    types,
+  };
+}
 function toSignalArray(value: unknown): Signal[] {
   if (!Array.isArray(value)) return [];
 
@@ -236,6 +344,82 @@ export function buildEvidenceBasedRecommendations({
           ) / competitorWebsiteSnapshots.length
         )
       : null;
+      const brandContentCoverage =
+  getContentCoverage(
+    brandWebsiteSnapshot
+      ?.technical_signals_json
+  );
+
+const competitorContentCoverages =
+  competitorWebsiteSnapshots
+    .map((snapshot) => ({
+      name: snapshot.competitor_name,
+      coverage: getContentCoverage(
+        snapshot.technical_signals_json
+      ),
+    }))
+    .filter(
+      (competitor) =>
+        competitor.coverage.checked
+    );
+
+const competitorContentGaps =
+  Array.from(contentTypes)
+    .map((contentType) => {
+      if (
+        !brandContentCoverage.checked ||
+        brandContentCoverage.types.has(
+          contentType
+        )
+      ) {
+        return null;
+      }
+
+      const competitorsWithType =
+        competitorContentCoverages.filter(
+          (competitor) =>
+            competitor.coverage.types.has(
+              contentType
+            )
+        );
+
+      if (
+        competitorsWithType.length === 0
+      ) {
+        return null;
+      }
+
+      return {
+        type: contentType,
+        competitorCount:
+          competitorsWithType.length,
+      };
+    })
+    .filter(
+      (
+        gap
+      ): gap is {
+        type: ContentType;
+        competitorCount: number;
+      } => gap !== null
+    )
+    .sort((first, second) => {
+      if (
+        second.competitorCount !==
+        first.competitorCount
+      ) {
+        return (
+          second.competitorCount -
+          first.competitorCount
+        );
+      }
+
+      return (
+        contentTypePriority[second.type] -
+        contentTypePriority[first.type]
+      );
+    })
+    .slice(0, 3);
 
   if (!brandWebsiteSnapshot) {
     pushUniqueRecommendation(recommendations, {
@@ -280,7 +464,29 @@ export function buildEvidenceBasedRecommendations({
       status: "open",
     });
   }
+if (competitorContentGaps.length > 0) {
+  const gapSummary =
+    competitorContentGaps
+      .map(
+        (gap) =>
+          `${contentTypeLabels[gap.type]} (${gap.competitorCount}/${competitorContentCoverages.length} rakipte)`
+      )
+      .join(", ");
 
+  pushUniqueRecommendation(
+    recommendations,
+    {
+      category: "competitor",
+      title:
+        "Rakiplerde bulunan içerik boşluklarını kapat",
+      description: `Rakip web sitesi analizlerinde bulunan fakat ${brandName} sitesinde belirgin olarak görülmeyen içerik türleri: ${gapSummary}. Rakiplerin metinlerini kopyalamadan, markanın müşterilerine özgü daha açıklayıcı sayfalar hazırlanmalı.`,
+      priority: "high",
+      effort: "medium",
+      impact: "high",
+      status: "open",
+    }
+  );
+}
   if (competitorOnlyServiceKeywords.length > 0) {
     pushUniqueRecommendation(recommendations, {
       category: "content",

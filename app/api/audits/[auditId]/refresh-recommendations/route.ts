@@ -85,8 +85,8 @@ const { data: analyses } = await supabase
   const { data: brandWebsiteSnapshots } = await supabase
     .from("brand_website_snapshots")
     .select(
-      "id, content_score, service_signals_json, trust_signals_json, created_at"
-    )
+  "id, content_score, service_signals_json, trust_signals_json, technical_signals_json, created_at"
+)
     .eq("brand_id", brand.id)
     .eq("status", "completed")
     .order("created_at", { ascending: false })
@@ -103,6 +103,7 @@ const { data: analyses } = await supabase
       content_score,
       service_signals_json,
       trust_signals_json,
+      technical_signals_json,
       created_at,
       competitors (
         id,
@@ -134,6 +135,8 @@ const { data: analyses } = await supabase
 
     return {
       competitor_name: competitor?.name ?? "Rakip",
+      technical_signals_json:
+  snapshot.technical_signals_json,
       content_score: snapshot.content_score,
       service_signals_json: snapshot.service_signals_json,
       trust_signals_json: snapshot.trust_signals_json,
