@@ -13,6 +13,13 @@ const MAX_REDIRECTS = 5;
 const MAX_HTML_BYTES = 2 * 1024 * 1024;
 const MAX_STORED_TEXT_LENGTH = 30_000;
 const MAX_SEARCHABLE_TEXT_LENGTH = 100_000;
+const WEBSITE_ANALYSIS_VERSION = "3.0";
+
+export type AnalysisCoverageLevel =
+  | "none"
+  | "single_page"
+  | "partial"
+  | "full";
 
 export type SignalResult = {
   keyword: string;
@@ -22,6 +29,9 @@ export type SignalResult = {
 
 export type TechnicalSignals = {
   finalUrl: string | null;
+  analysisVersion: string;
+  coverageLevel: AnalysisCoverageLevel;
+  startingUrlPathDepth: number;
   contentTypesFound: ContentPageType[];
   isHttps: boolean;
   canonicalUrl: string | null;
@@ -589,10 +599,31 @@ function calculateCategoryScores({
     overall,
   };
 }
+function getAnalysisCoverageLevel(
+  pagesAnalyzed: number
+): AnalysisCoverageLevel {
+  if (pagesAnalyzed >= 5) return "full";
+  if (pagesAnalyzed >= 2) return "partial";
+  if (pagesAnalyzed === 1) return "single_page";
 
+  return "none";
+}
+
+function getUrlPathDepth(value: string) {
+  try {
+    return new URL(value).pathname
+      .split("/")
+      .filter(Boolean).length;
+  } catch {
+    return 0;
+  }
+}
 function createEmptyTechnicalSignals(): TechnicalSignals {
   return {
-    finalUrl: null,
+  finalUrl: null,
+  analysisVersion: WEBSITE_ANALYSIS_VERSION,
+  coverageLevel: "none",
+  startingUrlPathDepth: 0,
     contentTypesFound: [],
     isHttps: false,
     canonicalUrl: null,
@@ -905,9 +936,20 @@ const allSchemaTypes = Array.from(
     ),
   ])
 ).slice(0, 50);
+const pagesAnalyzed =
+  linkedPageCrawl.analyzedPageCount + 1;
+
+const coverageLevel =
+  getAnalysisCoverageLevel(pagesAnalyzed);
+
+const startingUrlPathDepth =
+  getUrlPathDepth(finalUrl);
     const technicalSignals: TechnicalSignals = {
-      finalUrl,
-      contentTypesFound,
+  finalUrl,
+  analysisVersion: WEBSITE_ANALYSIS_VERSION,
+  coverageLevel,
+  startingUrlPathDepth,
+  contentTypesFound,
       isHttps: new URL(finalUrl).protocol === "https:",
       canonicalUrl: extractCanonicalUrl(html, finalUrl),
       robotsDirective,
@@ -939,8 +981,7 @@ const allSchemaTypes = Array.from(
       headingOrderValid: extractHeadingOrderValidity(html),
       pagesDiscovered:
   linkedPageCrawl.discoveredPageCount + 1,
-pagesAnalyzed:
-  linkedPageCrawl.analyzedPageCount + 1,
+pagesAnalyzed,
 pagesFailed:
   linkedPageCrawl.failedPageCount,
 pagesBlockedByRobots:

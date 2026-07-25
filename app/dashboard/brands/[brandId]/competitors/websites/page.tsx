@@ -56,7 +56,72 @@ function hasDetailedScores(value: unknown) {
     Number.isFinite(Number(record[key]))
   );
 }
+type AnalysisCoverageLevel =
+  | "none"
+  | "single_page"
+  | "partial"
+  | "full";
 
+const CURRENT_ANALYSIS_VERSION = "3.0";
+
+function getAnalysisCoverage(value: unknown) {
+  const record = toRecord(value);
+  const pagesAnalyzed = getNumber(
+    value,
+    "pagesAnalyzed"
+  );
+
+  const rawCoverage = record.coverageLevel;
+
+  let level: AnalysisCoverageLevel;
+
+  if (
+    rawCoverage === "none" ||
+    rawCoverage === "single_page" ||
+    rawCoverage === "partial" ||
+    rawCoverage === "full"
+  ) {
+    level = rawCoverage;
+  } else if (pagesAnalyzed >= 5) {
+    level = "full";
+  } else if (pagesAnalyzed >= 2) {
+    level = "partial";
+  } else if (pagesAnalyzed === 1) {
+    level = "single_page";
+  } else {
+    level = "none";
+  }
+
+  const versionCurrent =
+    record.analysisVersion ===
+    CURRENT_ANALYSIS_VERSION;
+
+  const startingUrlPathDepth = getNumber(
+    value,
+    "startingUrlPathDepth"
+  );
+
+  let label = "Analiz yok";
+
+  if (!versionCurrent && pagesAnalyzed > 0) {
+    label = "Yeniden analiz edilmeli";
+  } else if (level === "full") {
+    label = "Güçlü kapsam";
+  } else if (level === "partial") {
+    label = "Sınırlı kapsam";
+  } else if (level === "single_page") {
+    label = "Tek sayfa";
+  }
+
+  return {
+    level,
+    label,
+    pagesAnalyzed,
+    deepStartingUrl: startingUrlPathDepth >= 2,
+    comparable:
+      versionCurrent && level === "full",
+  };
+}
 export default async function CompetitorWebsitesPage({
   params,
   searchParams,
@@ -140,18 +205,30 @@ export default async function CompetitorWebsitesPage({
   const detailedSnapshots = analyzedSnapshots.filter((snapshot) =>
     hasDetailedScores(snapshot.category_scores_json)
   );
+const comparableSnapshots =
+  detailedSnapshots.filter((snapshot) =>
+    getAnalysisCoverage(
+      snapshot.technical_signals_json
+    ).comparable
+  );
 
+const brandCoverage = getAnalysisCoverage(
+  latestBrandSnapshot?.technical_signals_json
+);
   const averageCompetitorScore =
-    detailedSnapshots.length > 0
-      ? Math.round(
-          detailedSnapshots.reduce(
-            (sum, snapshot) =>
-              sum +
-              getNumber(snapshot.category_scores_json, "overall"),
-            0
-          ) / detailedSnapshots.length
-        )
-      : 0;
+  detailedSnapshots.length > 0
+    ? Math.round(
+        detailedSnapshots.reduce(
+          (sum, snapshot) =>
+            sum +
+            getNumber(
+              snapshot.category_scores_json,
+              "overall"
+            ),
+          0
+        ) / detailedSnapshots.length
+      )
+    : 0;
 
   return (
     <div className="space-y-6">
@@ -191,9 +268,9 @@ export default async function CompetitorWebsitesPage({
 
         <MetricCard
           title="Rakip ortalaması"
-          description="Genel web sitesi puanı"
+          description="Tam kapsamlı analizler"
           value={
-            detailedSnapshots.length > 0
+            comparableSnapshots.length > 0
               ? `${averageCompetitorScore}/100`
               : "-"
           }
@@ -201,34 +278,45 @@ export default async function CompetitorWebsitesPage({
       </section>
 
       <CompetitorScoreComparison
-        brandName={brand.name}
-        brandScoresValue={
-          latestBrandSnapshot?.category_scores_json ?? null
-        }
-        competitors={(competitors ?? [])
-          .map((competitor) => {
-            const snapshot = latestSnapshotByCompetitorId.get(
-              competitor.id
-            );
+  brandName={brand.name}
+  brandScoresValue={
+    brandCoverage.comparable
+      ? latestBrandSnapshot?.category_scores_json ??
+        null
+      : null
+  }
+  competitors={(competitors ?? [])
+    .map((competitor) => {
+      const snapshot =
+        latestSnapshotByCompetitorId.get(
+          competitor.id
+        );
 
-            if (!snapshot) return null;
+      if (!snapshot) return null;
 
-            return {
-              id: competitor.id,
-              name: competitor.name,
-              scoresValue: snapshot.category_scores_json,
-            };
-          })
-          .filter(
-            (
-              competitor
-            ): competitor is {
-              id: string;
-              name: string;
-              scoresValue: unknown;
-            } => competitor !== null
-          )}
-      />
+      const coverage = getAnalysisCoverage(
+        snapshot.technical_signals_json
+      );
+
+      if (!coverage.comparable) return null;
+
+      return {
+        id: competitor.id,
+        name: competitor.name,
+        scoresValue:
+          snapshot.category_scores_json,
+      };
+    })
+    .filter(
+      (
+        competitor
+      ): competitor is {
+        id: string;
+        name: string;
+        scoresValue: unknown;
+      } => competitor !== null
+    )}
+/>
      <CompetitorContentGap
   brandName={brand.name}
   brandTechnicalSignalsValue={
@@ -280,6 +368,9 @@ export default async function CompetitorWebsitesPage({
                 const detailed = hasDetailedScores(
                   snapshot?.category_scores_json
                 );
+                const coverage = getAnalysisCoverage(
+                  snapshot?.technical_signals_json
+                );
 
                 const scoreItems = snapshot
                   ? [
@@ -314,15 +405,8 @@ export default async function CompetitorWebsitesPage({
                     ]
                   : [];
 
-                const pagesAnalyzed = snapshot
-                  ? Math.max(
-                      getNumber(
-                        snapshot.technical_signals_json,
-                        "pagesAnalyzed"
-                      ),
-                      1
-                    )
-                  : 0;
+                const pagesAnalyzed =
+                  coverage.pagesAnalyzed;
 
                 return (
                   <div
@@ -336,19 +420,21 @@ export default async function CompetitorWebsitesPage({
                             {competitor.name}
                           </p>
 
-                          {detailed ? (
-                            <Badge variant="secondary">
-                              Analiz hazır
+                         <Badge
+                              variant={
+                                coverage.comparable
+                                  ? "secondary"
+                                  : "outline"
+                              }
+                            >
+                              {coverage.label}
                             </Badge>
-                          ) : snapshot ? (
-                            <Badge variant="outline">
-                              Yeniden analiz edilmeli
-                            </Badge>
-                          ) : (
-                            <Badge variant="outline">
-                              Analiz yok
-                            </Badge>
-                          )}
+
+                            {coverage.deepStartingUrl ? (
+                              <Badge variant="outline">
+                                Derin bağlantı
+                              </Badge>
+                            ) : null}
                         </div>
 
                         {competitor.website_url ? (
@@ -418,6 +504,25 @@ export default async function CompetitorWebsitesPage({
                           {pagesAnalyzed} sayfa incelendi · Son analiz:{" "}
                           {formatDate(snapshot.created_at)}
                         </p>
+                        <p className="mt-3 text-sm text-muted-foreground">
+                          {pagesAnalyzed} sayfa incelendi · Son analiz:{" "}
+                          {formatDate(snapshot.created_at)}
+                        </p>
+
+                        {!coverage.comparable ? (
+                          <p className="mt-2 text-sm text-amber-700">
+                            Bu analiz yeterli sayfa kapsamına sahip
+                            olmadığı için rakip ortalamasına dahil
+                            edilmedi.
+                          </p>
+                        ) : null}
+
+                        {coverage.deepStartingUrl ? (
+                          <p className="mt-2 text-sm text-muted-foreground">
+                            Daha güvenilir karşılaştırma için rakibin
+                            resmi ana sayfa adresini kullanın.
+                          </p>
+                        ) : null}
                       </div>
                     ) : null}
                   </div>
