@@ -18,7 +18,6 @@ import {
 } from "@/components/ui/card";
 import {
   EmptyState,
-  MetricCard,
   PageHeader,
   StatusBadge,
 } from "@/features/ui/components";
@@ -535,103 +534,74 @@ const { data: analyses } = await supabase
                 </div>
               </CardContent>
             </Card>
+               <Card className="shadow-sm">
+  <CardHeader>
+    <CardTitle>Yönetici Özeti</CardTitle>
+    <CardDescription>
+      Karar vermek için bilinmesi gereken temel sonuçlar.
+    </CardDescription>
+  </CardHeader>
 
-            <Card className="shadow-sm">
-              <CardHeader>
-                <CardTitle>Hızlı İçgörü</CardTitle>
-                <CardDescription>
-                  Bu rapordan çıkan en önemli sinyaller.
-                </CardDescription>
-              </CardHeader>
+  <CardContent className="space-y-4">
+    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
+      <div className="rounded-xl border bg-muted/20 p-3">
+        <p className="text-sm text-muted-foreground">
+          Ortalama sıra
+        </p>
+        <p className="mt-1 text-xl font-semibold">
+          {score.average_rank ?? "-"}
+        </p>
+      </div>
 
-              <CardContent className="space-y-4">
-                <div>
-                  <p className="text-sm text-muted-foreground">
-                    En görünür rakip
-                  </p>
-                  <p className="mt-1 font-medium">
-                    {strongestCompetitor
-                      ? strongestCompetitor.name
-                      : "Rakip görünürlüğü yok"}
-                  </p>
+      <div className="rounded-xl border bg-muted/20 p-3">
+        <p className="text-sm text-muted-foreground">
+          Olumlu ton
+        </p>
+        <p className="mt-1 text-xl font-semibold">
+          {Math.round(score.positive_sentiment_rate)}%
+        </p>
+      </div>
+    </div>
 
-                  {strongestCompetitor ? (
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {strongestCompetitor.mentionCount} cevapta göründü.
-                    </p>
-                  ) : null}
-                </div>
+    <div className="border-t pt-4">
+      <p className="text-sm text-muted-foreground">
+        En görünür rakip
+      </p>
 
-                <div className="border-t pt-4">
-                  <p className="text-sm text-muted-foreground">
-                    En önemli aksiyon
-                  </p>
-                  <p className="mt-1 font-medium">
-                    {topRecommendation
-                      ? topRecommendation.title
-                      : "Henüz aksiyon önerisi oluşmadı"}
-                  </p>
+      <p className="mt-1 font-medium">
+        {strongestCompetitor
+          ? strongestCompetitor.name
+          : "Belirgin rakip görünürlüğü yok"}
+      </p>
 
-                  {topRecommendation ? (
-                    <p className="mt-1 line-clamp-3 text-xs text-muted-foreground">
-                      {topRecommendation.description}
-                    </p>
-                  ) : null}
-                </div>
-              </CardContent>
-            </Card>
+      {strongestCompetitor ? (
+        <p className="mt-1 text-xs text-muted-foreground">
+          {strongestCompetitor.mentionCount} cevapta göründü.
+        </p>
+      ) : null}
+    </div>
+
+    <div className="border-t pt-4">
+      <p className="text-sm text-muted-foreground">
+        İlk uygulanacak aksiyon
+      </p>
+
+      <p className="mt-1 font-medium">
+        {topRecommendation
+          ? topRecommendation.title
+          : "Henüz aksiyon önerisi oluşmadı"}
+      </p>
+
+      {topRecommendation ? (
+        <p className="mt-1 line-clamp-3 text-xs leading-5 text-muted-foreground">
+          {topRecommendation.description}
+        </p>
+      ) : null}
+    </div>
+  </CardContent>
+</Card>
+          
           </section>
-
-          <section className="grid gap-4 md:grid-cols-4">
-            <MetricCard
-              title="Görünürlük Skoru"
-              description="Markanın AI cevaplarında görünme oranı"
-              value={`${Math.round(score.visibility_score)}/100`}
-            />
-
-            <MetricCard
-              title="Görünürlük Payı"
-              description="Rakiplere göre marka payı"
-              value={`${Math.round(score.share_of_voice)}%`}
-            />
-
-            <MetricCard
-              title="Ortalama Sıra"
-              description="Marka geçtiğinde yaklaşık konum"
-              value={score.average_rank ?? "-"}
-            />
-
-            <MetricCard
-              title="Olumlu Ton"
-              description="Olumlu marka bahsi oranı"
-              value={`${Math.round(score.positive_sentiment_rate)}%`}
-            />
-          </section>
-
-          <Card className="shadow-sm">
-            <CardHeader>
-              <CardTitle>Yönetici Özeti</CardTitle>
-              <CardDescription>Ölçüm sonuçlarının kısa yorumu.</CardDescription>
-            </CardHeader>
-
-            <CardContent className="space-y-4">
-              <p className="text-sm leading-6 text-muted-foreground">
-                {brand.name} için {audit.completed_prompts} /{" "}
-                {audit.total_prompts} test sorusu tamamlandı. Marka{" "}
-                {visibleAnalyses.length} cevapta görünürken,{" "}
-                {invisibleAnalyses.length} cevapta görünmedi.
-              </p>
-
-              <div className="rounded-xl border bg-muted/20 p-4">
-                <p className="font-medium">{getScoreComment(visibilityScore)}</p>
-                <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                  Markanın görünmediği sorular; içerik üretimi, karşılaştırma
-                  sayfaları, otorite sinyalleri ve AI görünürlük optimizasyonu
-                  için öncelikli fırsat alanı olarak değerlendirilebilir.
-                </p>
-              </div>
-            </CardContent>
-          </Card>
 
           <WebsiteSignalSummary
             brandId={brand.id}
