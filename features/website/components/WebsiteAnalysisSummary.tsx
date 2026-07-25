@@ -28,6 +28,17 @@ type Strength = {
   title: string;
   description: string;
 };
+type AiCrawlerAccessStatus =
+  | "allowed"
+  | "partial"
+  | "blocked"
+  | "unknown";
+
+type AiCrawlerAccessItem = {
+  name: string;
+  userAgent: string;
+  status: AiCrawlerAccessStatus;
+};
 
 function toRecord(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
@@ -71,6 +82,63 @@ function countFoundSignals(value: unknown) {
 
     return Boolean((item as Record<string, unknown>).found);
   }).length;
+}
+function getAiCrawlerAccess(value: unknown): AiCrawlerAccessItem[] {
+  if (!Array.isArray(value)) return [];
+
+  return value
+    .map((item) => {
+      if (!item || typeof item !== "object") {
+        return null;
+      }
+
+      const record = item as Record<string, unknown>;
+      const status = String(
+        record.status ?? "unknown"
+      );
+
+      if (
+        !["allowed", "partial", "blocked", "unknown"].includes(
+          status
+        )
+      ) {
+        return null;
+      }
+
+      return {
+        name: String(record.name ?? "AI tarayıcısı"),
+        userAgent: String(record.userAgent ?? ""),
+        status: status as AiCrawlerAccessStatus,
+      };
+    })
+    .filter(
+      (item): item is AiCrawlerAccessItem =>
+        Boolean(item?.userAgent)
+    );
+}
+
+function getCrawlerStatusLabel(
+  status: AiCrawlerAccessStatus
+) {
+  if (status === "allowed") return "Erişime açık";
+  if (status === "partial") return "Kısmen açık";
+  if (status === "blocked") return "Engellenmiş";
+
+  return "Kontrol edilemedi";
+}
+
+function getCrawlerStatusVariant(
+  status: AiCrawlerAccessStatus
+) {
+  if (status === "blocked") {
+    return "destructive" as const;
+  }
+
+  if (status === "allowed") {
+    return "secondary" as const;
+  }
+
+  return "outline" as const;
 }
 
 function getScoreLabel(score: number) {
@@ -129,6 +197,19 @@ export function WebsiteAnalysisSummary({
   const scores = toRecord(categoryScoresValue);
   const technicalSignals = toRecord(technicalSignalsValue);
   const headings = toRecord(headingsValue);
+  const aiCrawlerAccess = getAiCrawlerAccess(
+  technicalSignals.aiCrawlerAccess
+);
+
+const llmsTxtFound = getBoolean(
+  technicalSignals,
+  "llmsTxtFound"
+);
+
+const llmsTxtUrl =
+  typeof technicalSignals.llmsTxtUrl === "string"
+    ? technicalSignals.llmsTxtUrl
+    : null;
 
   const technicalScore = getNumber(scores, "technical");
   const structureScore = getNumber(scores, "structure");
@@ -168,6 +249,25 @@ export function WebsiteAnalysisSummary({
   );
 
   const issues: Issue[] = [];
+  const blockedSearchCrawlers = aiCrawlerAccess.filter(
+  (crawler) =>
+    crawler.status === "blocked" &&
+    ["OAI-SearchBot", "PerplexityBot"].includes(
+      crawler.userAgent
+    )
+);
+
+if (blockedSearchCrawlers.length > 0) {
+  issues.push({
+    title: "AI arama tarayıcıları engelleniyor",
+    description: `${blockedSearchCrawlers
+      .map((crawler) => crawler.name)
+      .join(
+        ", "
+      )} sitenin ana sayfasına robots.txt nedeniyle erişemiyor.`,
+    priority: "Yüksek",
+  });
+}
 
   if (!getBoolean(technicalSignals, "indexable")) {
     issues.push({
@@ -513,6 +613,78 @@ export function WebsiteAnalysisSummary({
           </CardContent>
         </Card>
       </section>
+      <Card className="shadow-sm">
+  <CardHeader>
+    <CardTitle>AI tarayıcı erişimi</CardTitle>
+    <CardDescription>
+      robots.txt kurallarının önemli AI tarayıcılarına etkisi.
+    </CardDescription>
+  </CardHeader>
+
+  <CardContent className="space-y-4">
+    {aiCrawlerAccess.length > 0 ? (
+      <div className="grid gap-3 sm:grid-cols-2">
+        {aiCrawlerAccess.map((crawler) => (
+          <div
+            key={crawler.userAgent}
+            className="flex items-center justify-between gap-3 rounded-xl border p-4"
+          >
+            <div>
+              <p className="font-medium">
+                {crawler.name}
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {crawler.userAgent}
+              </p>
+            </div>
+
+            <Badge
+              variant={getCrawlerStatusVariant(
+                crawler.status
+              )}
+            >
+              {getCrawlerStatusLabel(crawler.status)}
+            </Badge>
+          </div>
+        ))}
+      </div>
+    ) : (
+      <p className="text-sm text-muted-foreground">
+        AI tarayıcı erişimi kontrol edilemedi.
+      </p>
+    )}
+
+    <div className="rounded-xl border bg-muted/20 p-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="font-medium">
+            AI içerik dosyası
+          </p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            llms.txt isteğe bağlı bir içerik yönlendirme
+            dosyasıdır. Bulunmaması tek başına görünürlük
+            sorunu değildir.
+          </p>
+        </div>
+
+        <Badge variant={llmsTxtFound ? "secondary" : "outline"}>
+          {llmsTxtFound ? "Bulundu" : "Bulunamadı"}
+        </Badge>
+      </div>
+
+      {llmsTxtUrl ? (
+        <a
+          href={llmsTxtUrl}
+          target="_blank"
+          rel="noreferrer"
+          className="mt-3 block break-all text-sm underline underline-offset-4"
+        >
+          {llmsTxtUrl}
+        </a>
+      ) : null}
+    </div>
+  </CardContent>
+</Card>
       <WebsiteContentOpportunities
         technicalSignalsValue={
             technicalSignalsValue

@@ -1,6 +1,10 @@
 import { assertPublicWebsiteUrl } from "@/lib/security/public-website-url";
 import { getWebsiteKeywordPreset } from "@/lib/website-analysis/keyword-presets";
 import { crawlLinkedPages } from "@/lib/website-analysis/crawl-linked-pages";
+import {
+  analyzeAiCrawlerAccess,
+  type AiCrawlerAccessItem,
+} from "@/lib/website-analysis/analyze-ai-crawler-access";
 const MAX_REDIRECTS = 5;
 const MAX_HTML_BYTES = 2 * 1024 * 1024;
 const MAX_STORED_TEXT_LENGTH = 30_000;
@@ -43,6 +47,11 @@ pagesAnalyzed: number;
 pagesFailed: number;
 pagesBlockedByRobots: number;
 robotsTxtChecked: boolean;
+robotsTxtFound: boolean;
+robotsTxtUrl: string | null;
+llmsTxtFound: boolean;
+llmsTxtUrl: string | null;
+aiCrawlerAccess: AiCrawlerAccessItem[];
 analyzedPages: Array<{
   url: string;
   title: string | null;
@@ -604,6 +613,11 @@ pagesAnalyzed: 0,
 pagesFailed: 0,
 pagesBlockedByRobots: 0,
 robotsTxtChecked: false,
+robotsTxtFound: false,
+robotsTxtUrl: null,
+llmsTxtFound: false,
+llmsTxtUrl: null,
+aiCrawlerAccess: [],
 analyzedPages: [],
     headingOrderValid: false,
   };
@@ -787,10 +801,14 @@ export async function analyzeWebsite({
 
     const homepageText = stripHtml(html);
 
-const linkedPageCrawl = await crawlLinkedPages({
-  homepageHtml: html,
-  homepageUrl: finalUrl,
-});
+const [linkedPageCrawl, aiCrawlerAccess] =
+  await Promise.all([
+    crawlLinkedPages({
+      homepageHtml: html,
+      homepageUrl: finalUrl,
+    }),
+    analyzeAiCrawlerAccess(finalUrl),
+  ]);
 
 const combinedText = [
   homepageText,
@@ -897,6 +915,16 @@ pagesBlockedByRobots:
   linkedPageCrawl.blockedByRobotsCount,
 robotsTxtChecked:
   linkedPageCrawl.robotsChecked,
+  robotsTxtFound:
+  aiCrawlerAccess.robotsTxtFound,
+robotsTxtUrl:
+  aiCrawlerAccess.robotsTxtUrl,
+llmsTxtFound:
+  aiCrawlerAccess.llmsTxtFound,
+llmsTxtUrl:
+  aiCrawlerAccess.llmsTxtUrl,
+aiCrawlerAccess:
+  aiCrawlerAccess.crawlers,
 
 sitemapFound:
   linkedPageCrawl.sitemapFound,
