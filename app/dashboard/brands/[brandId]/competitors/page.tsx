@@ -171,7 +171,7 @@ export default async function CompetitorsPage({
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="websiteUrl">Website URL</Label>
+                <Label htmlFor="websiteUrl">Web sitesi adresi</Label>
                 <Input
                   id="websiteUrl"
                   name="websiteUrl"
@@ -190,7 +190,7 @@ export default async function CompetitorsPage({
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="aliases">Rakip aliasları</Label>
+                <Label htmlFor="aliases">farklı yazımlar</Label>
                 <Textarea
                   id="aliases"
                   name="aliases"
@@ -224,61 +224,62 @@ export default async function CompetitorsPage({
               <div className="grid gap-4 md:grid-cols-2">
                 {competitors.map((competitor) => (
                   <div
-                    key={competitor.id}
-                    className="rounded-xl border p-4 transition-colors hover:bg-muted/30"
-                  >
-                    <div>
-                      <p className="font-medium">{competitor.name}</p>
+  key={competitor.id}
+  className="rounded-xl border p-4 transition-colors hover:bg-muted/30"
+>
+  <div className="flex items-start justify-between gap-4">
+    <div className="min-w-0">
+      <p className="font-medium">{competitor.name}</p>
 
-                      {competitor.website_url ? (
-                        <Link
-                          href={competitor.website_url}
-                          target="_blank"
-                          className="mt-1 block text-sm text-muted-foreground underline underline-offset-4"
-                        >
-                          {getWebsiteLabel(competitor.website_url)}
-                        </Link>
-                      ) : (
-                        <p className="mt-1 text-sm text-muted-foreground">
-                          Website eklenmedi
-                        </p>
-                      )}
+      {competitor.website_url ? (
+        <Link
+          href={competitor.website_url}
+          target="_blank"
+          className="mt-1 block truncate text-sm text-muted-foreground underline underline-offset-4"
+        >
+          {getWebsiteLabel(competitor.website_url)}
+        </Link>
+      ) : (
+        <p className="mt-1 text-sm text-muted-foreground">
+          Web sitesi eklenmedi
+        </p>
+      )}
+    </div>
 
-                      {competitor.description ? (
-                        <p className="mt-3 text-sm leading-6 text-muted-foreground">
-                          {competitor.description}
-                        </p>
-                      ) : null}
-                    </div>
+    <Button asChild variant="outline" size="sm">
+      <Link href={`/dashboard/competitors/${competitor.id}/edit`}>
+        Düzenle
+      </Link>
+    </Button>
+  </div>
 
-                    <div className="mt-4 border-t pt-4">
-                      <p className="mb-2 text-xs font-medium text-muted-foreground">
-                        Aliaslar
-                      </p>
-                      <div className="mt-4 flex flex-wrap gap-2 border-t pt-4">
-  <Button asChild variant="outline" size="sm">
-    <Link href={`/dashboard/competitors/${competitor.id}/edit`}>
-      Düzenle
-    </Link>
-  </Button>
+  {competitor.description ? (
+    <p className="mt-3 text-sm leading-6 text-muted-foreground">
+      {competitor.description}
+    </p>
+  ) : null}
+
+  <div className="mt-4 border-t pt-4">
+    <p className="mb-2 text-xs font-medium text-muted-foreground">
+      Farklı yazımlar
+    </p>
+
+    {competitor.competitor_aliases &&
+    competitor.competitor_aliases.length > 0 ? (
+      <div className="flex flex-wrap gap-2">
+        {competitor.competitor_aliases.map((alias) => (
+          <Badge key={alias.id} variant="secondary">
+            {alias.alias}
+          </Badge>
+        ))}
+      </div>
+    ) : (
+      <p className="text-xs text-muted-foreground">
+        Farklı yazım eklenmedi.
+      </p>
+    )}
+  </div>
 </div>
-
-                      {competitor.competitor_aliases &&
-                      competitor.competitor_aliases.length > 0 ? (
-                        <div className="flex flex-wrap gap-2">
-                          {competitor.competitor_aliases.map((alias) => (
-                            <Badge key={alias.id} variant="secondary">
-                              {alias.alias}
-                            </Badge>
-                          ))}
-                        </div>
-                      ) : (
-                        <p className="text-xs text-muted-foreground">
-                          Alias eklenmedi.
-                        </p>
-                      )}
-                    </div>
-                  </div>
                 ))}
               </div>
             ) : (

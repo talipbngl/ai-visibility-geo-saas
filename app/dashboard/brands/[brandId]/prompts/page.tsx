@@ -214,15 +214,15 @@ const passivePromptCount = visiblePrompts.filter(
             </CardContent>
           </Card>
 
-          <Card className="shadow-sm">
-            <CardHeader>
-              <CardTitle>Yeni Soru Seti</CardTitle>
-              <CardDescription>
-                Test sorularını konu veya niyete göre grupla.
-              </CardDescription>
-            </CardHeader>
+          <details className="rounded-xl border bg-card shadow-sm">
+  <summary className="cursor-pointer list-none px-6 py-5">
+    <span className="block font-medium">Yeni soru seti oluştur</span>
+    <span className="mt-1 block text-sm text-muted-foreground">
+      Soruları konu veya amaca göre gruplandır.
+    </span>
+  </summary>
 
-            <CardContent>
+  <div className="border-t p-6">
               <form
                 action={`/api/brands/${brand.id}/prompt-sets`}
                 method="post"
@@ -249,21 +249,21 @@ const passivePromptCount = visiblePrompts.filter(
                 </div>
 
                 <Button type="submit" className="w-full">
-                  Soru setini kaydet
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
+                      Soru setini kaydet
+                    </Button>
+                    </form>
+                    </div>
+                    </details>
 
-          <Card className="shadow-sm">
-            <CardHeader>
-              <CardTitle>Manuel Test Sorusu Ekle</CardTitle>
-              <CardDescription>
-                Belirli bir soruyu doğrudan ölçüme dahil etmek için ekle.
-              </CardDescription>
-            </CardHeader>
+          <details className="rounded-xl border bg-card shadow-sm">
+                <summary className="cursor-pointer list-none px-6 py-5">
+                  <span className="block font-medium">Manuel test sorusu ekle</span>
+                  <span className="mt-1 block text-sm text-muted-foreground">
+                    Ölçmek istediğin özel bir soruyu kendin yaz.
+                  </span>
+                </summary>
 
-            <CardContent>
+                <div className="border-t p-6">
               {firstPromptSetId ? (
                 <form
                   action={`/api/brands/${brand.id}/prompts`}
@@ -371,9 +371,9 @@ const passivePromptCount = visiblePrompts.filter(
                   title="Önce soru seti oluştur"
                   description="Manuel test sorusu eklemek için önce bir soru seti gerekir."
                 />
-              )}
-            </CardContent>
-          </Card>
+                )}
+                </div>
+                </details>
         </div>
 
         <Card className="shadow-sm">
