@@ -8,12 +8,21 @@ const MAX_ROBOTS_BYTES = 100 * 1024;
 const REQUEST_TIMEOUT_MS = 6_000;
 const CONCURRENCY = 3;
 const MAX_PAGE_TEXT_LENGTH = 20_000;
-
+export type ContentPageType =
+  | "service"
+  | "about"
+  | "contact"
+  | "faq"
+  | "guide"
+  | "comparison"
+  | "pricing"
+  | "other";
 export type CrawledPage = {
   url: string;
   title: string | null;
   text: string;
   wordCount: number;
+  contentType: ContentPageType;
 };
 
 export type LinkedPageCrawlResult = {
@@ -26,6 +35,7 @@ export type LinkedPageCrawlResult = {
   sitemapFound: boolean;
   sitemapUrl: string | null;
   sitemapPageCount: number;
+  contentTypesFound: ContentPageType[];
 };
 
 function normalizeHostname(hostname: string) {
@@ -314,7 +324,9 @@ function shouldSkipUrl(url: URL) {
   );
 }
 
-function getPageCategory(url: string) {
+function getPageCategory(
+  url: string
+): ContentPageType {
   const parsedUrl = new URL(url);
   const pathname = normalizePathname(
     parsedUrl.pathname
@@ -761,6 +773,7 @@ async function crawlPage({
         MAX_PAGE_TEXT_LENGTH
       ),
       wordCount: getWordCount(fullText),
+      contentType: getPageCategory(result.finalUrl),
     };
   } catch {
     return null;
@@ -903,14 +916,24 @@ const candidates = Array.from(
 
   return {
     sitemapFound: sitemap.found,
-sitemapUrl: sitemap.sitemapUrl,
-sitemapPageCount: sitemap.pageCount,
+    sitemapUrl: sitemap.sitemapUrl,
+    sitemapPageCount: sitemap.pageCount,
     discoveredPageCount: candidates.length,
     analyzedPageCount: pages.length,
     failedPageCount:
-  attemptedPageCount - successfulPageCount,
+      attemptedPageCount - successfulPageCount,
     blockedByRobotsCount,
     robotsChecked: robots.checked,
     pages,
+    contentTypesFound: Array.from(
+      new Set(
+        pages
+          .map((page) => page.contentType)
+          .filter(
+            (contentType) =>
+              contentType !== "other"
+          )
+      )
+    ),
   };
 }

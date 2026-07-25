@@ -18,18 +18,33 @@ type Signal = {
   found: boolean;
 };
 
-type AnalyzedPage = {
-  url: string;
-  title: string | null;
-  wordCount: number;
-};
+type ContentPageType =
+  | "service"
+  | "about"
+  | "contact"
+  | "faq"
+  | "guide"
+  | "comparison"
+  | "pricing"
+  | "other";
 
 type Opportunity = {
   title: string;
   evidence: string;
   action: string;
-  priority: "Yüksek" | "Orta" | "Düşük";
+  priority: "Yüksek" | "Orta";
 };
+
+const validContentTypes = new Set<ContentPageType>([
+  "service",
+  "about",
+  "contact",
+  "faq",
+  "guide",
+  "comparison",
+  "pricing",
+  "other",
+]);
 
 function toRecord(
   value: unknown
@@ -57,18 +72,18 @@ function toSignals(value: unknown): Signal[] {
         return null;
       }
 
-      const signal =
+      const record =
         item as Record<string, unknown>;
 
       const keyword = String(
-        signal.keyword ?? ""
+        record.keyword ?? ""
       ).trim();
 
       if (!keyword) return null;
 
       return {
         keyword,
-        found: Boolean(signal.found),
+        found: Boolean(record.found),
       };
     })
     .filter(
@@ -77,92 +92,26 @@ function toSignals(value: unknown): Signal[] {
     );
 }
 
-function toAnalyzedPages(
-  technicalSignals: Record<string, unknown>
-): AnalyzedPage[] {
-  const value =
-    technicalSignals.analyzedPages;
-
+function toContentTypes(
+  value: unknown
+): ContentPageType[] {
   if (!Array.isArray(value)) return [];
 
-  return value
-    .map((item) => {
-      if (
-        !item ||
-        typeof item !== "object"
-      ) {
-        return null;
-      }
-
-      const page =
-        item as Record<string, unknown>;
-
-      const url = String(
-        page.url ?? ""
-      ).trim();
-
-      if (!url) return null;
-
-      return {
-        url,
-        title:
-          typeof page.title === "string"
-            ? page.title
-            : null,
-        wordCount: Number(
-          page.wordCount ?? 0
-        ),
-      };
-    })
-    .filter(
-      (item): item is AnalyzedPage =>
-        item !== null
-    );
-}
-
-function normalizeText(value: string) {
-  let decodedValue = value;
-
-  try {
-    decodedValue =
-      decodeURIComponent(value);
-  } catch {
-    // Kodlanmış adres çözülemezse mevcut değer kullanılır.
-  }
-
-  return decodedValue
-    .toLocaleLowerCase("tr-TR")
-    .replace(/ı/g, "i")
-    .replace(/ğ/g, "g")
-    .replace(/ü/g, "u")
-    .replace(/ş/g, "s")
-    .replace(/ö/g, "o")
-    .replace(/ç/g, "c")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function containsAnyTerm(
-  content: string,
-  terms: string[]
-) {
-  return terms.some((term) =>
-    content.includes(term)
+  return value.filter(
+    (item): item is ContentPageType =>
+      typeof item === "string" &&
+      validContentTypes.has(
+        item as ContentPageType
+      )
   );
 }
 
 function getPriorityVariant(
   priority: Opportunity["priority"]
 ) {
-  if (priority === "Yüksek") {
-    return "destructive" as const;
-  }
-
-  if (priority === "Orta") {
-    return "secondary" as const;
-  }
-
-  return "outline" as const;
+  return priority === "Yüksek"
+    ? ("destructive" as const)
+    : ("secondary" as const);
 }
 
 export function WebsiteContentOpportunities({
@@ -174,8 +123,19 @@ export function WebsiteContentOpportunities({
     technicalSignalsValue
   );
 
-  const analyzedPages =
-    toAnalyzedPages(technicalSignals);
+  const contentTypes = new Set(
+    toContentTypes(
+      technicalSignals.contentTypesFound
+    )
+  );
+
+  if (technicalSignals.hasAboutLink) {
+    contentTypes.add("about");
+  }
+
+  if (technicalSignals.hasContactLink) {
+    contentTypes.add("contact");
+  }
 
   const serviceSignals = toSignals(
     serviceSignalsValue
@@ -185,23 +145,9 @@ export function WebsiteContentOpportunities({
     trustSignalsValue
   );
 
-  const pageContent = normalizeText(
-    analyzedPages
-      .map(
-        (page) =>
-          `${page.url} ${page.title ?? ""}`
-      )
-      .join(" ")
-  );
-
   const foundServiceSignals =
     serviceSignals.filter(
       (signal) => signal.found
-    );
-
-  const missingServiceSignals =
-    serviceSignals.filter(
-      (signal) => !signal.found
     );
 
   const foundTrustSignals =
@@ -209,193 +155,105 @@ export function WebsiteContentOpportunities({
       (signal) => signal.found
     );
 
-  const pageScope =
-    analyzedPages.length > 1
-      ? `İncelenen ${analyzedPages.length} sayfada`
-      : "İncelenen ana sayfada";
+  const missingServiceExamples =
+    serviceSignals
+      .filter((signal) => !signal.found)
+      .slice(0, 3)
+      .map((signal) => signal.keyword)
+      .join(", ");
 
-  const hasServicePage = containsAnyTerm(
-    pageContent,
-    [
-      "hizmet",
-      "service",
-      "urun",
-      "product",
-      "cozum",
-      "solution",
-      "tedavi",
-      "uygulama",
-      "kategori",
-      "collection",
-    ]
-  );
-
-  const hasFaqPage = containsAnyTerm(
-    pageContent,
-    [
-      "sik-sorulan",
-      "sik sorulan",
-      "sss",
-      "faq",
-    ]
-  );
-
-  const hasGuidePage = containsAnyTerm(
-    pageContent,
-    [
-      "blog",
-      "rehber",
-      "guide",
-      "makale",
-      "article",
-      "bilgi",
-    ]
-  );
-
-  const hasAboutPage = containsAnyTerm(
-    pageContent,
-    [
-      "hakkimizda",
-      "about",
-      "kurumsal",
-      "ekibimiz",
-      "team",
-    ]
-  );
-
-  const hasContactPage = containsAnyTerm(
-    pageContent,
-    [
-      "iletisim",
-      "contact",
-      "sube",
-      "location",
-      "konum",
-    ]
-  );
-
-  const hasTrustContent = containsAnyTerm(
-    pageContent,
-    [
-      "referans",
-      "yorum",
-      "testimonial",
-      "basari",
-      "vaka",
-      "case-study",
-      "sertifika",
-    ]
-  );
-
-  const hasComparisonContent =
-    containsAnyTerm(
-      pageContent,
-      [
-        "karsilastir",
-        "comparison",
-        "versus",
-        "alternatif",
-      ]
-    );
+  const missingTrustExamples =
+    trustSignals
+      .filter((signal) => !signal.found)
+      .slice(0, 3)
+      .map((signal) => signal.keyword)
+      .join(", ");
 
   const opportunities: Opportunity[] = [];
 
   if (
-    !hasServicePage ||
+    !contentTypes.has("service") ||
     foundServiceSignals.length < 2
   ) {
-    const examples =
-      missingServiceSignals
-        .slice(0, 3)
-        .map((signal) => signal.keyword)
-        .join(", ");
-
     opportunities.push({
       title:
-        "Hizmet veya ürün sayfalarını güçlendirin",
-      evidence: `${pageScope} hizmetleri ayrıntılı açıklayan belirgin bir içerik yapısı sınırlı görünüyor.`,
-      action: examples
-        ? `${examples} gibi önemli konular için ayrı, açıklayıcı sayfalar hazırlayın.`
-        : "Her ana hizmet veya ürün için açıklayıcı ve özgün bir sayfa hazırlayın.",
+        "Ürün veya hizmet içeriklerini güçlendirin",
+      evidence:
+        "İncelenen sayfalarda ürün ve hizmetleri ayrıntılı açıklayan içerik kapsamı sınırlı görünüyor.",
+      action: missingServiceExamples
+        ? `${missingServiceExamples} konuları için ayrı ve açıklayıcı sayfalar hazırlayın.`
+        : "Her önemli ürün veya hizmet için özgün bir açıklama sayfası hazırlayın.",
       priority: "Yüksek",
     });
   }
 
-  if (!hasFaqPage) {
+  if (!contentTypes.has("faq")) {
     opportunities.push({
       title:
-        "Sık sorulan sorular bölümü oluşturun",
-      evidence: `${pageScope} kullanıcıların temel sorularını toplu şekilde cevaplayan belirgin bir bölüm bulunamadı.`,
+        "Sık sorulan sorular içeriği hazırlayın",
+      evidence:
+        "İncelenen sayfalarda kullanıcı sorularını toplu olarak cevaplayan belirgin bir içerik bulunamadı.",
       action:
-        "Fiyat, kullanım, teslimat, süreç, seçim ve güven konularındaki gerçek müşteri sorularını kısa cevaplarla açıklayın.",
+        "Fiyat, kullanım, teslimat, süreç ve seçim konularındaki gerçek müşteri sorularını kısa cevaplarla açıklayın.",
       priority: "Yüksek",
     });
   }
 
-  if (
-    foundTrustSignals.length < 2 ||
-    !hasTrustContent
-  ) {
-    const missingTrustExamples =
-      trustSignals
-        .filter(
-          (signal) => !signal.found
-        )
-        .slice(0, 3)
-        .map((signal) => signal.keyword)
-        .join(", ");
-
+  if (foundTrustSignals.length < 2) {
     opportunities.push({
       title:
         "Güven kanıtlarını görünür hale getirin",
-      evidence: `${pageScope} müşteri güvenini destekleyen kanıtlar sınırlı görünüyor.`,
+      evidence:
+        "İncelenen içeriklerde markanın güvenilirliğini destekleyen kanıtlar sınırlı görünüyor.",
       action: missingTrustExamples
         ? `${missingTrustExamples} gibi güven unsurlarını gerçek ve doğrulanabilir bilgilerle açıklayın.`
-        : "Müşteri yorumları, referanslar, uzmanlık bilgileri ve sertifikaları görünür hale getirin.",
+        : "Referans, müşteri yorumu, uzmanlık ve sertifika bilgilerini görünür hale getirin.",
       priority: "Yüksek",
     });
   }
 
-  if (!hasGuidePage) {
+  if (!contentTypes.has("guide")) {
     opportunities.push({
       title:
-        "Rehber ve bilgilendirici içerikler hazırlayın",
-      evidence: `${pageScope} araştırma yapan kullanıcılara yönelik belirgin bir rehber veya bilgi içeriği bulunamadı.`,
+        "Rehber içerikler oluşturun",
+      evidence:
+        "İncelenen sayfalarda araştırma yapan kullanıcıları bilgilendiren belirgin bir rehber içeriği bulunamadı.",
       action:
-        "Müşterilerin seçim yapmadan önce sorduğu soruları ayrı rehber içeriklerde ayrıntılı olarak cevaplayın.",
+        "Müşterilerin karar vermeden önce sorduğu soruları ayrı rehber yazılarda ayrıntılı biçimde cevaplayın.",
+      priority: "Orta",
+    });
+  }
+
+  if (!contentTypes.has("comparison")) {
+    opportunities.push({
+      title:
+        "Karşılaştırma içerikleri ekleyin",
+      evidence:
+        "İncelenen sayfalarda seçenekler arasında karar vermeyi kolaylaştıran karşılaştırma içeriği bulunamadı.",
+      action:
+        "Ürün veya hizmet seçeneklerini kullanım amacı, özellik ve hedef kitle gibi tarafsız ölçütlerle karşılaştırın.",
       priority: "Orta",
     });
   }
 
   if (
-    !hasAboutPage ||
-    !hasContactPage
+    !contentTypes.has("about") ||
+    !contentTypes.has("contact")
   ) {
     opportunities.push({
       title:
         "Kurumsal bilgileri tamamlayın",
-      evidence: `${pageScope} hakkımızda veya iletişim içeriği yeterince belirgin değil.`,
+      evidence:
+        "Hakkımızda veya iletişim bilgilerinden en az biri yeterince görünür değil.",
       action:
-        "Markanın kim olduğunu, uzmanlığını, iletişim kanallarını ve varsa fiziksel konumlarını açıkça gösterin.",
-      priority: "Orta",
-    });
-  }
-
-  if (!hasComparisonContent) {
-    opportunities.push({
-      title:
-        "Karşılaştırma içerikleri ekleyin",
-      evidence: `${pageScope} müşterinin alternatifler arasında seçim yapmasına yardımcı olan belirgin bir içerik bulunamadı.`,
-      action:
-        "Ürün, hizmet veya çözüm seçeneklerini tarafsız ölçütlerle karşılaştıran içerikler hazırlayın.",
+        "Markanın kimliğini, uzmanlığını, iletişim kanallarını ve fiziksel konumlarını açıkça gösterin.",
       priority: "Orta",
     });
   }
 
   const priorityOrder = {
-    Yüksek: 3,
-    Orta: 2,
-    Düşük: 1,
+    Yüksek: 2,
+    Orta: 1,
   };
 
   const selectedOpportunities =
@@ -405,17 +263,17 @@ export function WebsiteContentOpportunities({
           priorityOrder[second.priority] -
           priorityOrder[first.priority]
       )
-      .slice(0, 5);
+      .slice(0, 3);
 
   return (
     <Card className="shadow-sm">
       <CardHeader>
         <CardTitle>
-          İçerik fırsatları
+          Öncelikli içerik fırsatları
         </CardTitle>
 
         <CardDescription>
-          İncelenen sayfalara göre uygulanabilecek en önemli içerik önerileri.
+          İncelenen sayfalara göre uygulanabilecek en önemli üç öneri.
         </CardDescription>
       </CardHeader>
 
@@ -447,10 +305,6 @@ export function WebsiteContentOpportunities({
                   </p>
 
                   <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                    <span className="font-medium text-foreground">
-                      Neden:{" "}
-                    </span>
-
                     {opportunity.evidence}
                   </p>
 
@@ -467,12 +321,12 @@ export function WebsiteContentOpportunities({
           </div>
         ) : (
           <p className="text-sm leading-6 text-muted-foreground">
-            İncelenen sayfalarda belirgin bir içerik boşluğu tespit edilmedi.
+            İncelenen sayfalarda önemli bir içerik boşluğu tespit edilmedi.
           </p>
         )}
 
         <p className="mt-4 text-xs leading-5 text-muted-foreground">
-          Öneriler yalnızca taranabilen sayfalara dayanır. Taranmayan bir içerik sitede mevcut olabilir.
+          Sonuçlar yalnızca taranabilen sayfalara dayanır.
         </p>
       </CardContent>
     </Card>

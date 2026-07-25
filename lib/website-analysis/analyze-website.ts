@@ -1,6 +1,9 @@
 import { assertPublicWebsiteUrl } from "@/lib/security/public-website-url";
 import { getWebsiteKeywordPreset } from "@/lib/website-analysis/keyword-presets";
-import { crawlLinkedPages } from "@/lib/website-analysis/crawl-linked-pages";
+import {
+  crawlLinkedPages,
+  type ContentPageType,
+} from "@/lib/website-analysis/crawl-linked-pages";
 import {
   analyzeAiCrawlerAccess,
   type AiCrawlerAccessItem,
@@ -18,6 +21,7 @@ export type SignalResult = {
 
 export type TechnicalSignals = {
   finalUrl: string | null;
+  contentTypesFound: ContentPageType[];
   isHttps: boolean;
   canonicalUrl: string | null;
   robotsDirective: string | null;
@@ -583,6 +587,7 @@ function calculateCategoryScores({
 function createEmptyTechnicalSignals(): TechnicalSignals {
   return {
     finalUrl: null,
+    contentTypesFound: [],
     isHttps: false,
     canonicalUrl: null,
     robotsDirective: null,
@@ -876,6 +881,8 @@ const searchableText = normalizeText(
 
     const technicalSignals: TechnicalSignals = {
       finalUrl,
+      contentTypesFound:
+  linkedPageCrawl.contentTypesFound,
       isHttps: new URL(finalUrl).protocol === "https:",
       canonicalUrl: extractCanonicalUrl(html, finalUrl),
       robotsDirective,
@@ -932,7 +939,6 @@ sitemapUrl:
   linkedPageCrawl.sitemapUrl,
 sitemapPageCount:
   linkedPageCrawl.sitemapPageCount,
-
 analyzedPages: [
   {
     url: finalUrl,
