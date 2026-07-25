@@ -564,69 +564,124 @@ const analyses = completedRuns.map((run) => {
   const opportunityScore = round(
     (competitorOnlyOpportunityCount / totalAnalyzed) * 100
   );
-  const brandHostname = getHostname(brand.website_url);
+  function getCitationSources(value: unknown) {
+    if (!value || typeof value !== "object") {
+      return [];
+    }
 
-const sourcedRunCount = completedRuns.filter(
-  (run) => getCitationSources(run.citations_json).length > 0
-).length;
+    const data = value as {
+      sources?: Array<{
+        uri?: string;
+        title?: string;
+      }>;
+    };
 
-const brandSourceRunCount = completedRuns.filter((run) =>
-  getCitationSources(run.citations_json).some((source) =>
-    sourceMatchesHostname(source.uri, brandHostname)
-  )
-).length;
+    if (!Array.isArray(data.sources)) {
+      return [];
+    }
 
-const citationScore = round(
-  ((sourcedRunCount / totalAnalyzed) * 70) +
-    ((brandSourceRunCount / totalAnalyzed) * 30)
-);
-function getCitationSources(value: unknown) {
-  if (!value || typeof value !== "object") return [];
-
-  const data = value as {
-    sources?: Array<{
-      uri?: string;
-      title?: string;
-    }>;
-  };
-
-  if (!Array.isArray(data.sources)) return [];
-
-  return data.sources
-    .map((source) => ({
-      uri: String(source.uri ?? ""),
-      title: String(source.title ?? ""),
-    }))
-    .filter((source) => source.uri);
-}
-
-function getHostname(value: string | null) {
-  if (!value) return null;
-
-  try {
-    const url = new URL(
-      value.startsWith("http://") || value.startsWith("https://")
-        ? value
-        : `https://${value}`
-    );
-
-    return url.hostname.replace(/^www\./, "");
-  } catch {
-    return null;
+    return data.sources
+      .map((source) => ({
+        uri: String(source.uri ?? ""),
+        title: String(source.title ?? ""),
+      }))
+      .filter((source) => source.uri);
   }
-}
 
-function sourceMatchesHostname(sourceUri: string, hostname: string | null) {
-  if (!hostname) return false;
+  function hasGroundingEnabled(value: unknown) {
+    if (!value || typeof value !== "object") {
+      return false;
+    }
 
-  try {
-    const sourceHostname = new URL(sourceUri).hostname.replace(/^www\./, "");
+    const data = value as {
+      groundingEnabled?: boolean;
+    };
 
-    return sourceHostname === hostname || sourceHostname.endsWith(`.${hostname}`);
-  } catch {
-    return false;
+    return data.groundingEnabled === true;
   }
-}
+
+  function getHostname(value: string | null) {
+    if (!value) {
+      return null;
+    }
+
+    try {
+      const url = new URL(
+        value.startsWith("http://") ||
+          value.startsWith("https://")
+          ? value
+          : `https://${value}`
+      );
+
+      return url.hostname.replace(/^www\./, "");
+    } catch {
+      return null;
+    }
+  }
+
+  function sourceMatchesHostname(
+    sourceUri: string,
+    hostname: string | null
+  ) {
+    if (!hostname) {
+      return false;
+    }
+
+    try {
+      const sourceHostname = new URL(sourceUri)
+        .hostname
+        .replace(/^www\./, "");
+
+      return (
+        sourceHostname === hostname ||
+        sourceHostname.endsWith(`.${hostname}`)
+      );
+    } catch {
+      return false;
+    }
+  }
+
+  const brandHostname = getHostname(
+    brand.website_url
+  );
+
+  const groundedRuns = completedRuns.filter(
+    (run) =>
+      hasGroundingEnabled(
+        run.citations_json
+      )
+  );
+
+  const sourcedRunCount = groundedRuns.filter(
+    (run) =>
+      getCitationSources(
+        run.citations_json
+      ).length > 0
+  ).length;
+
+  const brandSourceRunCount =
+    groundedRuns.filter((run) =>
+      getCitationSources(
+        run.citations_json
+      ).some((source) =>
+        sourceMatchesHostname(
+          source.uri,
+          brandHostname
+        )
+      )
+    ).length;
+
+  const citationScore =
+    groundedRuns.length > 0
+      ? round(
+          (sourcedRunCount /
+            groundedRuns.length) *
+            70 +
+            (brandSourceRunCount /
+              groundedRuns.length) *
+              30
+        )
+      : null;
   const { error: scoreError } = await supabase.from("audit_scores").upsert(
     {
       audit_id: audit.id,

@@ -391,10 +391,24 @@ created_at: snapshot.created_at,
     };
   });
 
-  const visibilityScore = Math.round(Number(score?.visibility_score ?? 0));
-  const shareOfVoice = Math.round(Number(score?.share_of_voice ?? 0));
-  const citationScore = Math.round(Number(score?.citation_score ?? 0));
-  const averageRank = score?.average_rank ?? null;
+    const visibilityScore = Math.round(
+    Number(score?.visibility_score ?? 0)
+  );
+
+  const shareOfVoice = Math.round(
+    Number(score?.share_of_voice ?? 0)
+  );
+
+  const citationScore =
+    score?.citation_score === null ||
+    score?.citation_score === undefined
+      ? null
+      : Math.round(
+          Number(score.citation_score)
+        );
+
+  const averageRank =
+    score?.average_rank ?? null;
 
   const visibleAnalyses =
     analyses?.filter((analysis) => analysis.brand_mentioned) ?? [];
@@ -617,11 +631,19 @@ const competitorAverageWebsiteScore = getAverageScore(
               />
 
              <MetricBox
-                    label="Kaynak Skoru"
-                    value={`${citationScore}/100`}
-                    helper="Grounding kaynak kullanım gücü"
-                    tone="orange"
-                    />
+                  label="Kaynak Kullanımı"
+                  value={
+                    citationScore === null
+                      ? "Ölçülmedi"
+                      : `${citationScore}/100`
+                  }
+                  helper={
+                    citationScore === null
+                      ? "Bu ölçüm web kaynağı kullanılmadan oluşturuldu"
+                      : "Web kaynaklarının kullanım gücü"
+                  }
+                  tone="orange"
+                />
             </div>
             <div className="mt-6 rounded-3xl border border-slate-200 bg-slate-50 p-5">
             <h3 className="font-semibold text-slate-950">Skorlar nasıl okunmalı?</h3>
@@ -650,13 +672,14 @@ const competitorAverageWebsiteScore = getAverageScore(
                 Marka cevapta geçtiğinde rakiplere göre yaklaşık kaçıncı sırada
                 göründüğünü gösterir.
                 </p>
-                <p>
-  <span className="font-semibold text-slate-950">
-    Kaynak Skoru:
-  </span>{" "}
-  Gemini grounding çıktısında web kaynakları dönüp dönmediğini ve markanın
-  kendi web sitesinin kaynaklar arasında yer alıp almadığını gösterir.
-</p>
+                 <p>
+                <span className="font-semibold text-slate-950">
+                  Kaynak Kullanımı:
+                </span>{" "}
+                {citationScore === null
+                  ? "Bu ölçüm web araması kullanılmadan hazırlanmıştır; kaynak başarısı puanlanmamıştır."
+                  : "AI cevabında web kaynaklarının kullanılıp kullanılmadığını ve marka sitesinin kaynaklar arasında yer alıp almadığını gösterir."}
+              </p>
             </div>
             </div>
 

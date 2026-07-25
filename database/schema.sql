@@ -135,7 +135,7 @@ create table audit_scores (
   share_of_voice numeric not null default 0,
   average_rank numeric,
   positive_sentiment_rate numeric not null default 0,
-  citation_score numeric not null default 0,
+  citation_score numeric,
   competitor_gap_score numeric not null default 0,
   opportunity_score numeric not null default 0,
   created_at timestamptz not null default now()
