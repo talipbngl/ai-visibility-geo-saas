@@ -1,6 +1,7 @@
 import { assertPublicWebsiteUrl } from "@/lib/security/public-website-url";
 import { discoverSitemapPages } from "@/lib/website-analysis/discover-sitemap-pages";
 const MAX_LINKED_PAGES = 5;
+const MAX_CRAWL_ATTEMPTS = 8;
 const MAX_REDIRECTS = 3;
 const MAX_PAGE_BYTES = 512 * 1024;
 const MAX_ROBOTS_BYTES = 100 * 1024;
@@ -850,23 +851,35 @@ const candidates = Array.from(
   const blockedByRobotsCount =
     candidates.length -
     allowedCandidates.length;
-
-  const selectedCandidates =
-  selectDiverseCandidates(
+  const selectedCandidates = selectDiverseCandidates(
     allowedCandidates,
-    MAX_LINKED_PAGES
+    MAX_CRAWL_ATTEMPTS
   );
+
   const pages: CrawledPage[] = [];
+  let attemptedPageCount = 0;
+  let successfulPageCount = 0;
 
   for (
     let index = 0;
-    index < selectedCandidates.length;
+    index < selectedCandidates.length &&
+    pages.length < MAX_LINKED_PAGES;
     index += CONCURRENCY
   ) {
+    const remainingPageCount =
+      MAX_LINKED_PAGES - pages.length;
+
+    const batchSize = Math.min(
+      CONCURRENCY,
+      remainingPageCount
+    );
+
     const batch = selectedCandidates.slice(
       index,
-      index + CONCURRENCY
+      index + batchSize
     );
+
+    attemptedPageCount += batch.length;
 
     const results = await Promise.all(
       batch.map((candidate) =>
@@ -878,7 +891,11 @@ const candidates = Array.from(
     );
 
     for (const result of results) {
-      if (result) {
+      if (!result) continue;
+
+      successfulPageCount += 1;
+
+      if (pages.length < MAX_LINKED_PAGES) {
         pages.push(result);
       }
     }
@@ -891,7 +908,7 @@ sitemapPageCount: sitemap.pageCount,
     discoveredPageCount: candidates.length,
     analyzedPageCount: pages.length,
     failedPageCount:
-      selectedCandidates.length - pages.length,
+  attemptedPageCount - successfulPageCount,
     blockedByRobotsCount,
     robotsChecked: robots.checked,
     pages,
