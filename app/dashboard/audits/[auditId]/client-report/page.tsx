@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-
+import { ClientWebsiteScoreComparison } from "@/features/reports/components/ClientWebsiteScoreComparison";
 import { PrintReportButton } from "@/features/reports/components/PrintReportButton";
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
@@ -17,12 +17,6 @@ type CompetitorVisibility = {
   name: string;
   mentioned: boolean;
   rank: number | null;
-};
-
-type Signal = {
-  keyword: string;
-  count: number;
-  found: boolean;
 };
 
 type NestedPrompt = {
@@ -89,49 +83,34 @@ function getPromptText(run: NestedRun | null) {
 
   return prompt?.text ?? "Test sorusu bulunamadı";
 }
-
-function toSignalArray(value: unknown): Signal[] {
-  if (!Array.isArray(value)) return [];
-
-  return value
-    .map((item) => {
-      if (!item || typeof item !== "object") return null;
-
-      const signal = item as Partial<Signal>;
-
-      return {
-        keyword: String(signal.keyword ?? ""),
-        count: Number(signal.count ?? 0),
-        found: Boolean(signal.found),
-      };
-    })
-    .filter((item): item is Signal => Boolean(item?.keyword));
-}
-
-function getFoundSignals(value: unknown) {
-  return toSignalArray(value).filter((signal) => signal.found);
-}
-
-function getMissingSignals(value: unknown) {
-  return toSignalArray(value).filter((signal) => !signal.found);
-}
-
 function getAverageScore(values: number[]) {
   if (values.length === 0) return null;
 
   return Math.round(values.reduce((sum, value) => sum + value, 0) / values.length);
 }
+function toRecord(value: unknown): Record<string, unknown> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return {};
+  }
 
-function getBadgeColor(index: number) {
-  const colors = [
-    "bg-blue-50 text-blue-700 ring-blue-200",
-    "bg-violet-50 text-violet-700 ring-violet-200",
-    "bg-emerald-50 text-emerald-700 ring-emerald-200",
-    "bg-amber-50 text-amber-700 ring-amber-200",
-    "bg-rose-50 text-rose-700 ring-rose-200",
-  ];
+  return value as Record<string, unknown>;
+}
 
-  return colors[index % colors.length];
+function getCategoryScore(value: unknown, key: string) {
+  const record = toRecord(value);
+  const score = Number(record[key] ?? 0);
+
+  if (!Number.isFinite(score)) return 0;
+
+  return Math.max(0, Math.min(100, Math.round(score)));
+}
+
+function hasCategoryScores(value: unknown) {
+  const record = toRecord(value);
+
+  return ["technical", "structure", "content", "trust"].some((key) =>
+    Number.isFinite(Number(record[key]))
+  );
 }
 function getPriorityText(value: string | null) {
   if (value === "high") return "Yüksek";
@@ -328,8 +307,19 @@ const { data: analyses } = await supabase
   const { data: websiteSnapshots } = await supabase
     .from("brand_website_snapshots")
     .select(
-      "id, website_url, title, meta_description, word_count, content_score, service_signals_json, trust_signals_json, created_at"
-    )
+  `
+  id,
+  website_url,
+  title,
+  meta_description,
+  word_count,
+  content_score,
+  service_signals_json,
+  trust_signals_json,
+  category_scores_json,
+  created_at
+  `
+)
     .eq("brand_id", brand.id)
     .eq("status", "completed")
     .order("created_at", { ascending: false })
@@ -348,6 +338,7 @@ const { data: analyses } = await supabase
       word_count,
       service_signals_json,
       trust_signals_json,
+      category_scores_json,
       created_at,
       competitors (
         id,
@@ -390,7 +381,8 @@ const { data: analyses } = await supabase
       word_count: Number(snapshot.word_count ?? 0),
       service_signals_json: snapshot.service_signals_json,
       trust_signals_json: snapshot.trust_signals_json,
-      created_at: snapshot.created_at,
+category_scores_json: snapshot.category_scores_json,
+created_at: snapshot.created_at,
     };
   });
 
@@ -451,29 +443,27 @@ const { data: analyses } = await supabase
     }))
     .sort((a, b) => b.mentionCount - a.mentionCount);
 
-  const brandWebsiteScore = websiteSnapshot
-    ? Math.round(Number(websiteSnapshot.content_score ?? 0))
+const brandWebsiteScore =
+  websiteSnapshot &&
+  hasCategoryScores(websiteSnapshot.category_scores_json)
+    ? getCategoryScore(
+        websiteSnapshot.category_scores_json,
+        "overall"
+      )
     : null;
 
-  const competitorAverageWebsiteScore = getAverageScore(
-    latestCompetitorWebsiteSnapshots.map((snapshot) => snapshot.content_score)
-  );
+const competitorWebsiteScores =
+  latestCompetitorWebsiteSnapshots
+    .filter((snapshot) =>
+      hasCategoryScores(snapshot.category_scores_json)
+    )
+    .map((snapshot) =>
+      getCategoryScore(snapshot.category_scores_json, "overall")
+    );
 
-  const foundServiceSignals = websiteSnapshot
-    ? getFoundSignals(websiteSnapshot.service_signals_json)
-    : [];
-
-  const foundTrustSignals = websiteSnapshot
-    ? getFoundSignals(websiteSnapshot.trust_signals_json)
-    : [];
-
-  const missingServiceSignals = websiteSnapshot
-    ? getMissingSignals(websiteSnapshot.service_signals_json)
-    : [];
-
-  const missingTrustSignals = websiteSnapshot
-    ? getMissingSignals(websiteSnapshot.trust_signals_json)
-    : [];
+const competitorAverageWebsiteScore = getAverageScore(
+  competitorWebsiteScores
+);
 
   const topRecommendations = (recommendations ?? []).slice(0, 4);
   const strongestCompetitor = competitorStats[0] ?? null;
@@ -502,7 +492,7 @@ const { data: analyses } = await supabase
         "Rakiplerin öne çıktığı cevap tipleri incelenerek markanın farklılaşma mesajları ve kategori otoritesi güçlendirilmeli.",
     },
     {
-      title: "Website sinyallerinde iyileştirme alanı var",
+      title: "Web sitesi puanlarında iyileştirme alanı var",
       evidence:
         brandWebsiteScore !== null
           ? `Marka website skoru ${brandWebsiteScore}/100. Rakip website ortalaması ${
@@ -510,7 +500,7 @@ const { data: analyses } = await supabase
             }/100.`
           : "Marka website analizi henüz yapılmamış.",
       action:
-        "Ana sayfa başlıkları, hizmet açıklamaları, güven unsurları ve SSS alanları daha net hale getirilmeli.",
+         "Önemli sayfaların başlıkları, hizmet açıklamaları, güven unsurları ve sık sorulan sorular alanları güçlendirilmelidir.",
     },
   ];
 
@@ -689,12 +679,21 @@ const { data: analyses } = await supabase
               <table className="w-full border-collapse text-left text-sm">
                 <thead className="bg-slate-950 text-white">
                   <tr>
-                    <th className="px-5 py-4 font-semibold">Marka / Rakip</th>
-                    <th className="px-5 py-4 font-semibold">Görünme</th>
-                    <th className="px-5 py-4 font-semibold">Ortalama sıra</th>
-                    <th className="px-5 py-4 font-semibold">Yorum</th>
+                    <th className="px-5 py-4 font-semibold">
+                      Marka / Rakip
+                    </th>
+                    <th className="px-5 py-4 font-semibold">
+                      Görünme
+                    </th>
+                    <th className="px-5 py-4 font-semibold">
+                      Ortalama sıra
+                    </th>
+                    <th className="px-5 py-4 font-semibold">
+                      Yorum
+                    </th>
                   </tr>
                 </thead>
+
                 <tbody>
                   <tr className="border-b bg-indigo-50">
                     <td className="px-5 py-4 font-semibold text-indigo-900">
@@ -703,17 +702,25 @@ const { data: analyses } = await supabase
                     <td className="px-5 py-4">
                       {visibleAnalyses.length}/{audit.completed_prompts}
                     </td>
-                    <td className="px-5 py-4">{averageRank ?? "-"}</td>
+                    <td className="px-5 py-4">
+                      {averageRank ?? "-"}
+                    </td>
                     <td className="px-5 py-4 text-slate-600">
                       Takip edilen ana marka
                     </td>
                   </tr>
 
                   {competitorStats.map((competitor) => (
-                    <tr key={competitor.name} className="border-b last:border-0">
-                      <td className="px-5 py-4 font-medium">{competitor.name}</td>
+                    <tr
+                      key={competitor.name}
+                      className="border-b last:border-0"
+                    >
+                      <td className="px-5 py-4 font-medium">
+                        {competitor.name}
+                      </td>
                       <td className="px-5 py-4">
-                        {competitor.mentionCount}/{audit.completed_prompts}
+                        {competitor.mentionCount}/
+                        {audit.completed_prompts}
                       </td>
                       <td className="px-5 py-4">
                         {competitor.averageRank ?? "-"}
@@ -728,158 +735,19 @@ const { data: analyses } = await supabase
             </div>
           </section>
 
-          <section className="print:break-after-page">
-            <SectionTitle
-              eyebrow="03 - Website Sinyalleri"
-              title="Marka ve rakip website karşılaştırması"
-              description="Ana sayfa içerik sinyalleri üzerinden marka ve rakiplerin görünürlük destekleyici sinyalleri karşılaştırılır."
-            />
-
-            <div className="grid gap-4 md:grid-cols-3">
-              <MetricBox
-                label="Marka Website Skoru"
-                value={brandWebsiteScore !== null ? `${brandWebsiteScore}/100` : "-"}
-                helper="Ana sayfa içerik sinyali"
-                tone="blue"
-              />
-
-              <MetricBox
-                label="Rakip Ortalaması"
-                value={
-                  competitorAverageWebsiteScore !== null
-                    ? `${competitorAverageWebsiteScore}/100`
-                    : "-"
-                }
-                helper="Analiz edilen rakiplerin ortalaması"
-                tone="purple"
-              />
-
-              <MetricBox
-                label="Analiz Edilen Rakip"
-                value={latestCompetitorWebsiteSnapshots.length}
-                helper="Website analizi bulunan rakip sayısı"
-                tone="green"
-              />
-            </div>
-
-            <div className="mt-6 grid gap-5 lg:grid-cols-2">
-              <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-                <h3 className="font-semibold text-slate-950">
-                  Bulunan sektör / hizmet sinyalleri
-                </h3>
-
-                <div className="mt-4 flex flex-wrap gap-2">
-                  {foundServiceSignals.length > 0 ? (
-                    foundServiceSignals.map((signal, index) => (
-                      <span
-                        key={signal.keyword}
-                        className={`rounded-full px-3 py-1 text-xs font-medium ring-1 ${getBadgeColor(
-                          index
-                        )}`}
-                      >
-                        {signal.keyword}: {signal.count}
-                      </span>
-                    ))
-                  ) : (
-                    <p className="text-sm text-slate-500">
-                      Hizmet sinyali bulunamadı.
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-                <h3 className="font-semibold text-slate-950">
-                  Bulunan güven sinyalleri
-                </h3>
-
-                <div className="mt-4 flex flex-wrap gap-2">
-                  {foundTrustSignals.length > 0 ? (
-                    foundTrustSignals.map((signal, index) => (
-                      <span
-                        key={signal.keyword}
-                        className={`rounded-full px-3 py-1 text-xs font-medium ring-1 ${getBadgeColor(
-                          index + 2
-                        )}`}
-                      >
-                        {signal.keyword}: {signal.count}
-                      </span>
-                    ))
-                  ) : (
-                    <p className="text-sm text-slate-500">
-                      Güven sinyali bulunamadı.
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              <div className="rounded-3xl border border-rose-200 bg-rose-50 p-5">
-                <h3 className="font-semibold text-rose-900">
-                  Eksik görünen hizmet sinyalleri
-                </h3>
-
-                <div className="mt-4 flex flex-wrap gap-2">
-                  {missingServiceSignals.slice(0, 12).map((signal) => (
-                    <span
-                      key={signal.keyword}
-                      className="rounded-full bg-white px-3 py-1 text-xs font-medium text-rose-700 ring-1 ring-rose-200"
-                    >
-                      {signal.keyword}
-                    </span>
-                  ))}
-                </div>
-              </div>
-
-              <div className="rounded-3xl border border-amber-200 bg-amber-50 p-5">
-                <h3 className="font-semibold text-amber-900">
-                  Eksik görünen güven sinyalleri
-                </h3>
-
-                <div className="mt-4 flex flex-wrap gap-2">
-                  {missingTrustSignals.slice(0, 12).map((signal) => (
-                    <span
-                      key={signal.keyword}
-                      className="rounded-full bg-white px-3 py-1 text-xs font-medium text-amber-700 ring-1 ring-amber-200"
-                    >
-                      {signal.keyword}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-6 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
-              <table className="w-full border-collapse text-left text-sm">
-                <thead className="bg-slate-100 text-slate-700">
-                  <tr>
-                    <th className="px-5 py-4 font-semibold">Rakip</th>
-                    <th className="px-5 py-4 font-semibold">Website</th>
-                    <th className="px-5 py-4 font-semibold">Website skoru</th>
-                    <th className="px-5 py-4 font-semibold">Kelime</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {latestCompetitorWebsiteSnapshots
-                    .sort((a, b) => b.content_score - a.content_score)
-                    .map((snapshot) => (
-                      <tr key={snapshot.id} className="border-b last:border-0">
-                        <td className="px-5 py-4 font-medium">
-                          {snapshot.competitor_name}
-                        </td>
-                        <td className="px-5 py-4 text-slate-600">
-                          {snapshot.website_url}
-                        </td>
-                        <td className="px-5 py-4 font-semibold">
-                          {snapshot.content_score}/100
-                        </td>
-                        <td className="px-5 py-4">{snapshot.word_count}</td>
-                      </tr>
-                    ))}
-                </tbody>
-              </table>
-            </div>
-          </section>
-
+          <ClientWebsiteScoreComparison
+            brandName={brand.name}
+            brandScoresValue={
+              websiteSnapshot?.category_scores_json ?? null
+            }
+            competitors={latestCompetitorWebsiteSnapshots.map(
+              (snapshot) => ({
+                id: snapshot.id,
+                name: snapshot.competitor_name,
+                scoresValue: snapshot.category_scores_json,
+              })
+            )}
+          />
           <section className="print:break-after-page">
             <SectionTitle
               eyebrow="04 - Aksiyon Planı"
@@ -927,9 +795,10 @@ const { data: analyses } = await supabase
             <div className="mt-6 rounded-3xl border border-slate-200 bg-slate-50 p-5">
               <h3 className="font-semibold text-slate-950">Metodoloji notu</h3>
               <p className="mt-2 text-sm leading-6 text-slate-600">
-                Bu rapor; Gemini tabanlı AI cevap testi, ana sayfa website
-                sinyalleri ve analiz edilen rakip website verileri üzerinden
-                hazırlanmış bir ön teşhis raporudur. Google yorumları,
+               Bu rapor; Gemini tabanlı AI cevap testi, seçilen önemli web
+                sayfalarındaki teknik ve içerik sinyalleri ile analiz edilen
+                rakip web sitesi verileri üzerinden hazırlanmış bir ön teşhis
+                raporudur. Google yorumları,
                 backlinkler, tüm site crawl verisi ve canlı harita verisi bu MVP
                 kapsamına dahil değildir.
               </p>
