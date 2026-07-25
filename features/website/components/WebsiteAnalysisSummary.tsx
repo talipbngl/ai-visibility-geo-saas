@@ -22,6 +22,7 @@ type Issue = {
   title: string;
   description: string;
   priority: "Yüksek" | "Orta" | "Düşük";
+  affectedPages?: string[];
 };
 
 type Strength = {
@@ -40,6 +41,7 @@ type AiCrawlerAccessItem = {
   status: AiCrawlerAccessStatus;
 };
 type AnalyzedPageQuality = {
+  url: string;
   title: string | null;
   canonicalUrl: string | null;
 canonicalChecked: boolean;
@@ -105,10 +107,14 @@ function getAnalyzedPageQuality(
       );
 
       return {
-        canonicalUrl:
-  typeof record.canonicalUrl === "string"
-    ? record.canonicalUrl
-    : null,
+  url:
+    typeof record.url === "string"
+      ? record.url
+      : "",
+  canonicalUrl:
+    typeof record.canonicalUrl === "string"
+      ? record.canonicalUrl
+      : null,
 canonicalChecked:
   Object.prototype.hasOwnProperty.call(
     record,
@@ -148,6 +154,15 @@ indexable:
       ): item is AnalyzedPageQuality =>
         item !== null
     );
+}
+function getPagePathLabel(value: string) {
+  try {
+    const parsedUrl = new URL(value);
+
+    return `${parsedUrl.pathname}${parsedUrl.search}` || "/";
+  } catch {
+    return value;
+  }
 }
 function countFoundSignals(value: unknown) {
   if (!Array.isArray(value)) return 0;
@@ -322,32 +337,34 @@ const pagesMissingMetaDescription =
     (page) =>
       page.metaDescriptionChecked &&
       !page.metaDescription
-  ).length;
+  );
 
 const pagesWithHeadingProblem =
   secondaryPages.filter(
     (page) =>
       page.h1Count !== null &&
       page.h1Count !== 1
-  ).length;
+  );
+
 const pagesMissingCanonical =
   secondaryPages.filter(
     (page) =>
       page.canonicalChecked &&
       !page.canonicalUrl
-  ).length;
+  );
 
-const nonIndexablePageCount =
+const nonIndexablePages =
   secondaryPages.filter(
     (page) =>
       page.indexable === false
-  ).length;
-const thinPageCount =
+  );
+
+const thinPages =
   analyzedPageQuality.filter(
     (page) =>
       page.wordCount > 0 &&
       page.wordCount < 200
-  ).length;
+  );
 
 const normalizedTitles =
   analyzedPageQuality
@@ -436,38 +453,54 @@ if (blockedSearchCrawlers.length > 0) {
       priority: "Yüksek",
     });
   }
-if (pagesMissingMetaDescription > 0) {
+if (pagesMissingMetaDescription.length > 0) {
   issues.push({
     title:
       "Alt sayfalarda açıklama eksikleri var",
-    description: `İncelenen alt sayfaların ${pagesMissingMetaDescription} tanesinde meta açıklaması bulunamadı.`,
+    description: `İncelenen alt sayfaların ${pagesMissingMetaDescription.length} tanesinde meta açıklaması bulunamadı.`,
     priority: "Yüksek",
+    affectedPages: pagesMissingMetaDescription
+      .map((page) => page.url)
+      .filter(Boolean)
+      .slice(0, 3),
   });
 }
 
-if (pagesWithHeadingProblem > 0) {
+if (pagesWithHeadingProblem.length > 0) {
   issues.push({
     title:
       "Alt sayfaların başlık yapısı düzeltilmeli",
-    description: `İncelenen alt sayfaların ${pagesWithHeadingProblem} tanesinde tek bir ana H1 başlığı kullanılmıyor.`,
+    description: `İncelenen alt sayfaların ${pagesWithHeadingProblem.length} tanesinde tek bir ana H1 başlığı kullanılmıyor.`,
     priority: "Orta",
+    affectedPages: pagesWithHeadingProblem
+      .map((page) => page.url)
+      .filter(Boolean)
+      .slice(0, 3),
   });
 }
-if (nonIndexablePageCount > 0) {
+if (nonIndexablePages.length > 0) {
   issues.push({
     title:
       "Bazı alt sayfalar indekslenemiyor",
-    description: `İncelenen alt sayfaların ${nonIndexablePageCount} tanesinde noindex sinyali tespit edildi.`,
+    description: `İncelenen alt sayfaların ${nonIndexablePages.length} tanesinde noindex sinyali tespit edildi.`,
     priority: "Yüksek",
+    affectedPages: nonIndexablePages
+      .map((page) => page.url)
+      .filter(Boolean)
+      .slice(0, 3),
   });
 }
 
-if (pagesMissingCanonical > 0) {
+if (pagesMissingCanonical.length > 0) {
   issues.push({
     title:
       "Alt sayfalarda canonical eksikleri var",
-    description: `İncelenen alt sayfaların ${pagesMissingCanonical} tanesinde canonical adresi bulunamadı.`,
+    description: `İncelenen alt sayfaların ${pagesMissingCanonical.length} tanesinde canonical adresi bulunamadı.`,
     priority: "Orta",
+    affectedPages: pagesMissingCanonical
+      .map((page) => page.url)
+      .filter(Boolean)
+      .slice(0, 3),
   });
 }
 if (duplicateTitleCount > 0) {
@@ -479,12 +512,16 @@ if (duplicateTitleCount > 0) {
   });
 }
 
-if (thinPageCount > 0) {
+if (thinPages.length > 0) {
   issues.push({
     title:
       "Bazı sayfaların içeriği çok kısa",
-    description: `İncelenen sayfaların ${thinPageCount} tanesinde 200 kelimeden daha az içerik bulunuyor.`,
+    description: `İncelenen sayfaların ${thinPages.length} tanesinde 200 kelimeden daha az içerik bulunuyor.`,
     priority: "Düşük",
+    affectedPages: thinPages
+      .map((page) => page.url)
+      .filter(Boolean)
+      .slice(0, 3),
   });
 }
   if (
@@ -748,6 +785,29 @@ if (thinPageCount > 0) {
                     <p className="mt-1 text-sm leading-6 text-muted-foreground">
                       {issue.description}
                     </p>
+                    {issue.affectedPages &&
+                      issue.affectedPages.length > 0 ? (
+                        <div className="mt-3 border-t pt-3">
+                          <p className="text-xs font-medium text-muted-foreground">
+                            Etkilenen sayfalar
+                          </p>
+
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            {issue.affectedPages.map((pageUrl) => (
+                              <a
+                                key={pageUrl}
+                                href={pageUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="max-w-full truncate rounded-md bg-muted px-2 py-1 text-xs underline underline-offset-4"
+                                title={pageUrl}
+                              >
+                                {getPagePathLabel(pageUrl)}
+                              </a>
+                            ))}
+                          </div>
+                        </div>
+                      ) : null}
                   </div>
                 ))}
               </div>
