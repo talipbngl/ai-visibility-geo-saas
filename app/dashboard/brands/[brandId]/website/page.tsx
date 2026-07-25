@@ -11,6 +11,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { EmptyState, PageHeader } from "@/features/ui/components";
+import { BrandSectionNav } from "@/features/brands/components/BrandSectionNav";
 import { WebsiteAnalysisSummary } from "@/features/website/components/WebsiteAnalysisSummary";
 import { createClient } from "@/lib/supabase/server";
 
@@ -82,30 +83,27 @@ export default async function WebsiteAnalysisPage({
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Web Sitesi Analizi"
-        title={`${brand.name} web sitesi analizi`}
-        description="Ana sayfanın teknik, yapısal, içerik ve güven durumunu ölçün. Sonuçlarda yalnızca önemli sorunlar ve yapılması gerekenler gösterilir."
-        actions={
-          <>
-            <Button asChild variant="outline">
-              <Link href={`/dashboard/brands/${brand.id}`}>
-                Marka detayına dön
-              </Link>
-            </Button>
+  eyebrow="Web Sitesi Analizi"
+  title={`${brand.name} web sitesi analizi`}
+  description="Sitenin önemli teknik, içerik ve güven sinyallerini ölçün."
+  actions={
+    <form
+      action={`/api/brands/${brand.id}/website-analysis`}
+      method="post"
+    >
+      <Button type="submit">
+        {latestSnapshot
+          ? "Yeniden Analiz Et"
+          : "Analizi Başlat"}
+      </Button>
+    </form>
+  }
+/>
 
-            <form
-              action={`/api/brands/${brand.id}/website-analysis`}
-              method="post"
-            >
-              <Button type="submit">
-                {latestSnapshot
-                  ? "Yeniden analiz et"
-                  : "Analizi başlat"}
-              </Button>
-            </form>
-          </>
-        }
-      />
+<BrandSectionNav
+  brandId={brand.id}
+  active="website"
+/>
 
       {query.error ? (
         <Card className="border-destructive shadow-sm">

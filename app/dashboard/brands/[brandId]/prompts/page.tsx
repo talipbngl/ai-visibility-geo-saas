@@ -17,6 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { EmptyState, MetricCard, PageHeader } from "@/features/ui/components";
+import { BrandSectionNav } from "@/features/brands/components/BrandSectionNav";
 
 const intentOptions = [
   "buying_intent",
@@ -101,35 +102,47 @@ const passivePromptCount = visiblePrompts.filter(
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Test Soruları"
-        title={`${brand.name} ölçüm soruları`}
-        description="AI görünürlük ölçümünde kullanılacak test sorularını hazırla. Sadece aktif sorular yeni ölçümlere dahil edilir."
-        actions={
-          <>
-            <Button asChild variant="outline">
-              <Link href={`/dashboard/brands/${brand.id}`}>
-                Marka detayına dön
-              </Link>
-            </Button>
-            <Button asChild variant="outline">
-  <Link href={`/dashboard/brands/${brand.id}/prompts/archived`}>
-    Arşivlenenler
-  </Link>
-</Button>
+  eyebrow="Test Soruları"
+  title={`${brand.name} ölçüm soruları`}
+  description="AI görünürlük ölçümünde kullanılacak soruları hazırlayın."
+  actions={
+    <form
+      action={`/api/brands/${brand.id}/audits`}
+      method="post"
+    >
+      <Button
+        type="submit"
+        disabled={activePromptCount === 0}
+      >
+        Ölçüm Başlat
+      </Button>
+    </form>
+  }
+/>
 
-            <form action={`/api/brands/${brand.id}/audits`} method="post">
-              <Button type="submit">Ölçüm başlat</Button>
-            </form>
-          </>
-        }
-      />
+<BrandSectionNav
+  brandId={brand.id}
+  active="prompts"
+/>
 
       {query.error ? (
         <Alert variant="destructive">
           <AlertDescription>{query.error}</AlertDescription>
         </Alert>
       ) : null}
-
+<div className="flex justify-end">
+  <Button
+    asChild
+    variant="outline"
+    size="sm"
+  >
+    <Link
+      href={`/dashboard/brands/${brand.id}/prompts/archived`}
+    >
+      Arşivlenen Sorular
+    </Link>
+  </Button>
+</div>
       <section className="grid gap-4 md:grid-cols-3">
         <MetricCard
           title="Soru Setleri"
@@ -151,39 +164,16 @@ const passivePromptCount = visiblePrompts.filter(
       </section>
 
       <Card className="border-primary/20 bg-primary/5 shadow-sm">
-        <CardHeader>
-          <CardTitle>Bu sayfada ne yapacaksın?</CardTitle>
-          <CardDescription>
-            Önce soru seti oluştur, sonra AI ile soru üret veya manuel soru ekle.
-            Hazır olduğunda ölçümü başlat.
-          </CardDescription>
-        </CardHeader>
-
-        <CardContent>
-          <div className="grid gap-3 md:grid-cols-3">
-            <div className="rounded-xl border bg-background/80 p-4">
-              <p className="font-medium">1. Soru seti oluştur</p>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Satın alma, karşılaştırma veya yerel öneri gibi gruplar aç.
-              </p>
-            </div>
-
-            <div className="rounded-xl border bg-background/80 p-4">
-              <p className="font-medium">2. Test sorularını hazırla</p>
-              <p className="mt-1 text-sm text-muted-foreground">
-                AI ile otomatik üret veya elle soru ekle.
-              </p>
-            </div>
-
-            <div className="rounded-xl border bg-background/80 p-4">
-              <p className="font-medium">3. Ölçüm başlat</p>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Aktif sorular üzerinden AI görünürlük raporu oluştur.
-              </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+  <CardContent className="pt-6">
+    <p className="text-sm leading-6 text-muted-foreground">
+      <span className="font-medium text-foreground">
+        Hazırlık akışı:
+      </span>{" "}
+      Soru seti oluşturun, test sorularını hazırlayın ve aktif
+      sorularla ölçümü başlatın.
+    </p>
+  </CardContent>
+</Card>
 
       <section className="grid gap-6 xl:grid-cols-[420px_1fr]">
         <div className="space-y-6">

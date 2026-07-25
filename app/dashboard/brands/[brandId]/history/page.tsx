@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { VisibilityTrendChart } from "@/features/brands/components/VisibilityTrendChart";
+import { BrandSectionNav } from "@/features/brands/components/BrandSectionNav";
 import { createClient } from "@/lib/supabase/server";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -140,25 +141,24 @@ export default async function BrandHistoryPage({
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Ölçüm Geçmişi"
-        title={`${brand.name} geçmişi`}
-        description="Markanın AI görünürlük skorunun zaman içindeki değişimini, önceki raporlarını ve ölçüm detaylarını buradan takip et."
-        actions={
-          <>
-            <Button asChild variant="outline">
-              <Link href={`/dashboard/brands/${brand.id}`}>
-                Marka detayına dön
-              </Link>
-            </Button>
+  eyebrow="Ölçüm Geçmişi"
+  title={`${brand.name} geçmişi`}
+  description="Görünürlük değişimini ve önceki ölçüm sonuçlarını takip edin."
+  actions={
+    <Button asChild>
+      <Link
+        href={`/dashboard/brands/${brand.id}/prompts`}
+      >
+        Yeni Ölçüm Başlat
+      </Link>
+    </Button>
+  }
+/>
 
-            <Button asChild>
-              <Link href={`/dashboard/brands/${brand.id}/prompts`}>
-                Yeni ölçüm başlat
-              </Link>
-            </Button>
-          </>
-        }
-      />
+<BrandSectionNav
+  brandId={brand.id}
+  active="history"
+/>
 
       <section className="grid gap-4 md:grid-cols-4">
         <MetricCard
