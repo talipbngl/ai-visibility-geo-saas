@@ -182,8 +182,19 @@ export default async function AuditReportPage({ params }: AuditReportPageProps) 
   const { data: websiteSnapshots } = await supabase
     .from("brand_website_snapshots")
     .select(
-      "id, website_url, title, meta_description, word_count, content_score, service_signals_json, trust_signals_json, created_at"
-    )
+  `
+  id,
+  website_url,
+  title,
+  meta_description,
+  word_count,
+  content_score,
+  service_signals_json,
+  trust_signals_json,
+  category_scores_json,
+  created_at
+  `
+)
     .eq("brand_id", brand.id)
     .eq("status", "completed")
     .order("created_at", { ascending: false })
@@ -197,11 +208,12 @@ export default async function AuditReportPage({ params }: AuditReportPageProps) 
     id,
     competitor_id,
     website_url,
-    content_score,
-    word_count,
-    service_signals_json,
-    trust_signals_json,
-    created_at,
+   content_score,
+word_count,
+service_signals_json,
+trust_signals_json,
+category_scores_json,
+created_at,
     competitors (
       id,
       name
@@ -243,7 +255,8 @@ const latestCompetitorWebsiteSnapshots = Array.from(
     word_count: snapshot.word_count,
     service_signals_json: snapshot.service_signals_json,
     trust_signals_json: snapshot.trust_signals_json,
-    created_at: snapshot.created_at,
+category_scores_json: snapshot.category_scores_json,
+created_at: snapshot.created_at,
   };
 });
 const competitorWebsiteSnapshotCount = latestCompetitorWebsiteSnapshots.length;
@@ -621,6 +634,7 @@ const { data: analyses } = await supabase
             snapshot={websiteSnapshot}
           />
           <CompetitorWebsiteComparison
+  brandName={brand.name}
   brandSnapshot={websiteSnapshot}
   competitorSnapshots={latestCompetitorWebsiteSnapshots}
 />
