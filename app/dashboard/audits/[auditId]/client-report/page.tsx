@@ -4,6 +4,7 @@ import { ClientWebsiteScoreComparison } from "@/features/reports/components/Clie
 import { PrintReportButton } from "@/features/reports/components/PrintReportButton";
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
+import { CompetitorContentGap } from "@/features/website/components/CompetitorContentGap";
 export const metadata = {
   title: "AI Görünürlük Ön Teşhis Raporu",
 };
@@ -315,6 +316,7 @@ const { data: analyses } = await supabase
   word_count,
   content_score,
   service_signals_json,
+  technical_signals_json,
   trust_signals_json,
   category_scores_json,
   created_at
@@ -338,6 +340,7 @@ const { data: analyses } = await supabase
       word_count,
       service_signals_json,
       trust_signals_json,
+      technical_signals_json,
       category_scores_json,
       created_at,
       competitors (
@@ -374,6 +377,8 @@ const { data: analyses } = await supabase
 
     return {
       id: snapshot.id,
+      technical_signals_json:
+  snapshot.technical_signals_json,
       competitor_id: snapshot.competitor_id,
       competitor_name: competitor?.name ?? "Rakip",
       website_url: snapshot.website_url,
@@ -748,6 +753,21 @@ const competitorAverageWebsiteScore = getAverageScore(
               })
             )}
           />
+          <CompetitorContentGap
+  brandName={brand.name}
+  brandTechnicalSignalsValue={
+    websiteSnapshot
+      ?.technical_signals_json ?? null
+  }
+  competitors={latestCompetitorWebsiteSnapshots.map(
+    (snapshot) => ({
+      id: snapshot.id,
+      name: snapshot.competitor_name,
+      technicalSignalsValue:
+        snapshot.technical_signals_json,
+    })
+  )}
+/>
           <section className="print:break-after-page">
             <SectionTitle
               eyebrow="04 - Aksiyon Planı"

@@ -7,6 +7,7 @@ import { ReportReadinessPanel } from "@/features/reports/components/ReportReadin
 import { PrintReportButton } from "@/features/reports/components/PrintReportButton";
 import { createClient } from "@/lib/supabase/server";
 import { Badge } from "@/components/ui/badge";
+import { CompetitorContentGap } from "@/features/website/components/CompetitorContentGap";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -191,6 +192,7 @@ export default async function AuditReportPage({ params }: AuditReportPageProps) 
   content_score,
   service_signals_json,
   trust_signals_json,
+  technical_signals_json,
   category_scores_json,
   created_at
   `
@@ -212,6 +214,7 @@ export default async function AuditReportPage({ params }: AuditReportPageProps) 
 word_count,
 service_signals_json,
 trust_signals_json,
+technical_signals_json,
 category_scores_json,
 created_at,
     competitors (
@@ -248,6 +251,8 @@ const latestCompetitorWebsiteSnapshots = Array.from(
 
   return {
     id: snapshot.id,
+    technical_signals_json:
+  snapshot.technical_signals_json,
     competitor_id: snapshot.competitor_id,
     competitor_name: competitor?.name ?? "Rakip",
     website_url: snapshot.website_url,
@@ -637,6 +642,21 @@ const { data: analyses } = await supabase
   brandName={brand.name}
   brandSnapshot={websiteSnapshot}
   competitorSnapshots={latestCompetitorWebsiteSnapshots}
+/>
+<CompetitorContentGap
+  brandName={brand.name}
+  brandTechnicalSignalsValue={
+    websiteSnapshot
+      ?.technical_signals_json ?? null
+  }
+  competitors={latestCompetitorWebsiteSnapshots.map(
+    (snapshot) => ({
+      id: snapshot.id,
+      name: snapshot.competitor_name,
+      technicalSignalsValue:
+        snapshot.technical_signals_json,
+    })
+  )}
 />
 <EvidenceActionSummary
   brandName={brand.name}
