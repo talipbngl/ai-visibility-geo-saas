@@ -863,52 +863,97 @@ const competitorAverageWebsiteScore = getAverageScore(
     </div>
   </div>
 </section>
-          <section>
-            <SectionTitle
-              eyebrow="05 - Ek"
-              title="Analiz edilen test soruları"
-              description="Bu bölüm ham test sorularını ve markanın bu sorularda görünüp görünmediğini gösterir. Yönetici özeti için değil, detay inceleme içindir."
-            />
+                       <details className="group overflow-hidden rounded-3xl border border-slate-200 bg-slate-50 print:hidden">
+  <summary className="cursor-pointer list-none p-5">
+    <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+      <div>
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-indigo-600">
+          Ek · Teknik ayrıntı
+        </p>
 
-            <div className="grid gap-3 lg:grid-cols-2">
-                    {(analyses ?? []).slice(0, 12).map((analysis, index) => {
-                const run = getNestedRun(analysis.audit_runs);
+        <h2 className="mt-1 text-xl font-semibold tracking-tight text-slate-950">
+          Analiz edilen test soruları
+        </h2>
 
-                return (
-                  <div
-                    key={analysis.id}
-                    className="rounded-2xl border border-slate-200 bg-white p-4 text-sm shadow-sm"
-                  >
-                    <div className="mb-2 flex flex-wrap gap-2">
-                      <span
-                        className={
-                          analysis.brand_mentioned
-                            ? "rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700 ring-1 ring-emerald-200"
-                            : "rounded-full bg-rose-50 px-3 py-1 text-xs font-medium text-rose-700 ring-1 ring-rose-200"
-                        }
-                      >
-                        {analysis.brand_mentioned ? "Göründü" : "Görünmedi"}
-                      </span>
+        <p className="mt-2 text-sm leading-6 text-slate-600">
+          Ham test sorularını ve markanın bu sorularda görünüp
+          görünmediğini inceleyin.
+        </p>
+      </div>
 
-                      {analysis.brand_rank ? (
-                        <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
-                          Sıra: {analysis.brand_rank}
-                        </span>
-                      ) : null}
-                    </div>
+      <div className="flex items-center gap-3">
+        <span className="rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-600 ring-1 ring-slate-200">
+          {Math.min(analyses?.length ?? 0, 12)} soru
+        </span>
 
-                    <p className="font-medium leading-6 text-slate-950">
-                      {index + 1}. {getPromptText(run)}
-                    </p>
+        <span className="rounded-full bg-indigo-600 px-4 py-2 text-sm font-semibold text-white group-open:hidden">
+          Ayrıntıları göster
+        </span>
 
-                    <p className="mt-2 leading-6 text-slate-600">
-                      {analysis.summary}
-                    </p>
-                  </div>
-                );
-              })}
+        <span className="hidden rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white group-open:inline">
+          Ayrıntıları gizle
+        </span>
+      </div>
+    </div>
+  </summary>
+
+  <div className="border-t border-slate-200 bg-white p-5">
+    {analyses && analyses.length > 0 ? (
+      <div className="grid gap-3 lg:grid-cols-2">
+        {analyses.slice(0, 12).map((analysis, index) => {
+          const run = getNestedRun(
+            analysis.audit_runs
+          );
+
+          return (
+            <div
+              key={analysis.id}
+              className="rounded-2xl border border-slate-200 bg-white p-4 text-sm shadow-sm"
+            >
+              <div className="mb-2 flex flex-wrap gap-2">
+                <span
+                  className={
+                    analysis.brand_mentioned
+                      ? "rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700 ring-1 ring-emerald-200"
+                      : "rounded-full bg-rose-50 px-3 py-1 text-xs font-medium text-rose-700 ring-1 ring-rose-200"
+                  }
+                >
+                  {analysis.brand_mentioned
+                    ? "Göründü"
+                    : "Görünmedi"}
+                </span>
+
+                {analysis.brand_rank ? (
+                  <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
+                    Sıra: {analysis.brand_rank}
+                  </span>
+                ) : null}
+              </div>
+
+              <p className="font-medium leading-6 text-slate-950">
+                {index + 1}. {getPromptText(run)}
+              </p>
+
+              {analysis.summary ? (
+                <p className="mt-2 leading-6 text-slate-600">
+                  {analysis.summary}
+                </p>
+              ) : (
+                <p className="mt-2 text-slate-500">
+                  Bu soru için kısa analiz özeti bulunmuyor.
+                </p>
+              )}
             </div>
-          </section>
+          );
+        })}
+      </div>
+    ) : (
+      <p className="text-sm text-slate-600">
+        Bu ölçüm için analiz edilmiş test sorusu bulunmuyor.
+      </p>
+    )}
+  </div>
+</details>
         </article>
       </div>
     </main>
