@@ -60,6 +60,9 @@ analyzedPages: Array<{
   url: string;
   title: string | null;
   metaDescription: string | null;
+  canonicalUrl: string | null;
+  indexable: boolean;
+  schemaTypes: string[];
   h1Count: number;
   wordCount: number;
 }>;
@@ -880,7 +883,17 @@ const searchableText = normalizeText(
 
     const linkSignals = extractLinkSignals(html, finalUrl);
     const imageSignals = extractImageSignals(html);
+    const homepageSchemaTypes =
+  extractSchemaTypes(html);
 
+const allSchemaTypes = Array.from(
+  new Set([
+    ...homepageSchemaTypes,
+    ...linkedPageCrawl.pages.flatMap(
+      (page) => page.schemaTypes
+    ),
+  ])
+).slice(0, 50);
     const technicalSignals: TechnicalSignals = {
       finalUrl,
       contentTypesFound:
@@ -910,7 +923,7 @@ const searchableText = normalizeText(
       hasTwitterCard: Boolean(
         getMetaContent(html, "name", "twitter:card")
       ),
-      schemaTypes: extractSchemaTypes(html),
+      schemaTypes: allSchemaTypes,
       ...imageSignals,
       ...linkSignals,
       headingOrderValid: extractHeadingOrderValidity(html),
@@ -946,14 +959,28 @@ analyzedPages: [
     url: finalUrl,
     title,
     metaDescription,
+    canonicalUrl: extractCanonicalUrl(
+      html,
+      finalUrl
+    ),
+    indexable: !normalizeText(
+      robotsDirective ?? ""
+    ).includes("noindex"),
+    schemaTypes: homepageSchemaTypes,
     h1Count: h1.length,
-    wordCount: getWordCount(homepageText),
+    wordCount: getWordCount(
+      homepageText
+    ),
   },
   ...linkedPageCrawl.pages.map((page) => ({
     url: page.url,
     title: page.title,
     metaDescription:
       page.metaDescription,
+    canonicalUrl:
+      page.canonicalUrl,
+    indexable: page.indexable,
+    schemaTypes: page.schemaTypes,
     h1Count: page.h1Count,
     wordCount: page.wordCount,
   })),

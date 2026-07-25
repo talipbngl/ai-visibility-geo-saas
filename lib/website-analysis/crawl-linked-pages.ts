@@ -21,6 +21,9 @@ export type CrawledPage = {
   url: string;
   title: string | null;
   metaDescription: string | null;
+  canonicalUrl: string | null;
+  indexable: boolean;
+  schemaTypes: string[];
   h1Count: number;
   text: string;
   wordCount: number;
@@ -138,6 +141,128 @@ function extractMetaDescription(html: string) {
   }
 
   return null;
+}
+function extractMetaRobots(html: string) {
+  const metaTags =
+    html.match(/<meta\b[^>]*>/gi) ?? [];
+
+  for (const tag of metaTags) {
+    const name = getHtmlAttribute(
+      tag,
+      "name"
+    )?.toLowerCase();
+
+    if (name !== "robots") continue;
+
+    return (
+      getHtmlAttribute(tag, "content")
+        ?.trim() ?? null
+    );
+  }
+
+  return null;
+}
+
+function extractCanonicalUrl(
+  html: string,
+  pageUrl: string
+) {
+  const linkTags =
+    html.match(/<link\b[^>]*>/gi) ?? [];
+
+  for (const tag of linkTags) {
+    const relations = getHtmlAttribute(
+      tag,
+      "rel"
+    )
+      ?.toLowerCase()
+      .split(/\s+/);
+
+    if (!relations?.includes("canonical")) {
+      continue;
+    }
+
+    const href = getHtmlAttribute(
+      tag,
+      "href"
+    );
+
+    if (!href) return null;
+
+    try {
+      return new URL(
+        href,
+        pageUrl
+      ).toString();
+    } catch {
+      return null;
+    }
+  }
+
+  return null;
+}
+
+function extractSchemaTypes(html: string) {
+  const schemaTypes = new Set<string>();
+
+  function collectTypes(value: unknown) {
+    if (Array.isArray(value)) {
+      value.forEach(collectTypes);
+      return;
+    }
+
+    if (
+      !value ||
+      typeof value !== "object"
+    ) {
+      return;
+    }
+
+    const record =
+      value as Record<string, unknown>;
+
+    const typeValue = record["@type"];
+
+    if (typeof typeValue === "string") {
+      schemaTypes.add(typeValue);
+    }
+
+    if (Array.isArray(typeValue)) {
+      typeValue.forEach((type) => {
+        if (typeof type === "string") {
+          schemaTypes.add(type);
+        }
+      });
+    }
+
+    Object.values(record).forEach(
+      collectTypes
+    );
+  }
+
+  const schemaScripts =
+    /<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
+
+  for (
+    const match of html.matchAll(
+      schemaScripts
+    )
+  ) {
+    const jsonText = match[1]?.trim();
+
+    if (!jsonText) continue;
+
+    try {
+      collectTypes(JSON.parse(jsonText));
+    } catch {
+      // Geçersiz JSON-LD diğer kontrolleri durdurmaz.
+    }
+  }
+
+  return Array.from(schemaTypes).slice(
+    0,
+    50
+  );
 }
 
 function countH1Elements(html: string) {
@@ -304,6 +429,8 @@ async function fetchPublicText({
       return {
         text,
         finalUrl: currentUrl,
+        xRobotsTag:
+          response.headers.get("x-robots-tag"),
       };
     }
 
@@ -817,13 +944,31 @@ async function crawlPage({
     });
 
     const fullText = stripHtml(result.text);
+    const robotsDirective = [
+  extractMetaRobots(result.text),
+  result.xRobotsTag,
+]
+  .filter(Boolean)
+  .join(", ");
 
-    return {
+  return {
   url: result.finalUrl,
   title: extractTitle(result.text),
   metaDescription:
     extractMetaDescription(result.text),
-  h1Count: countH1Elements(result.text),
+  canonicalUrl: extractCanonicalUrl(
+    result.text,
+    result.finalUrl
+  ),
+  indexable: !robotsDirective
+    .toLowerCase()
+    .includes("noindex"),
+  schemaTypes: extractSchemaTypes(
+    result.text
+  ),
+  h1Count: countH1Elements(
+    result.text
+  ),
   text: fullText.slice(
     0,
     MAX_PAGE_TEXT_LENGTH

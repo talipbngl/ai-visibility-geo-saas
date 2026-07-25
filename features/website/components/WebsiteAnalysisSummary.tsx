@@ -41,6 +41,9 @@ type AiCrawlerAccessItem = {
 };
 type AnalyzedPageQuality = {
   title: string | null;
+  canonicalUrl: string | null;
+canonicalChecked: boolean;
+indexable: boolean | null;
   metaDescription: string | null;
   metaDescriptionChecked: boolean;
   h1Count: number | null;
@@ -83,7 +86,7 @@ function getAnalyzedPageQuality(
   value: unknown
 ): AnalyzedPageQuality[] {
   if (!Array.isArray(value)) return [];
-
+  
   return value
     .map((item) => {
       if (
@@ -102,6 +105,19 @@ function getAnalyzedPageQuality(
       );
 
       return {
+        canonicalUrl:
+  typeof record.canonicalUrl === "string"
+    ? record.canonicalUrl
+    : null,
+canonicalChecked:
+  Object.prototype.hasOwnProperty.call(
+    record,
+    "canonicalUrl"
+  ),
+indexable:
+  typeof record.indexable === "boolean"
+    ? record.indexable
+    : null,
         title:
           typeof record.title === "string"
             ? record.title
@@ -314,7 +330,18 @@ const pagesWithHeadingProblem =
       page.h1Count !== null &&
       page.h1Count !== 1
   ).length;
+const pagesMissingCanonical =
+  secondaryPages.filter(
+    (page) =>
+      page.canonicalChecked &&
+      !page.canonicalUrl
+  ).length;
 
+const nonIndexablePageCount =
+  secondaryPages.filter(
+    (page) =>
+      page.indexable === false
+  ).length;
 const thinPageCount =
   analyzedPageQuality.filter(
     (page) =>
@@ -426,7 +453,23 @@ if (pagesWithHeadingProblem > 0) {
     priority: "Orta",
   });
 }
+if (nonIndexablePageCount > 0) {
+  issues.push({
+    title:
+      "Bazı alt sayfalar indekslenemiyor",
+    description: `İncelenen alt sayfaların ${nonIndexablePageCount} tanesinde noindex sinyali tespit edildi.`,
+    priority: "Yüksek",
+  });
+}
 
+if (pagesMissingCanonical > 0) {
+  issues.push({
+    title:
+      "Alt sayfalarda canonical eksikleri var",
+    description: `İncelenen alt sayfaların ${pagesMissingCanonical} tanesinde canonical adresi bulunamadı.`,
+    priority: "Orta",
+  });
+}
 if (duplicateTitleCount > 0) {
   issues.push({
     title:
