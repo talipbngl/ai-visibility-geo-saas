@@ -39,7 +39,13 @@ type AiCrawlerAccessItem = {
   userAgent: string;
   status: AiCrawlerAccessStatus;
 };
-
+type AnalyzedPageQuality = {
+  title: string | null;
+  metaDescription: string | null;
+  metaDescriptionChecked: boolean;
+  h1Count: number | null;
+  wordCount: number;
+};
 function toRecord(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return {};
@@ -73,7 +79,60 @@ function getArrayLength(record: Record<string, unknown>, key: string) {
 
   return Array.isArray(value) ? value.length : 0;
 }
+function getAnalyzedPageQuality(
+  value: unknown
+): AnalyzedPageQuality[] {
+  if (!Array.isArray(value)) return [];
 
+  return value
+    .map((item) => {
+      if (
+        !item ||
+        typeof item !== "object"
+      ) {
+        return null;
+      }
+
+      const record =
+        item as Record<string, unknown>;
+
+      const rawH1Count = record.h1Count;
+      const rawWordCount = Number(
+        record.wordCount ?? 0
+      );
+
+      return {
+        title:
+          typeof record.title === "string"
+            ? record.title
+            : null,
+        metaDescription:
+          typeof record.metaDescription ===
+          "string"
+            ? record.metaDescription
+            : null,
+        metaDescriptionChecked:
+          Object.prototype.hasOwnProperty.call(
+            record,
+            "metaDescription"
+          ),
+        h1Count:
+          typeof rawH1Count === "number" &&
+          Number.isFinite(rawH1Count)
+            ? rawH1Count
+            : null,
+        wordCount: Number.isFinite(rawWordCount)
+          ? rawWordCount
+          : 0,
+      };
+    })
+    .filter(
+      (
+        item
+      ): item is AnalyzedPageQuality =>
+        item !== null
+    );
+}
 function countFoundSignals(value: unknown) {
   if (!Array.isArray(value)) return 0;
 
@@ -234,7 +293,51 @@ const llmsTxtUrl =
   getNumber(technicalSignals, "pagesAnalyzed"),
   1
 );
+const analyzedPageQuality =
+  getAnalyzedPageQuality(
+    technicalSignals.analyzedPages
+  );
 
+const secondaryPages =
+  analyzedPageQuality.slice(1);
+
+const pagesMissingMetaDescription =
+  secondaryPages.filter(
+    (page) =>
+      page.metaDescriptionChecked &&
+      !page.metaDescription
+  ).length;
+
+const pagesWithHeadingProblem =
+  secondaryPages.filter(
+    (page) =>
+      page.h1Count !== null &&
+      page.h1Count !== 1
+  ).length;
+
+const thinPageCount =
+  analyzedPageQuality.filter(
+    (page) =>
+      page.wordCount > 0 &&
+      page.wordCount < 200
+  ).length;
+
+const normalizedTitles =
+  analyzedPageQuality
+    .map((page) =>
+      page.title
+        ?.toLocaleLowerCase("tr-TR")
+        .replace(/\s+/g, " ")
+        .trim()
+    )
+    .filter(
+      (pageTitle): pageTitle is string =>
+        Boolean(pageTitle)
+    );
+
+const duplicateTitleCount =
+  normalizedTitles.length -
+  new Set(normalizedTitles).size;
   const schemaTypes = getStringArray(
     technicalSignals,
     "schemaTypes"
@@ -306,7 +409,41 @@ if (blockedSearchCrawlers.length > 0) {
       priority: "Yüksek",
     });
   }
+if (pagesMissingMetaDescription > 0) {
+  issues.push({
+    title:
+      "Alt sayfalarda açıklama eksikleri var",
+    description: `İncelenen alt sayfaların ${pagesMissingMetaDescription} tanesinde meta açıklaması bulunamadı.`,
+    priority: "Yüksek",
+  });
+}
 
+if (pagesWithHeadingProblem > 0) {
+  issues.push({
+    title:
+      "Alt sayfaların başlık yapısı düzeltilmeli",
+    description: `İncelenen alt sayfaların ${pagesWithHeadingProblem} tanesinde tek bir ana H1 başlığı kullanılmıyor.`,
+    priority: "Orta",
+  });
+}
+
+if (duplicateTitleCount > 0) {
+  issues.push({
+    title:
+      "Tekrarlanan sayfa başlıkları var",
+    description: `İncelenen sayfalarda ${duplicateTitleCount} tekrarlanan başlık tespit edildi.`,
+    priority: "Orta",
+  });
+}
+
+if (thinPageCount > 0) {
+  issues.push({
+    title:
+      "Bazı sayfaların içeriği çok kısa",
+    description: `İncelenen sayfaların ${thinPageCount} tanesinde 200 kelimeden daha az içerik bulunuyor.`,
+    priority: "Düşük",
+  });
+}
   if (
     !getBoolean(technicalSignals, "hasContactLink") ||
     !getBoolean(technicalSignals, "hasAboutLink")

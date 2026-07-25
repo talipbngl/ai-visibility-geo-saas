@@ -59,6 +59,8 @@ aiCrawlerAccess: AiCrawlerAccessItem[];
 analyzedPages: Array<{
   url: string;
   title: string | null;
+  metaDescription: string | null;
+  h1Count: number;
   wordCount: number;
 }>;
   headingOrderValid: boolean;
@@ -943,11 +945,16 @@ analyzedPages: [
   {
     url: finalUrl,
     title,
+    metaDescription,
+    h1Count: h1.length,
     wordCount: getWordCount(homepageText),
   },
   ...linkedPageCrawl.pages.map((page) => ({
     url: page.url,
     title: page.title,
+    metaDescription:
+      page.metaDescription,
+    h1Count: page.h1Count,
     wordCount: page.wordCount,
   })),
 ],

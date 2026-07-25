@@ -20,6 +20,8 @@ export type ContentPageType =
 export type CrawledPage = {
   url: string;
   title: string | null;
+  metaDescription: string | null;
+  h1Count: number;
   text: string;
   wordCount: number;
   contentType: ContentPageType;
@@ -91,6 +93,57 @@ function getHref(tag: string) {
   );
 
   return match?.[1] ?? match?.[2] ?? match?.[3] ?? null;
+}
+function getHtmlAttribute(
+  tag: string,
+  attributeName: string
+) {
+  const regex = new RegExp(
+    `\\b${attributeName}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s>]+))`,
+    "i"
+  );
+
+  const match = tag.match(regex);
+
+  return (
+    match?.[1] ??
+    match?.[2] ??
+    match?.[3] ??
+    null
+  );
+}
+
+function extractMetaDescription(html: string) {
+  const metaTags =
+    html.match(/<meta\b[^>]*>/gi) ?? [];
+
+  for (const tag of metaTags) {
+    const name = getHtmlAttribute(
+      tag,
+      "name"
+    )?.toLowerCase();
+
+    if (name !== "description") continue;
+
+    const content = getHtmlAttribute(
+      tag,
+      "content"
+    );
+
+    return content
+      ? decodeHtmlEntities(content)
+          .trim()
+          .slice(0, 500)
+      : null;
+  }
+
+  return null;
+}
+
+function countH1Elements(html: string) {
+  return (
+    html.match(/<h1\b[^>]*>/gi) ?? []
+  ).length;
 }
 
 function getWordCount(text: string) {
@@ -766,15 +819,20 @@ async function crawlPage({
     const fullText = stripHtml(result.text);
 
     return {
-      url: result.finalUrl,
-      title: extractTitle(result.text),
-      text: fullText.slice(
-        0,
-        MAX_PAGE_TEXT_LENGTH
-      ),
-      wordCount: getWordCount(fullText),
-      contentType: getPageCategory(result.finalUrl),
-    };
+  url: result.finalUrl,
+  title: extractTitle(result.text),
+  metaDescription:
+    extractMetaDescription(result.text),
+  h1Count: countH1Elements(result.text),
+  text: fullText.slice(
+    0,
+    MAX_PAGE_TEXT_LENGTH
+  ),
+  wordCount: getWordCount(fullText),
+  contentType: getPageCategory(
+    result.finalUrl
+  ),
+};
   } catch {
     return null;
   }
