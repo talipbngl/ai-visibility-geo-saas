@@ -309,6 +309,162 @@ function getPagePriority(url: URL) {
 
   return score;
 }
+function getPageCategory(url: string) {
+  const pathname = new URL(url).pathname
+    .toLocaleLowerCase("tr-TR")
+    .replace(/ı/g, "i")
+    .replace(/ğ/g, "g")
+    .replace(/ü/g, "u")
+    .replace(/ş/g, "s")
+    .replace(/ö/g, "o")
+    .replace(/ç/g, "c");
+
+  if (
+    [
+      "hizmet",
+      "service",
+      "urun",
+      "product",
+      "cozum",
+      "solution",
+      "tedavi",
+      "uygulama",
+      "kategori",
+      "collection",
+    ].some((term) => pathname.includes(term))
+  ) {
+    return "service";
+  }
+
+  if (
+    [
+      "hakkimizda",
+      "about",
+      "kurumsal",
+      "ekibimiz",
+      "team",
+    ].some((term) => pathname.includes(term))
+  ) {
+    return "about";
+  }
+
+  if (
+    [
+      "iletisim",
+      "contact",
+      "sube",
+      "location",
+      "konum",
+    ].some((term) => pathname.includes(term))
+  ) {
+    return "contact";
+  }
+
+  if (
+    [
+      "sik-sorulan",
+      "sss",
+      "faq",
+    ].some((term) => pathname.includes(term))
+  ) {
+    return "faq";
+  }
+
+  if (
+    [
+      "blog",
+      "rehber",
+      "guide",
+      "makale",
+      "article",
+      "bilgi",
+    ].some((term) => pathname.includes(term))
+  ) {
+    return "guide";
+  }
+
+  if (
+    [
+      "karsilastir",
+      "comparison",
+      "versus",
+      "alternatif",
+    ].some((term) => pathname.includes(term))
+  ) {
+    return "comparison";
+  }
+
+  if (
+    [
+      "fiyat",
+      "pricing",
+      "price",
+      "ucret",
+      "paket",
+    ].some((term) => pathname.includes(term))
+  ) {
+    return "pricing";
+  }
+
+  return "other";
+}
+
+function selectDiverseCandidates(
+  candidates: Array<{
+    url: string;
+    score: number;
+  }>,
+  limit: number
+) {
+  const selected: Array<{
+    url: string;
+    score: number;
+  }> = [];
+
+  const selectedUrls = new Set<string>();
+
+  const preferredCategories = [
+    "service",
+    "about",
+    "contact",
+    "faq",
+    "guide",
+    "comparison",
+    "pricing",
+  ];
+
+  for (const category of preferredCategories) {
+    const candidate = candidates.find(
+      (item) =>
+        !selectedUrls.has(item.url) &&
+        getPageCategory(item.url) === category
+    );
+
+    if (!candidate) continue;
+
+    selected.push(candidate);
+    selectedUrls.add(candidate.url);
+
+    if (selected.length >= limit) {
+      return selected;
+    }
+  }
+
+  for (const candidate of candidates) {
+    if (selectedUrls.has(candidate.url)) {
+      continue;
+    }
+
+    selected.push(candidate);
+    selectedUrls.add(candidate.url);
+
+    if (selected.length >= limit) {
+      break;
+    }
+  }
+
+  return selected;
+}
 
 function extractCandidateUrls(
   homepageHtml: string,
@@ -599,11 +755,10 @@ const candidates = Array.from(
     allowedCandidates.length;
 
   const selectedCandidates =
-    allowedCandidates.slice(
-      0,
-      MAX_LINKED_PAGES
-    );
-
+  selectDiverseCandidates(
+    allowedCandidates,
+    MAX_LINKED_PAGES
+  );
   const pages: CrawledPage[] = [];
 
   for (
