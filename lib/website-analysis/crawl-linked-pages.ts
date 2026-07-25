@@ -250,9 +250,55 @@ async function fetchPublicText({
     clearTimeout(timeout);
   }
 }
+function normalizePathname(pathname: string) {
+  return pathname
+    .toLocaleLowerCase("tr-TR")
+    .replace(/ı/g, "i")
+    .replace(/ğ/g, "g")
+    .replace(/ü/g, "u")
+    .replace(/ş/g, "s")
+    .replace(/ö/g, "o")
+    .replace(/ç/g, "c")
+    .replace(/_+/g, "-")
+    .replace(/-+/g, "-");
+}
+
+function getPathSegments(url: URL) {
+  return normalizePathname(url.pathname)
+    .split("/")
+    .filter(Boolean);
+}
+
+function isLowValuePage(url: URL) {
+  const segments = getPathSegments(url);
+
+  const lowValuePatterns = [
+    /(^|-)kvkk($|-)/,
+    /(^|-)gizlilik($|-)/,
+    /(^|-)privacy($|-)/,
+    /(^|-)cerez($|-)/,
+    /(^|-)cookie($|-)/,
+    /aydinlatma(-metni)?/,
+    /ticari-iletisim/,
+    /mesafeli-satis/,
+    /kullanim-kosullari/,
+    /terms-and-conditions/,
+    /(^|-)legal($|-)/,
+    /iade-ve-iptal/,
+    /(^|-)kariyer($|-)/,
+    /(^|-)career($|-)/,
+    /is-ilanlari/,
+  ];
+
+  return segments.some((segment) =>
+    lowValuePatterns.some((pattern) =>
+      pattern.test(segment)
+    )
+  );
+}
 
 function shouldSkipUrl(url: URL) {
-  const path = url.pathname.toLowerCase();
+  const path = normalizePathname(url.pathname);
 
   const skippedPaths =
     /\/(admin|wp-admin|login|register|account|cart|checkout|search|giris|kayit|hesabim|sepet|odeme)(\/|$)/i;
@@ -262,146 +308,148 @@ function shouldSkipUrl(url: URL) {
 
   return (
     skippedPaths.test(path) ||
-    skippedExtensions.test(path)
+    skippedExtensions.test(path) ||
+    isLowValuePage(url)
   );
 }
 
-function getPagePriority(url: URL) {
-  const normalizedPath = url.pathname
-    .toLocaleLowerCase("tr-TR")
-    .replace(/ı/g, "i")
-    .replace(/ğ/g, "g")
-    .replace(/ü/g, "u")
-    .replace(/ş/g, "s")
-    .replace(/ö/g, "o")
-    .replace(/ç/g, "c");
+function getPageCategory(url: string) {
+  const parsedUrl = new URL(url);
+  const pathname = normalizePathname(
+    parsedUrl.pathname
+  );
+  const segments = getPathSegments(parsedUrl);
 
-  const importantTerms = [
+  const serviceTerms = [
     "hizmet",
+    "hizmetler",
     "service",
+    "services",
     "urun",
+    "urunler",
     "product",
-    "hakkimizda",
-    "about",
-    "iletisim",
-    "contact",
-    "sss",
-    "faq",
+    "products",
+    "menu",
     "cozum",
     "solution",
+    "tedavi",
+    "uygulama",
     "kategori",
     "category",
+    "collection",
   ];
 
-  let score = 0;
-
-  for (const term of importantTerms) {
-    if (normalizedPath.includes(term)) {
-      score += 20;
-    }
-  }
-
-  const segmentCount = normalizedPath
-    .split("/")
-    .filter(Boolean).length;
-
-  score += Math.max(0, 10 - segmentCount * 2);
-
-  return score;
-}
-function getPageCategory(url: string) {
-  const pathname = new URL(url).pathname
-    .toLocaleLowerCase("tr-TR")
-    .replace(/ı/g, "i")
-    .replace(/ğ/g, "g")
-    .replace(/ü/g, "u")
-    .replace(/ş/g, "s")
-    .replace(/ö/g, "o")
-    .replace(/ç/g, "c");
-
   if (
-    [
-      "hizmet",
-      "service",
-      "urun",
-      "product",
-      "cozum",
-      "solution",
-      "tedavi",
-      "uygulama",
-      "kategori",
-      "collection",
-    ].some((term) => pathname.includes(term))
+    serviceTerms.some((term) =>
+      pathname.includes(term)
+    )
   ) {
     return "service";
   }
 
+  const aboutTerms = [
+    "hakkimizda",
+    "about",
+    "kurumsal",
+    "sirketimiz",
+    "tarihce",
+    "ekibimiz",
+    "team",
+  ];
+
   if (
-    [
-      "hakkimizda",
-      "about",
-      "kurumsal",
-      "ekibimiz",
-      "team",
-    ].some((term) => pathname.includes(term))
+    aboutTerms.some((term) =>
+      pathname.includes(term)
+    )
   ) {
     return "about";
   }
 
+  const contactSegments = new Set([
+    "iletisim",
+    "contact",
+    "contact-us",
+    "bize-ulasin",
+    "sube",
+    "subeler",
+    "magaza",
+    "magazalar",
+    "location",
+    "locations",
+    "konum",
+  ]);
+
   if (
-    [
-      "iletisim",
-      "contact",
-      "sube",
-      "location",
-      "konum",
-    ].some((term) => pathname.includes(term))
+    segments.some((segment) =>
+      contactSegments.has(segment)
+    )
   ) {
     return "contact";
   }
 
+  const faqTerms = [
+    "sik-sorulan",
+    "sikca-sorulan",
+    "sss",
+    "faq",
+  ];
+
   if (
-    [
-      "sik-sorulan",
-      "sss",
-      "faq",
-    ].some((term) => pathname.includes(term))
+    faqTerms.some((term) =>
+      pathname.includes(term)
+    )
   ) {
     return "faq";
   }
 
+  const guideTerms = [
+    "blog",
+    "rehber",
+    "guide",
+    "makale",
+    "article",
+    "bilgi",
+    "kaynak",
+    "resource",
+  ];
+
   if (
-    [
-      "blog",
-      "rehber",
-      "guide",
-      "makale",
-      "article",
-      "bilgi",
-    ].some((term) => pathname.includes(term))
+    guideTerms.some((term) =>
+      pathname.includes(term)
+    )
   ) {
     return "guide";
   }
 
+  const comparisonTerms = [
+    "karsilastir",
+    "comparison",
+    "versus",
+    "alternatif",
+    "-vs-",
+  ];
+
   if (
-    [
-      "karsilastir",
-      "comparison",
-      "versus",
-      "alternatif",
-    ].some((term) => pathname.includes(term))
+    comparisonTerms.some((term) =>
+      pathname.includes(term)
+    )
   ) {
     return "comparison";
   }
 
+  const pricingTerms = [
+    "fiyat",
+    "pricing",
+    "price",
+    "ucret",
+    "paket",
+    "plan",
+  ];
+
   if (
-    [
-      "fiyat",
-      "pricing",
-      "price",
-      "ucret",
-      "paket",
-    ].some((term) => pathname.includes(term))
+    pricingTerms.some((term) =>
+      pathname.includes(term)
+    )
   ) {
     return "pricing";
   }
@@ -409,6 +457,55 @@ function getPageCategory(url: string) {
   return "other";
 }
 
+function getPagePriority(url: URL) {
+  const category = getPageCategory(
+    url.toString()
+  );
+
+  const categoryScores: Record<string, number> = {
+    comparison: 55,
+    faq: 50,
+    pricing: 45,
+    service: 45,
+    guide: 35,
+    about: 30,
+    contact: 25,
+    other: 5,
+  };
+
+  const segments = getPathSegments(url);
+
+  let score = categoryScores[category] ?? 0;
+
+  // Daha kısa ve üst seviye sayfalar genellikle daha kapsayıcıdır.
+  score += Math.max(0, 12 - segments.length * 3);
+
+  // Ana kategori/liste sayfaları tekil detay sayfalarından önce gelir.
+  if (
+    segments.some((segment) =>
+      [
+        "hizmetler",
+        "services",
+        "urunler",
+        "products",
+        "menu",
+        "rehber",
+        "blog",
+        "faq",
+        "sss",
+      ].includes(segment)
+    )
+  ) {
+    score += 10;
+  }
+
+  // Çok derin tekil sayfalar kotayı tamamen tüketmemeli.
+  if (segments.length >= 4) {
+    score -= 8;
+  }
+
+  return score;
+}
 function selectDiverseCandidates(
   candidates: Array<{
     url: string;
