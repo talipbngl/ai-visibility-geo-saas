@@ -504,7 +504,7 @@ function shouldSkipUrl(url: URL) {
   );
 }
 
-function getPageCategory(
+export function getPageCategory(
   url: string
 ): ContentPageType {
   const parsedUrl = new URL(url);

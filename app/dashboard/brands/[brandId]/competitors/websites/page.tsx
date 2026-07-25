@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-
+import { CompetitorContentGap } from "@/features/website/components/CompetitorContentGap";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -106,6 +106,7 @@ export default async function CompetitorWebsitesPage({
         .select(
           `
           id,
+          technical_signals_json,
           category_scores_json,
           content_score,
           created_at
@@ -228,7 +229,38 @@ export default async function CompetitorWebsitesPage({
             } => competitor !== null
           )}
       />
+     <CompetitorContentGap
+  brandName={brand.name}
+  brandTechnicalSignalsValue={
+    latestBrandSnapshot
+      ?.technical_signals_json ?? null
+  }
+  competitors={(competitors ?? [])
+    .map((competitor) => {
+      const snapshot =
+        latestSnapshotByCompetitorId.get(
+          competitor.id
+        );
 
+      if (!snapshot) return null;
+
+      return {
+        id: competitor.id,
+        name: competitor.name,
+        technicalSignalsValue:
+          snapshot.technical_signals_json,
+      };
+    })
+    .filter(
+      (
+        competitor
+      ): competitor is {
+        id: string;
+        name: string;
+        technicalSignalsValue: unknown;
+      } => competitor !== null
+    )}
+/>
       <Card className="shadow-sm">
         <CardHeader>
           <CardTitle>Rakip analizleri</CardTitle>

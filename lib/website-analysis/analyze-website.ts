@@ -2,6 +2,7 @@ import { assertPublicWebsiteUrl } from "@/lib/security/public-website-url";
 import { getWebsiteKeywordPreset } from "@/lib/website-analysis/keyword-presets";
 import {
   crawlLinkedPages,
+  getPageCategory,
   type ContentPageType,
 } from "@/lib/website-analysis/crawl-linked-pages";
 import {
@@ -819,7 +820,17 @@ const [linkedPageCrawl, aiCrawlerAccess] =
     }),
     analyzeAiCrawlerAccess(finalUrl),
   ]);
+const primaryContentType =
+  getPageCategory(finalUrl);
 
+const contentTypesFound = Array.from(
+  new Set<ContentPageType>([
+    ...(primaryContentType === "other"
+      ? []
+      : [primaryContentType]),
+    ...linkedPageCrawl.contentTypesFound,
+  ])
+);
 const combinedText = [
   homepageText,
   ...linkedPageCrawl.pages.map((page) => page.text),
@@ -896,8 +907,7 @@ const allSchemaTypes = Array.from(
 ).slice(0, 50);
     const technicalSignals: TechnicalSignals = {
       finalUrl,
-      contentTypesFound:
-  linkedPageCrawl.contentTypesFound,
+      contentTypesFound,
       isHttps: new URL(finalUrl).protocol === "https:",
       canonicalUrl: extractCanonicalUrl(html, finalUrl),
       robotsDirective,
