@@ -1,3 +1,4 @@
+import { getIntentContentPlan } from "@/lib/recommendations/intent-content-actions";
 type Signal = {
   keyword: string;
   count: number;
@@ -293,6 +294,11 @@ export function buildEvidenceBasedRecommendations({
       .map((analysis) => getPromptIntent(analysis))
       .filter((intent): intent is string => Boolean(intent))
   );
+    const primaryInvisibleIntent = invisibleIntents[0] ?? null;
+
+  const invisibleIntentContentPlan = getIntentContentPlan(
+    primaryInvisibleIntent
+  );
 
   const competitorStats = getCompetitorMentionStats(analyses);
   const strongestCompetitor = competitorStats[0] ?? null;
@@ -554,13 +560,12 @@ if (competitorContentGaps.length > 0) {
   if (invisibleAnalyses.length > 0) {
     pushUniqueRecommendation(recommendations, {
       category: "content",
-      title: "Markanın görünmediği soru tiplerine özel sayfalar oluştur",
-      description:
-        invisibleIntents.length > 0
-          ? `Marka özellikle şu soru niyetlerinde görünmüyor: ${invisibleIntents.join(
-              ", "
-            )}. Bu niyetlere karşılık gelen rehber, karşılaştırma, hizmet ve SSS içerikleri oluşturulmalı.`
-          : `Marka ${invisibleAnalyses.length} test sorusunda görünmedi. Görünmediği sorular incelenerek bu sorulara cevap veren sayfa ve içerikler hazırlanmalı.`,
+      title:
+        invisibleIntentContentPlan?.title ??
+        "Markanın görünmediği sorulara özel içerik oluştur",
+      description: invisibleIntentContentPlan
+        ? `${brandName}, özellikle ${invisibleIntentContentPlan.label} sorularında yeterince görünmüyor. ${invisibleIntentContentPlan.action}`
+        : `${brandName}, ${invisibleAnalyses.length} test sorusunda görünmedi. Görünmediği sorular incelenerek kullanıcı ihtiyacına doğrudan cevap veren sayfalar hazırlanmalı.`,
       priority: "high",
       effort: "medium",
       impact: "high",

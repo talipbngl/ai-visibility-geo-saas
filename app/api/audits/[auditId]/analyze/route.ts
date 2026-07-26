@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { createClient } from "@/lib/supabase/server";
-
+import { getIntentContentPlan } from "@/lib/recommendations/intent-content-actions";
 type RouteContext = {
   params: Promise<{
     auditId: string;
@@ -27,6 +27,7 @@ type CompletedRunRecord = {
   id: string;
   raw_answer: string | null;
   citations_json: unknown;
+  prompt_intent_snapshot: string | null;
 };
 type MentionResult = {
   name: string;
@@ -258,7 +259,6 @@ function analyzeAnswer(args: {
     confidence_score: brandMentioned || mentionedCompetitors.length > 0 ? 0.75 : 0.55,
   };
 }
-
 function buildRecommendations(args: {
   auditId: string;
   brandName: string;
@@ -268,15 +268,24 @@ function buildRecommendations(args: {
   positiveSentimentRate: number;
   opportunityScore: number;
   topCompetitorNames: string[];
+  primaryInvisibleIntent: string | null;
 }) {
   const recommendations = [];
+
+  const intentContentPlan = getIntentContentPlan(
+    args.primaryInvisibleIntent
+  );
 
   if (args.visibilityScore < 50) {
     recommendations.push({
       audit_id: args.auditId,
       category: "content",
-      title: "Kategori ve satın alma niyetli içerikleri güçlendir",
-      description: `${args.brandName}, test edilen promptların çoğunda görünmüyor. “En iyi”, “öneri”, “karşılaştırma”, “yeni başlayanlar için” gibi satın alma niyetli konularda landing page ve rehber içerikleri oluşturulmalı.`,
+      title:
+        intentContentPlan?.title ??
+        "Markanın görünmediği soru tiplerine özel içerik oluştur",
+      description: intentContentPlan
+        ? `${args.brandName}, özellikle ${intentContentPlan.label} sorularında yeterince görünmüyor. ${intentContentPlan.action}`
+        : `${args.brandName}, test edilen soruların çoğunda görünmüyor. Kullanıcıların karar verirken sorduğu önemli sorulara doğrudan cevap veren hizmet, rehber ve sık sorulan sorular içerikleri hazırlanmalı.`,
       priority: "high",
       effort: "medium",
       impact: "high",
@@ -424,7 +433,9 @@ export async function POST(request: Request, context: RouteContext) {
 
   const { data: runsData, error: runsError } = await supabase
     .from("audit_runs")
-    .select("id, raw_answer, citations_json")
+    .select("id, raw_answer, citations_json").select(
+  "id, raw_answer, citations_json, prompt_intent_snapshot"
+)
         .eq("audit_id", audit.id)
     .eq("status", "completed");
 
@@ -532,6 +543,29 @@ const analyses = completedRuns.map((run) => {
     .sort((a, b) => b[1] - a[1])
     .map(([name]) => name)
     .slice(0, 3);
+      const invisibleIntentCounts = new Map<string, number>();
+
+  analyses.forEach((analysis) => {
+    if (analysis.brand_mentioned) return;
+
+    const matchingRun = completedRuns.find(
+      (run) => run.id === analysis.audit_run_id
+    );
+
+    const intent = matchingRun?.prompt_intent_snapshot;
+
+    if (!intent) return;
+
+    invisibleIntentCounts.set(
+      intent,
+      (invisibleIntentCounts.get(intent) ?? 0) + 1
+    );
+  });
+
+  const primaryInvisibleIntent =
+    Array.from(invisibleIntentCounts.entries())
+      .sort((first, second) => second[1] - first[1])
+      .map(([intent]) => intent)[0] ?? null;
 
   const visibilityScore = round((brandMentionCount / totalAnalyzed) * 100);
 
@@ -718,6 +752,7 @@ const analyses = completedRuns.map((run) => {
     positiveSentimentRate,
     opportunityScore,
     topCompetitorNames,
+    primaryInvisibleIntent,
   });
 
   const { error: recommendationsError } = await supabase
