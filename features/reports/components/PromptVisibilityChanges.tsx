@@ -57,21 +57,20 @@ export function PromptVisibilityChanges({
         result !== null
     );
 
-  const gainedVisibility = comparableResults
-    .filter(
-      (result) =>
-        !result.previousMentioned &&
-        result.currentMentioned
-    )
-    .slice(0, 3);
+  const allGainedVisibility = comparableResults.filter(
+  (result) =>
+    !result.previousMentioned &&
+    result.currentMentioned
+);
 
-  const lostVisibility = comparableResults
-    .filter(
-      (result) =>
-        result.previousMentioned &&
-        !result.currentMentioned
-    )
-    .slice(0, 3);
+const allLostVisibility = comparableResults.filter(
+  (result) =>
+    result.previousMentioned &&
+    !result.currentMentioned
+);
+
+const gainedVisibility = allGainedVisibility.slice(0, 3);
+const lostVisibility = allLostVisibility.slice(0, 3);
 
   return (
     <section className="space-y-4">
@@ -112,7 +111,7 @@ export function PromptVisibilityChanges({
                 Görünürlük kazanılan
               </p>
               <p className="mt-2 text-2xl font-semibold text-emerald-900">
-                {gainedVisibility.length}
+                {allGainedVisibility.length}
               </p>
             </div>
 
@@ -121,7 +120,7 @@ export function PromptVisibilityChanges({
                 Görünürlük kaybedilen
               </p>
               <p className="mt-2 text-2xl font-semibold text-rose-900">
-                {lostVisibility.length}
+                {allLostVisibility.length}
               </p>
             </div>
           </div>
