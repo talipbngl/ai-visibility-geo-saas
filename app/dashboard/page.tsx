@@ -119,7 +119,7 @@ export default async function DashboardPage() {
     .from("recommendations")
     .select("id, audit_id, title, description, priority, impact, category")
     .order("created_at", { ascending: false })
-    .limit(5);
+    .limit(3);
 
   const hasAnyBrand = (brandCount ?? 0) > 0;
   const hasAnyAudit = (auditCount ?? 0) > 0;
@@ -127,32 +127,16 @@ export default async function DashboardPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Genel Bakış"
-        title="AI Görünürlük Paneli"
-        description="Markalarının AI cevaplarında ne kadar göründüğünü, rakiplere göre görünürlük payını ve aksiyon önerilerini tek ekrandan takip et."
-        actions={
-          <>
-            <Button asChild variant="outline">
-              <Link href="/dashboard/brands">Markalar</Link>
-            </Button>
-            <Button asChild variant="outline">
-  <Link href="/dashboard/demo-report">
-    Demo rapor
-  </Link>
-</Button>
-
-            <Button asChild>
-              <Link href="/dashboard/brands/new">Yeni marka ekle</Link>
-            </Button>
-          </>
-        }
-      />
-      <Button asChild variant="outline">
-  <Link href="/dashboard/health">
-    Sistem kontrol
-  </Link>
-</Button>
-
+  eyebrow="Genel bakış"
+  title="AI görünürlük paneli"
+  description="Markalarının AI cevaplarındaki görünürlüğünü, rakiplere göre payını ve öncelikli önerileri takip et."
+  actions={
+    <Button asChild>
+      <Link href="/dashboard/brands/new">Yeni marka ekle</Link>
+    </Button>
+  }
+/>
+{!hasAnyAudit ? (
       <Card className="border-primary/20 bg-primary/5 shadow-sm">
         <CardHeader>
           <CardTitle>Hızlı başlangıç</CardTitle>
@@ -195,8 +179,9 @@ export default async function DashboardPage() {
           </div>
         </CardContent>
       </Card>
+) : null}
 
-      <section className="grid gap-4 md:grid-cols-4">
+<section className="grid gap-4 md:grid-cols-4">
         <MetricCard
           title="Markalar"
           description="Takip edilen marka"
@@ -237,7 +222,7 @@ export default async function DashboardPage() {
       <section className="grid gap-6 lg:grid-cols-[1.3fr_0.9fr]">
         <Card className="shadow-sm">
           <CardHeader>
-            <CardTitle>Son Ölçümler</CardTitle>
+            <CardTitle>Son ölçümler</CardTitle>
             <CardDescription>
               En son oluşturulan AI görünürlük ölçümleri.
             </CardDescription>
@@ -286,22 +271,25 @@ export default async function DashboardPage() {
                           </p>
                         </div>
 
-                        <div className="flex flex-wrap gap-2">
-  <form action={`/api/audits/${audit.id}/continue`} method="post">
-    <Button type="submit" size="sm">
-      Devam et
+                        
+  <div className="flex flex-wrap gap-2">
+  {auditScore ? (
+    <Button asChild size="sm">
+      <Link href={`/dashboard/audits/${audit.id}/report`}>
+        Raporu aç
+      </Link>
     </Button>
-  </form>
+  ) : (
+    <form action={`/api/audits/${audit.id}/continue`} method="post">
+      <Button type="submit" size="sm">
+        Ölçüme devam et
+      </Button>
+    </form>
+  )}
 
   <Button asChild variant="outline" size="sm">
     <Link href={`/dashboard/audits/${audit.id}`}>
-      Detay
-    </Link>
-  </Button>
-
-  <Button asChild variant="outline" size="sm">
-    <Link href={`/dashboard/audits/${audit.id}/report`}>
-      Rapor
+      Detayı gör
     </Link>
   </Button>
 </div>
@@ -327,7 +315,7 @@ export default async function DashboardPage() {
         <div className="space-y-6">
           <Card className="shadow-sm">
             <CardHeader>
-              <CardTitle>Aksiyon Önerileri</CardTitle>
+              <CardTitle>Öncelikli Öneriler</CardTitle>
               <CardDescription>
                 Son analizlerden çıkan uygulanabilir öneriler.
               </CardDescription>
