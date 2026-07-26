@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { createClient } from "@/lib/supabase/server";
-import { getIntentContentPlan } from "@/lib/recommendations/intent-content-actions";
+import { replaceAuditRecommendations } from "@/lib/recommendations/replace-audit-recommendations";
 type RouteContext = {
   params: Promise<{
     auditId: string;
@@ -27,7 +27,6 @@ type CompletedRunRecord = {
   id: string;
   raw_answer: string | null;
   citations_json: unknown;
-  prompt_intent_snapshot: string | null;
 };
 type MentionResult = {
   name: string;
@@ -259,110 +258,6 @@ function analyzeAnswer(args: {
     confidence_score: brandMentioned || mentionedCompetitors.length > 0 ? 0.75 : 0.55,
   };
 }
-function buildRecommendations(args: {
-  auditId: string;
-  brandName: string;
-  visibilityScore: number;
-  shareOfVoice: number;
-  averageRank: number | null;
-  positiveSentimentRate: number;
-  opportunityScore: number;
-  topCompetitorNames: string[];
-  primaryInvisibleIntent: string | null;
-}) {
-  const recommendations = [];
-
-  const intentContentPlan = getIntentContentPlan(
-    args.primaryInvisibleIntent
-  );
-
-  if (args.visibilityScore < 50) {
-    recommendations.push({
-      audit_id: args.auditId,
-      category: "content",
-      title:
-        intentContentPlan?.title ??
-        "Markanın görünmediği soru tiplerine özel içerik oluştur",
-      description: intentContentPlan
-        ? `${args.brandName}, özellikle ${intentContentPlan.label} sorularında yeterince görünmüyor. ${intentContentPlan.action}`
-        : `${args.brandName}, test edilen soruların çoğunda görünmüyor. Kullanıcıların karar verirken sorduğu önemli sorulara doğrudan cevap veren hizmet, rehber ve sık sorulan sorular içerikleri hazırlanmalı.`,
-      priority: "high",
-      effort: "medium",
-      impact: "high",
-      status: "open",
-    });
-  }
-
-  if (args.shareOfVoice < 40 && args.topCompetitorNames.length > 0) {
-    recommendations.push({
-      audit_id: args.auditId,
-      category: "competitor",
-      title: "Rakip karşılaştırma sayfaları oluştur",
-      description: `${args.topCompetitorNames.join(
-        ", "
-      )} gibi rakipler cevaplarda daha görünür. ${args.brandName} ile bu rakipleri karşılaştıran objektif içerikler hazırlanmalı.`,
-      priority: "high",
-      effort: "medium",
-      impact: "high",
-      status: "open",
-    });
-  }
-
-  if (args.averageRank && args.averageRank > 2) {
-    recommendations.push({
-      audit_id: args.auditId,
-      category: "authority",
-      title: "Marka otoritesini ve güven sinyallerini artır",
-      description: `${args.brandName} cevaplarda geçiyor ama genellikle ilk sırada değil. Ürün yorumları, uzman içerikleri, FAQ, hakkında sayfası ve üçüncü taraf incelemeler güçlendirilmeli.`,
-      priority: "medium",
-      effort: "medium",
-      impact: "high",
-      status: "open",
-    });
-  }
-
-  if (args.positiveSentimentRate < 60) {
-    recommendations.push({
-      audit_id: args.auditId,
-      category: "brand",
-      title: "Marka anlatımını daha net ve güven verici hale getir",
-      description: `AI cevaplarında marka tonu yeterince olumlu değil. Web sitesinde marka vaadi, kalite kanıtları, müşteri yorumları ve ürün farkları daha açık anlatılmalı.`,
-      priority: "medium",
-      effort: "low",
-      impact: "medium",
-      status: "open",
-    });
-  }
-
-  if (args.opportunityScore > 30) {
-    recommendations.push({
-      audit_id: args.auditId,
-      category: "geo",
-      title: "Görünmeyen fakat rakiplerin çıktığı promptlara odaklan",
-      description: `Rakiplerin görünüp ${args.brandName} markasının görünmediği promptlar fırsat alanı. Bu promptların ortak konularına göre yeni içerik kümeleri oluşturulmalı.`,
-      priority: "high",
-      effort: "medium",
-      impact: "high",
-      status: "open",
-    });
-  }
-
-  if (recommendations.length === 0) {
-    recommendations.push({
-      audit_id: args.auditId,
-      category: "monitoring",
-      title: "Haftalık AI görünürlük takibi başlat",
-      description: `${args.brandName} için temel görünürlük sinyalleri iyi görünüyor. Skorun korunması için haftalık audit ve rakip takip rutini oluşturulmalı.`,
-      priority: "medium",
-      effort: "low",
-      impact: "medium",
-      status: "open",
-    });
-  }
-
-  return recommendations.slice(0, 5);
-}
-
 export async function POST(request: Request, context: RouteContext) {
   const { auditId } = await context.params;
 
@@ -431,12 +326,10 @@ export async function POST(request: Request, context: RouteContext) {
 
   const competitors = (competitorsData ?? []) as CompetitorRecord[];
 
-  const { data: runsData, error: runsError } = await supabase
+   const { data: runsData, error: runsError } = await supabase
     .from("audit_runs")
-    .select("id, raw_answer, citations_json").select(
-  "id, raw_answer, citations_json, prompt_intent_snapshot"
-)
-        .eq("audit_id", audit.id)
+    .select("id, raw_answer, citations_json")
+    .eq("audit_id", audit.id)
     .eq("status", "completed");
 
   if (runsError) {
@@ -523,49 +416,6 @@ const analyses = completedRuns.map((run) => {
       competitorsJson.some((competitor) => competitor.mentioned)
     );
   }).length;
-
-  const competitorMentionTotals = new Map<string, number>();
-
-  analyses.forEach((analysis) => {
-    const competitorsJson = analysis.competitors_json as MentionResult[];
-
-    competitorsJson.forEach((competitor) => {
-      if (!competitor.mentioned) return;
-
-      competitorMentionTotals.set(
-        competitor.name,
-        (competitorMentionTotals.get(competitor.name) ?? 0) + 1
-      );
-    });
-  });
-
-  const topCompetitorNames = Array.from(competitorMentionTotals.entries())
-    .sort((a, b) => b[1] - a[1])
-    .map(([name]) => name)
-    .slice(0, 3);
-      const invisibleIntentCounts = new Map<string, number>();
-
-  analyses.forEach((analysis) => {
-    if (analysis.brand_mentioned) return;
-
-    const matchingRun = completedRuns.find(
-      (run) => run.id === analysis.audit_run_id
-    );
-
-    const intent = matchingRun?.prompt_intent_snapshot;
-
-    if (!intent) return;
-
-    invisibleIntentCounts.set(
-      intent,
-      (invisibleIntentCounts.get(intent) ?? 0) + 1
-    );
-  });
-
-  const primaryInvisibleIntent =
-    Array.from(invisibleIntentCounts.entries())
-      .sort((first, second) => second[1] - first[1])
-      .map(([intent]) => intent)[0] ?? null;
 
   const visibilityScore = round((brandMentionCount / totalAnalyzed) * 100);
 
@@ -741,28 +591,17 @@ const analyses = completedRuns.map((run) => {
     );
   }
 
-  await supabase.from("recommendations").delete().eq("audit_id", audit.id);
+    const recommendationResult =
+    await replaceAuditRecommendations({
+      auditId: audit.id,
+      brandId: brand.id,
+      brandName: brand.name,
+    });
 
-  const recommendations = buildRecommendations({
-    auditId: audit.id,
-    brandName: brand.name,
-    visibilityScore,
-    shareOfVoice,
-    averageRank,
-    positiveSentimentRate,
-    opportunityScore,
-    topCompetitorNames,
-    primaryInvisibleIntent,
-  });
-
-  const { error: recommendationsError } = await supabase
-    .from("recommendations")
-    .insert(recommendations);
-
-  if (recommendationsError) {
+  if (!recommendationResult.success) {
     return redirectTo(
       `/dashboard/audits/${audit.id}?error=${encodeURIComponent(
-        recommendationsError.message
+        recommendationResult.error
       )}`,
       request.url
     );

@@ -1,7 +1,7 @@
 import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
 
-import { buildEvidenceBasedRecommendations } from "@/lib/recommendations/evidence-based-recommendations";
+import { replaceAuditRecommendations } from "@/lib/recommendations/replace-audit-recommendations";
 import { createClient } from "@/lib/supabase/server";
 
 type RefreshRecommendationsRouteProps = {
@@ -54,128 +54,16 @@ export async function POST(
     );
   }
 
-  const { data: score } = await supabase
-    .from("audit_scores")
-    .select(
-      "visibility_score, share_of_voice, average_rank, positive_sentiment_rate, opportunity_score"
-    )
-    .eq("audit_id", audit.id)
-    .maybeSingle();
-const { data: analyses } = await supabase
-  .from("analyses")
-  .select(
-    `
-    id,
-    audit_run_id,
-    brand_mentioned,
-    brand_rank,
-    brand_sentiment,
-    competitors_json,
-    summary,
-    audit_runs!inner (
-      id,
-      audit_id,
-      prompt_text_snapshot,
-      prompt_intent_snapshot
-    )
-  `
-  )
-  .eq("audit_runs.audit_id", audit.id);
-
-  const { data: brandWebsiteSnapshots } = await supabase
-    .from("brand_website_snapshots")
-    .select(
-  "id, content_score, service_signals_json, trust_signals_json, technical_signals_json, created_at"
-)
-    .eq("brand_id", brand.id)
-    .eq("status", "completed")
-    .order("created_at", { ascending: false })
-    .limit(1);
-
-  const brandWebsiteSnapshot = brandWebsiteSnapshots?.[0] ?? null;
-
-  const { data: competitorWebsiteSnapshots } = await supabase
-    .from("competitor_website_snapshots")
-    .select(
-      `
-      id,
-      competitor_id,
-      content_score,
-      service_signals_json,
-      trust_signals_json,
-      technical_signals_json,
-      created_at,
-      competitors (
-        id,
-        name
-      )
-    `
-    )
-    .eq("brand_id", brand.id)
-    .eq("status", "completed")
-    .order("created_at", { ascending: false });
-
-  const latestCompetitorWebsiteSnapshotMap = new Map<
-    string,
-    NonNullable<typeof competitorWebsiteSnapshots>[number]
-  >();
-
-  (competitorWebsiteSnapshots ?? []).forEach((snapshot) => {
-    if (!latestCompetitorWebsiteSnapshotMap.has(snapshot.competitor_id)) {
-      latestCompetitorWebsiteSnapshotMap.set(snapshot.competitor_id, snapshot);
-    }
-  });
-
-  const latestCompetitorWebsiteSnapshots = Array.from(
-    latestCompetitorWebsiteSnapshotMap.values()
-  ).map((snapshot) => {
-    const competitor = Array.isArray(snapshot.competitors)
-      ? snapshot.competitors[0]
-      : snapshot.competitors;
-
-    return {
-      competitor_name: competitor?.name ?? "Rakip",
-      technical_signals_json:
-  snapshot.technical_signals_json,
-      content_score: snapshot.content_score,
-      service_signals_json: snapshot.service_signals_json,
-      trust_signals_json: snapshot.trust_signals_json,
-    };
-  });
-
-  const recommendations = buildEvidenceBasedRecommendations({
+  const result = await replaceAuditRecommendations({
+    auditId: audit.id,
+    brandId: brand.id,
     brandName: brand.name,
-    score,
-    analyses: analyses ?? [],
-    brandWebsiteSnapshot,
-    competitorWebsiteSnapshots: latestCompetitorWebsiteSnapshots,
   });
 
-  const { error: deleteError } = await supabase
-    .from("recommendations")
-    .delete()
-    .eq("audit_id", audit.id);
-
-  if (deleteError) {
+  if (!result.success) {
     return redirectTo(
       `/dashboard/audits/${audit.id}/report?error=${encodeURIComponent(
-        deleteError.message
-      )}`,
-      request.url
-    );
-  }
-
-  const { error: insertError } = await supabase.from("recommendations").insert(
-    recommendations.map((recommendation) => ({
-      audit_id: audit.id,
-      ...recommendation,
-    }))
-  );
-
-  if (insertError) {
-    return redirectTo(
-      `/dashboard/audits/${audit.id}/report?error=${encodeURIComponent(
-        insertError.message
+        result.error
       )}`,
       request.url
     );
@@ -183,6 +71,12 @@ const { data: analyses } = await supabase
 
   revalidatePath(`/dashboard/audits/${audit.id}`);
   revalidatePath(`/dashboard/audits/${audit.id}/report`);
+  revalidatePath(
+    `/dashboard/audits/${audit.id}/client-report`
+  );
 
-  return redirectTo(`/dashboard/audits/${audit.id}/report`, request.url);
+  return redirectTo(
+    `/dashboard/audits/${audit.id}/report`,
+    request.url
+  );
 }
