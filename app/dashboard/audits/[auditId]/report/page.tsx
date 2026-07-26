@@ -404,31 +404,26 @@ const { data: analyses } = await supabase
         title={brand.name}
         description="Bu rapor, markanın AI cevaplarında ne kadar görünür olduğunu, rakiplere göre konumunu ve uygulanabilir iyileştirme alanlarını gösterir."
         actions={
-          <div className="flex flex-wrap gap-2 print:hidden">
-            <Button asChild variant="outline">
-              <Link href={`/dashboard/audits/${audit.id}`}>
-                Ölçüm detayına dön
-              </Link>
-            </Button>
+  <div className="flex flex-wrap gap-2 print:hidden">
+    <Button asChild variant="outline">
+      <Link href={`/dashboard/audits/${audit.id}`}>
+        Ölçüm detayına dön
+      </Link>
+    </Button>
 
-            <Button asChild variant="outline">
-              <Link href={`/dashboard/brands/${brand.id}/prompts`}>
-                Yeni ölçüm başlat
-              </Link>
-            </Button>
-            <Button asChild variant="outline">
-              <Link href={`/dashboard/audits/${audit.id}/client-report`}>
-                Müşteri raporu
-              </Link>
-            </Button>
-                          <form action={`/api/audits/${audit.id}/refresh-recommendations`} method="post">
-              <Button type="submit" variant="outline">
-                Önerileri kanıta göre güncelle
-              </Button>
-            </form>
-            <PrintReportButton />
-          </div>
-        }
+    {score ? (
+      <>
+        <Button asChild variant="outline">
+          <Link href={`/dashboard/audits/${audit.id}/client-report`}>
+            Müşteri raporu
+          </Link>
+        </Button>
+
+        <PrintReportButton />
+      </>
+    ) : null}
+  </div>
+}
       />
 
       <div className="flex flex-wrap gap-2">

@@ -97,36 +97,40 @@ export function ReportReadinessPanel({
         />
 
         <CheckRow
-          title="Marka website analizi"
-          description="Markanın kendi web sitesindeki hizmet ve güven sinyalleri analiz edilmeli."
-          isReady={hasBrandWebsiteSnapshot}
-          action={
-            <Button asChild size="sm" variant="outline">
-              <Link href={`/dashboard/brands/${brandId}/website`}>
-                Website analizi
-              </Link>
-            </Button>
-          }
-        />
+  title="Marka web sitesi analizi"
+  description="Markanın web sitesindeki hizmet ve güven sinyalleri analiz edilmeli."
+  isReady={hasBrandWebsiteSnapshot}
+  action={
+    hasBrandWebsiteSnapshot ? null : (
+      <Button asChild size="sm" variant="outline">
+        <Link href={`/dashboard/brands/${brandId}/website`}>
+          Analiz et
+        </Link>
+      </Button>
+    )
+  }
+/>
 
         <CheckRow
-          title="Rakip website analizi"
-          description={`${competitorWebsiteSnapshotCount} rakip için website analizi yapılmış.`}
-          isReady={hasCompetitorWebsiteSnapshots}
-          action={
-            <Button asChild size="sm" variant="outline">
-              <Link href={`/dashboard/brands/${brandId}/competitors/websites`}>
-                Rakip analizleri
-              </Link>
-            </Button>
-          }
-        />
+  title="Rakip web sitesi analizi"
+  description={`${competitorWebsiteSnapshotCount} rakibin web sitesi analiz edildi.`}
+  isReady={hasCompetitorWebsiteSnapshots}
+  action={
+    hasCompetitorWebsiteSnapshots ? null : (
+      <Button asChild size="sm" variant="outline">
+        <Link href={`/dashboard/brands/${brandId}/competitors/websites`}>
+          Analizleri tamamla
+        </Link>
+      </Button>
+    )
+  }
+/>
 
         <CheckRow
           title="Kanıta bağlı öneriler"
           description={
             hasRecommendations
-              ? `${recommendationCount} aksiyon önerisi mevcut. Website ve rakip analizlerinden sonra önerileri tekrar güncelleyebilirsin.`
+              ? `${recommendationCount} öneri mevcut. Web sitesi ve rakip analizlerinden sonra önerileri yenileyebilirsin.`
               : "Henüz aksiyon önerisi yok. Analizleri tamamladıktan sonra önerileri üret."
           }
           isReady={hasRecommendations}
@@ -136,7 +140,7 @@ export function ReportReadinessPanel({
               method="post"
             >
               <Button type="submit" size="sm">
-                Önerileri güncelle
+                {hasRecommendations ? "Önerileri yenile" : "Önerileri oluştur"}
               </Button>
             </form>
           }
@@ -145,8 +149,8 @@ export function ReportReadinessPanel({
         <div className="rounded-xl border bg-background/70 p-4 text-sm leading-6 text-muted-foreground">
           {isStrongReport ? (
             <p>
-              Bu rapor; AI cevap analizi, marka website sinyalleri ve rakip
-              website karşılaştırmasıyla daha güçlü hale getirilmiş durumda.
+             Bu rapor; AI cevap analizi, marka web sitesi sinyalleri ve rakip
+              web sitesi karşılaştırmasıyla güçlendirilmiş durumda.
             </p>
           ) : (
             <p>

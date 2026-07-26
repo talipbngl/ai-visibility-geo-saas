@@ -225,31 +225,15 @@ const nextStepButtonLabel = failedRunCount
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Ölçüm Detayı"
-        title={`${brand?.name ?? "Marka"} ölçümü`}
-        description="Bu ekranda AI cevaplarını, analiz durumunu, skorları ve prompt bazlı sonuçları inceleyebilirsin."
-        actions={
-          <>
-            <Button asChild variant="outline">
-              <Link href="/dashboard/audits">Ölçümlere dön</Link>
-            </Button>
-
-            {brand ? (
-              <Button asChild variant="outline">
-                <Link href={`/dashboard/brands/${brand.id}/prompts`}>
-                  Test sorularına dön
-                </Link>
-              </Button>
-            ) : null}
-
-            <Button asChild>
-              <Link href={`/dashboard/audits/${audit.id}/report`}>
-                Raporu gör
-              </Link>
-            </Button>
-          </>
-        }
-      />
+  eyebrow="Ölçüm detayı"
+  title={`${brand?.name ?? "Marka"} ölçümü`}
+  description="AI cevaplarını, analiz durumunu ve test sorusu bazlı sonuçları incele."
+  actions={
+    <Button asChild variant="outline">
+      <Link href="/dashboard/audits">Ölçümlere dön</Link>
+    </Button>
+  }
+/>
 
       <div className="flex flex-wrap items-center gap-2">
         <StatusBadge status={audit.status} />
