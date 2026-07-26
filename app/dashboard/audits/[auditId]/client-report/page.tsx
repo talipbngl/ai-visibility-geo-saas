@@ -834,6 +834,12 @@ const competitorAverageWebsiteScore = getAverageScore(
                   previousPromptCount={
                     previousAudit?.total_prompts ?? null
                   }
+                  currentPromptTexts={currentPromptResults.map(
+                    (result) => result.promptText
+                  )}
+                  previousPromptTexts={previousPromptResults.map(
+                    (result) => result.promptText
+                  )}
                   previousDate={
                     previousAudit?.created_at ?? null
                   }

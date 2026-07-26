@@ -10,6 +10,8 @@ type AuditChangeSummaryProps = {
   previousScore: AuditScoreSnapshot | null;
   currentPromptCount: number;
   previousPromptCount: number | null;
+  currentPromptTexts: string[];
+  previousPromptTexts: string[];
   previousDate: string | null;
 };
 
@@ -44,7 +46,47 @@ function formatDate(value: string | null) {
     dateStyle: "medium",
   }).format(new Date(value));
 }
+function normalizePromptText(value: string) {
+  return value
+    .trim()
+    .toLocaleLowerCase("tr-TR")
+    .replace(/\s+/g, " ");
+}
 
+function getComparisonReliability(
+  comparablePromptCount: number,
+  coverageRate: number
+) {
+  if (
+    comparablePromptCount >= 5 &&
+    coverageRate >= 80
+  ) {
+    return {
+      level: "high",
+      label: "Yüksek",
+      className:
+        "bg-emerald-50 text-emerald-700",
+    };
+  }
+
+  if (
+    comparablePromptCount >= 3 &&
+    coverageRate >= 50
+  ) {
+    return {
+      level: "medium",
+      label: "Orta",
+      className:
+        "bg-amber-50 text-amber-700",
+    };
+  }
+
+  return {
+    level: "low",
+    label: "Düşük",
+    className: "bg-rose-50 text-rose-700",
+  };
+}
 function getChangeStatus(
   difference: number,
   lowerIsBetter: boolean
@@ -76,9 +118,48 @@ export function AuditChangeSummary({
   previousScore,
   currentPromptCount,
   previousPromptCount,
+  currentPromptTexts,
+  previousPromptTexts,
   previousDate,
 }: AuditChangeSummaryProps) {
   if (!previousScore) return null;
+  const currentPromptKeys = new Set(
+  currentPromptTexts
+    .map(normalizePromptText)
+    .filter(Boolean)
+);
+
+const previousPromptKeys = new Set(
+  previousPromptTexts
+    .map(normalizePromptText)
+    .filter(Boolean)
+);
+
+const comparablePromptCount = Array.from(
+  currentPromptKeys
+).filter((promptKey) =>
+  previousPromptKeys.has(promptKey)
+).length;
+
+const largestPromptSetSize = Math.max(
+  currentPromptKeys.size,
+  previousPromptKeys.size
+);
+
+const comparisonCoverage =
+  largestPromptSetSize > 0
+    ? Math.round(
+        (comparablePromptCount /
+          largestPromptSetSize) *
+          100
+      )
+    : 0;
+
+const comparisonReliability =
+  getComparisonReliability(
+    comparablePromptCount,
+    comparisonCoverage
+  );
 
   const metrics: ComparisonMetric[] = [
     {
@@ -139,6 +220,19 @@ export function AuditChangeSummary({
           Karşılaştırılan önceki ölçüm:{" "}
           {formatDate(previousDate)}
         </p>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+                <span
+                    className={`rounded-full px-3 py-1 text-xs font-medium ${comparisonReliability.className}`}
+                >
+                    Karşılaştırma güveni:{" "}
+                    {comparisonReliability.label}
+                </span>
+
+                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-700">
+                    Ortak soru: {comparablePromptCount}/
+                    {largestPromptSetSize} · %{comparisonCoverage}
+                </span>
+                </div>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -154,12 +248,18 @@ export function AuditChangeSummary({
               : null;
 
           const status =
-            difference !== null
-              ? getChangeStatus(
-                  difference,
-                  Boolean(metric.lowerIsBetter)
-                )
-              : null;
+        difference === null
+            ? null
+            : comparisonReliability.level === "low"
+            ? {
+          label: "Sınırlı veri",
+          className:
+            "bg-amber-50 text-amber-700",
+        }
+      : getChangeStatus(
+          difference,
+          Boolean(metric.lowerIsBetter)
+        );
 
           return (
             <div
@@ -206,15 +306,20 @@ export function AuditChangeSummary({
         })}
       </div>
 
-      {previousPromptCount !== null &&
-      previousPromptCount !== currentPromptCount ? (
-        <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm leading-6 text-amber-800">
-          İki ölçümdeki soru sayısı farklıdır. Güncel ölçümde{" "}
-          {currentPromptCount}, önceki ölçümde{" "}
-          {previousPromptCount} soru kullanılmıştır. Değişimi
-          kesin sonuç yerine yön göstergesi olarak değerlendirin.
-        </p>
-      ) : null}
+     {comparisonReliability.level === "low" ? (
+  <p className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm leading-6 text-rose-800">
+    İki ölçüm arasında yeterli sayıda ortak test sorusu
+    bulunmadığı için skor değişimleri kesin gelişim veya
+    gerileme olarak yorumlanmamalıdır.
+  </p>
+) : previousPromptCount !== null &&
+  previousPromptCount !== currentPromptCount ? (
+  <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm leading-6 text-amber-800">
+    Güncel ölçümde {currentPromptCount}, önceki ölçümde{" "}
+    {previousPromptCount} soru kullanılmıştır. Ortak soru
+    kapsamı dikkate alınarak değerlendirme yapılmalıdır.
+  </p>
+) : null}
     </section>
   );
 }
