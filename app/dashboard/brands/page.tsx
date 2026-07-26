@@ -114,7 +114,7 @@ export default async function BrandsPage() {
                     </p>
                   ) : (
                     <p className="text-sm text-muted-foreground">
-                      Website eklenmedi
+                      Web sitesi eklenmedi
                     </p>
                   )}
 
@@ -141,25 +141,11 @@ export default async function BrandsPage() {
                     </div>
                   </div>
 
-                  <div className="flex flex-wrap gap-2">
-                    <Button asChild variant="outline" size="sm">
-                      <Link href={`/dashboard/brands/${brand.id}`}>
-                        Detay
-                      </Link>
-                    </Button>
-
-                    <Button asChild variant="outline" size="sm">
-                      <Link href={`/dashboard/brands/${brand.id}/competitors`}>
-                        Rakipler
-                      </Link>
-                    </Button>
-
-                    <Button asChild size="sm">
-                      <Link href={`/dashboard/brands/${brand.id}/prompts`}>
-                        Test soruları
-                      </Link>
-                    </Button>
-                  </div>
+                  <Button asChild className="w-full">
+                    <Link href={`/dashboard/brands/${brand.id}`}>
+                      Markayı aç
+                    </Link>
+                  </Button>
                 </CardContent>
               </Card>
             );

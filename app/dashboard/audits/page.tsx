@@ -127,7 +127,7 @@ export default async function AuditsPage() {
                         </div>
 
                         <div className="rounded-lg border p-3">
-                          <p className="text-muted-foreground">Pay</p>
+                          <p className="text-muted-foreground">Görünürlük payı</p>
                           <p className="font-semibold">
                             {score
                               ? `${Math.round(score.share_of_voice)}%`
@@ -137,24 +137,26 @@ export default async function AuditsPage() {
                       </div>
 
                       <div className="flex flex-wrap gap-2">
-                        <form action={`/api/audits/${audit.id}/continue`} method="post">
-                          <Button type="submit" size="sm">
-                            Devam et
-                        </Button>
-                        </form>
+                            {score ? (
+                              <Button asChild size="sm">
+                                <Link href={`/dashboard/audits/${audit.id}/report`}>
+                                  Raporu aç
+                                </Link>
+                              </Button>
+                            ) : (
+                              <form action={`/api/audits/${audit.id}/continue`} method="post">
+                                <Button type="submit" size="sm">
+                                  Ölçüme devam et
+                                </Button>
+                              </form>
+                            )}
 
-                         <Button asChild variant="outline" size="sm">
-                          <Link href={`/dashboard/audits/${audit.id}`}>
-                          Detay
-                          </Link>
-                         </Button>
-
-                         <Button asChild variant="outline" size="sm">
-                          <Link href={`/dashboard/audits/${audit.id}/report`}>
-                            Rapor
-                          </Link>
-                        </Button>
-                      </div>
+                            <Button asChild variant="outline" size="sm">
+                              <Link href={`/dashboard/audits/${audit.id}`}>
+                                Detayı gör
+                              </Link>
+                            </Button>
+                          </div>
                     </div>
                   </div>
                 );
