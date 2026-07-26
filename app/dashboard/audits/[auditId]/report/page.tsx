@@ -5,6 +5,7 @@ import { EvidenceActionSummary } from "@/features/reports/components/EvidenceAct
 import { IntentPerformanceSummary } from "@/features/reports/components/IntentPerformanceSummary";
 import { ThirtyDayActionPlan } from "@/features/reports/components/ThirtyDayActionPlan";
 import { AuditChangeSummary } from "@/features/reports/components/AuditChangeSummary";
+import { PromptVisibilityChanges } from "@/features/reports/components/PromptVisibilityChanges";
 import { CompetitorWebsiteComparison } from "@/features/website/components/CompetitorWebsiteComparison";
 import { ReportReadinessPanel } from "@/features/reports/components/ReportReadinessPanel";
 import { PrintReportButton } from "@/features/reports/components/PrintReportButton";
@@ -349,7 +350,52 @@ const { data: analyses } = await supabase
   `
   )
   .eq("audit_runs.audit_id", audit.id);
+   const previousAnalysesResult = previousAudit
+  ? await supabase
+      .from("analyses")
+      .select(
+        `
+        id,
+        brand_mentioned,
+        brand_rank,
+        audit_runs!inner (
+          audit_id,
+          prompt_text_snapshot,
+          prompts (
+            text
+          )
+        )
+      `
+      )
+      .eq(
+        "audit_runs.audit_id",
+        previousAudit.id
+      )
+  : { data: [] };
 
+const currentPromptResults = (analyses ?? []).map(
+  (analysis) => {
+    const run = getNestedRun(analysis.audit_runs);
+
+    return {
+      promptText: getPromptText(run),
+      mentioned: analysis.brand_mentioned,
+      rank: analysis.brand_rank,
+    };
+  }
+);
+
+const previousPromptResults = (
+  previousAnalysesResult.data ?? []
+).map((analysis) => {
+  const run = getNestedRun(analysis.audit_runs);
+
+  return {
+    promptText: getPromptText(run),
+    mentioned: analysis.brand_mentioned,
+    rank: analysis.brand_rank,
+  };
+});
   const visibilityScore = Number(score?.visibility_score ?? 0);
   const roundedVisibilityScore = Math.round(visibilityScore);
 
@@ -663,6 +709,10 @@ const { data: analyses } = await supabase
               }
             />
           ) : null}
+          <PromptVisibilityChanges
+              currentResults={currentPromptResults}
+              previousResults={previousPromptResults}
+            />
           <WebsiteSignalSummary
             brandId={brand.id}
             brandName={brand.name}

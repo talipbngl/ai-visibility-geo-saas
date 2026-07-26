@@ -4,6 +4,7 @@ import { ClientWebsiteScoreComparison } from "@/features/reports/components/Clie
 import { PrintReportButton } from "@/features/reports/components/PrintReportButton";
 import { ThirtyDayActionPlan } from "@/features/reports/components/ThirtyDayActionPlan";
 import { AuditChangeSummary } from "@/features/reports/components/AuditChangeSummary";
+import { PromptVisibilityChanges } from "@/features/reports/components/PromptVisibilityChanges";
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
 import { CompetitorContentGap } from "@/features/website/components/CompetitorContentGap";
@@ -356,7 +357,52 @@ const { data: analyses } = await supabase
   `
   )
   .eq("audit_runs.audit_id", audit.id);
+const previousAnalysesResult = previousAudit
+  ? await supabase
+      .from("analyses")
+      .select(
+        `
+        id,
+        brand_mentioned,
+        brand_rank,
+        audit_runs!inner (
+          audit_id,
+          prompt_text_snapshot,
+          prompts (
+            text
+          )
+        )
+      `
+      )
+      .eq(
+        "audit_runs.audit_id",
+        previousAudit.id
+      )
+  : { data: [] };
 
+const currentPromptResults = (analyses ?? []).map(
+  (analysis) => {
+    const run = getNestedRun(analysis.audit_runs);
+
+    return {
+      promptText: getPromptText(run),
+      mentioned: analysis.brand_mentioned,
+      rank: analysis.brand_rank,
+    };
+  }
+);
+
+const previousPromptResults = (
+  previousAnalysesResult.data ?? []
+).map((analysis) => {
+  const run = getNestedRun(analysis.audit_runs);
+
+  return {
+    promptText: getPromptText(run),
+    mentioned: analysis.brand_mentioned,
+    rank: analysis.brand_rank,
+  };
+});
   const { data: websiteSnapshots } = await supabase
     .from("brand_website_snapshots")
     .select(
@@ -793,7 +839,10 @@ const competitorAverageWebsiteScore = getAverageScore(
                   }
                 />
               ) : null}
-
+               <PromptVisibilityChanges
+                    currentResults={currentPromptResults}
+                    previousResults={previousPromptResults}
+                  />
               {intentPerformance.length > 0 ? (
             <section>
               <SectionTitle
