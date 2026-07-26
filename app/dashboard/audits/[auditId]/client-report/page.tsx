@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ClientWebsiteScoreComparison } from "@/features/reports/components/ClientWebsiteScoreComparison";
 import { PrintReportButton } from "@/features/reports/components/PrintReportButton";
+import { ThirtyDayActionPlan } from "@/features/reports/components/ThirtyDayActionPlan";
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
 import { CompetitorContentGap } from "@/features/website/components/CompetitorContentGap";
@@ -996,6 +997,9 @@ const competitorAverageWebsiteScore = getAverageScore(
               </p>
             </div>
           </section>
+                    <ThirtyDayActionPlan
+            recommendations={recommendations ?? []}
+          />
           <section>
   <div className="overflow-hidden rounded-[2rem] bg-gradient-to-br from-slate-950 via-indigo-950 to-blue-900 p-7 text-white">
     <div className="grid gap-6 lg:grid-cols-[1.4fr_0.6fr] lg:items-center">
@@ -1005,13 +1009,13 @@ const competitorAverageWebsiteScore = getAverageScore(
         </p>
 
         <h2 className="mt-2 text-3xl font-bold tracking-tight">
-          Bu ön teşhisi detaylı aksiyon planına dönüştürelim
+          30 günlük planı uygulamaya başlayalım
         </h2>
 
         <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-300">
-          Bu rapor bir ön analizdir. Bir sonraki adımda markanın görünmediği
-          sorular, rakiplerin öne çıktığı alanlar ve website içerik eksikleri
-          üzerinden uygulanabilir 30 günlük aksiyon planı çıkarılabilir.
+          Rapordaki 30 günlük plan; öncelikli içerik, web sitesi ve
+          rakip aksiyonlarını uygulanabilir bir sıraya koyar. İlk adım,
+birinci hafta için belirlenen çalışmaları başlatmaktır.
         </p>
       </div>
 

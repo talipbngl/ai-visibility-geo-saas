@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { WebsiteSignalSummary } from "@/features/website/components/WebsiteSignalSummary";
 import { EvidenceActionSummary } from "@/features/reports/components/EvidenceActionSummary";
 import { IntentPerformanceSummary } from "@/features/reports/components/IntentPerformanceSummary";
+import { ThirtyDayActionPlan } from "@/features/reports/components/ThirtyDayActionPlan";
 import { CompetitorWebsiteComparison } from "@/features/website/components/CompetitorWebsiteComparison";
 import { ReportReadinessPanel } from "@/features/reports/components/ReportReadinessPanel";
 import { PrintReportButton } from "@/features/reports/components/PrintReportButton";
@@ -23,12 +24,8 @@ import {
   StatusBadge,
 } from "@/features/ui/components";
 import {
-  getCategoryLabel,
-  getEffortLabel,
-  getImpactLabel,
   getIntentLabel,
   getPriorityLabel,
-  getRecommendationPriorityLabel,
   getSentimentLabel,
 } from "@/lib/ui/labels";
 import { buildIntentPerformance } from "@/lib/reports/intent-performance";
@@ -602,7 +599,10 @@ const { data: analyses } = await supabase
 
       {topRecommendation ? (
         <p className="mt-1 line-clamp-3 text-xs leading-5 text-muted-foreground">
-          {topRecommendation.description}
+          {topRecommendation.description.replace(
+            /\baudit\b/gi,
+            "ölçüm"
+          )}
         </p>
       ) : null}
     </div>
@@ -731,56 +731,9 @@ const { data: analyses } = await supabase
             </section>
           ) : null}
 
-          {recommendations && recommendations.length > 0 ? (
-            <Card className="shadow-sm">
-              <CardHeader>
-                <CardTitle>Aksiyon Planı</CardTitle>
-                <CardDescription>
-                  Görünürlüğü artırmak için uygulanabilir öneriler.
-                </CardDescription>
-              </CardHeader>
-
-              <CardContent>
-                <div className="grid gap-4 md:grid-cols-2">
-                  {recommendations.map((recommendation, index) => (
-                    <div
-                      key={recommendation.id}
-                      className="rounded-xl border p-4"
-                    >
-                      <div className="mb-2 flex flex-wrap gap-2">
-                        <Badge variant="secondary">{index + 1}. öneri</Badge>
-
-                        <Badge variant="outline">
-                          {getCategoryLabel(recommendation.category)}
-                        </Badge>
-
-                        <Badge variant="outline">
-                          Öncelik:{" "}
-                          {getRecommendationPriorityLabel(
-                            recommendation.priority
-                          )}
-                        </Badge>
-
-                        <Badge variant="outline">
-                          Etki: {getImpactLabel(recommendation.impact)}
-                        </Badge>
-
-                        <Badge variant="outline">
-                          Efor: {getEffortLabel(recommendation.effort)}
-                        </Badge>
-                      </div>
-
-                      <p className="font-medium">{recommendation.title}</p>
-                      <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                        {recommendation.description}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          ) : null}
-
+          <ThirtyDayActionPlan
+              recommendations={recommendations ?? []}
+            />
           <section className="grid gap-6 lg:grid-cols-2">
             <Card className="shadow-sm">
               <CardHeader>
