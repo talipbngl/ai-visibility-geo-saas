@@ -5,6 +5,8 @@ import { PrintReportButton } from "@/features/reports/components/PrintReportButt
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
 import { CompetitorContentGap } from "@/features/website/components/CompetitorContentGap";
+import { buildIntentPerformance } from "@/lib/reports/intent-performance";
+import { getIntentLabel } from "@/lib/ui/labels";
 export const metadata = {
   title: "AI Görünürlük Ön Teşhis Raporu",
 };
@@ -83,6 +85,15 @@ function getPromptText(run: NestedRun | null) {
   const prompt = getNestedPrompt(run);
 
   return prompt?.text ?? "Test sorusu bulunamadı";
+}
+function getPromptIntent(run: NestedRun | null) {
+  if (run?.prompt_intent_snapshot) {
+    return run.prompt_intent_snapshot;
+  }
+
+  const prompt = getNestedPrompt(run);
+
+  return prompt?.intent ?? null;
 }
 function getAverageScore(values: number[]) {
   if (values.length === 0) return null;
@@ -415,6 +426,38 @@ created_at: snapshot.created_at,
 
   const invisibleAnalyses =
     analyses?.filter((analysis) => !analysis.brand_mentioned) ?? [];
+      const intentPerformance = buildIntentPerformance(
+    (analyses ?? []).map((analysis) => {
+      const run = getNestedRun(analysis.audit_runs);
+
+      return {
+        intent: getPromptIntent(run),
+        brandMentioned: analysis.brand_mentioned,
+        brandRank: analysis.brand_rank,
+      };
+    })
+  );
+
+  const comparableIntents = intentPerformance.filter(
+    (item) => item.total >= 2
+  );
+
+  const strongestIntent =
+    [...comparableIntents].sort(
+      (first, second) =>
+        second.visibilityRate - first.visibilityRate
+    )[0] ?? null;
+
+  const weakestIntent =
+    [...comparableIntents].sort(
+      (first, second) =>
+        first.visibilityRate - second.visibilityRate
+    )[0] ?? null;
+
+  const hasIntentDifference =
+    strongestIntent !== null &&
+    weakestIntent !== null &&
+    strongestIntent.visibilityRate !== weakestIntent.visibilityRate;
 
   const competitorStatsMap = new Map<
     string,
@@ -695,7 +738,113 @@ const competitorAverageWebsiteScore = getAverageScore(
               ))}
             </div>
           </section>
+          {intentPerformance.length > 0 ? (
+            <section>
+              <SectionTitle
+                eyebrow="Ek analiz · Soru niyetleri"
+                title="Marka hangi kullanıcı ihtiyaçlarında görünür?"
+                description="Markanın satın alma, karşılaştırma, yerel öneri ve diğer kullanıcı niyetlerindeki görünürlüğünü gösterir."
+              />
 
+              <div className="grid gap-4 md:grid-cols-2">
+                {intentPerformance.map((item) => {
+                  const isStrongest =
+                    hasIntentDifference &&
+                    strongestIntent?.intent === item.intent;
+
+                  const isWeakest =
+                    hasIntentDifference &&
+                    weakestIntent?.intent === item.intent;
+
+                  return (
+                    <div
+                      key={item.intent}
+                      className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm"
+                    >
+                      <div className="flex items-start justify-between gap-4">
+                        <div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h3 className="font-semibold text-slate-950">
+                              {getIntentLabel(item.intent)}
+                            </h3>
+
+                            {isStrongest ? (
+                              <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-200">
+                                En güçlü alan
+                              </span>
+                            ) : null}
+
+                            {isWeakest ? (
+                              <span className="rounded-full bg-rose-50 px-3 py-1 text-xs font-semibold text-rose-700 ring-1 ring-rose-200">
+                                Gelişim alanı
+                              </span>
+                            ) : null}
+
+                            {item.total < 3 ? (
+                              <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-medium text-amber-700 ring-1 ring-amber-200">
+                                Az veri
+                              </span>
+                            ) : null}
+                          </div>
+
+                          <p className="mt-2 text-sm text-slate-600">
+                            {item.mentionCount}/{item.total} soruda görünür
+                          </p>
+                        </div>
+
+                        <div className="text-right">
+                          <p className="text-3xl font-bold text-slate-950">
+                            %{item.visibilityRate}
+                          </p>
+
+                          <p className="mt-1 text-xs text-slate-500">
+                            Ortalama sıra: {item.averageRank ?? "-"}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="mt-5 h-2 overflow-hidden rounded-full bg-slate-100">
+                        <div
+                          className={
+                            item.visibilityRate >= 75
+                              ? "h-full rounded-full bg-emerald-500"
+                              : item.visibilityRate >= 50
+                                ? "h-full rounded-full bg-blue-500"
+                                : item.visibilityRate >= 25
+                                  ? "h-full rounded-full bg-amber-500"
+                                  : "h-full rounded-full bg-rose-500"
+                          }
+                          style={{
+                            width: `${item.visibilityRate}%`,
+                          }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {hasIntentDifference && weakestIntent ? (
+                <div className="mt-5 rounded-3xl border border-rose-200 bg-rose-50 p-5">
+                  <p className="font-semibold text-rose-900">
+                    Öncelikli görünürlük alanı
+                  </p>
+
+                  <p className="mt-2 text-sm leading-6 text-rose-800">
+                    {getIntentLabel(weakestIntent.intent)} sorularında marka
+                    görünürlüğü %{weakestIntent.visibilityRate}. Bu kullanıcı
+                    ihtiyacına özel hizmet sayfası, karşılaştırma içeriği veya
+                    sık sorulan sorular bölümü hazırlanmalıdır.
+                  </p>
+                </div>
+              ) : null}
+
+              <p className="mt-4 text-xs leading-5 text-slate-500">
+                Üçten az sorusu bulunan niyetler sınırlı veri olarak
+                değerlendirilmelidir.
+              </p>
+            </section>
+          ) : null}
           <section className="print:break-after-page">
             <SectionTitle
               eyebrow="02 - Rakip Görünürlüğü"
