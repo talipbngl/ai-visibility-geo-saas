@@ -1,49 +1,39 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
-
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { DashboardNavigation } from "@/features/dashboard/components/DashboardNavigation";
 import { isPlatformAdmin } from "@/lib/auth/platform-admin";
 import { createClient } from "@/lib/supabase/server";
-
 type DashboardLayoutProps = {
   children: ReactNode;
 };
-
 const memberNavigationItems = [
   {
-    label: "Genel Bakış",
+    label: "Genel bakış",
     href: "/dashboard",
-    description: "Ana panel",
   },
   {
     label: "Markalar",
     href: "/dashboard/brands",
-    description: "Marka ve rakip yönetimi",
   },
   {
     label: "Ölçümler",
     href: "/dashboard/audits",
-    description: "Ölçümler ve raporlar",
   },
   {
     label: "Ayarlar",
     href: "/dashboard/settings",
-    description: "Hesap ve çalışma alanı",
   },
 ];
 
 const adminNavigationItems = [
   {
-    label: "Sistem Kontrolü",
+    label: "Sistem kontrolü",
     href: "/dashboard/health",
-    description: "Yayın ve servis durumu",
   },
   {
-    label: "Rapor Talepleri",
+    label: "Rapor talepleri",
     href: "/dashboard/leads",
-    description: "Herkese açık formdan gelen talepler",
   },
 ];
 
@@ -83,38 +73,18 @@ export default async function DashboardLayout({
       <div className="flex min-h-screen">
         <aside className="hidden w-72 border-r bg-background/95 px-4 py-5 shadow-sm md:flex md:flex-col">
           <div className="rounded-2xl border bg-muted/30 p-4">
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              AI Görünürlük
-            </p>
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                AI görünürlük
+              </p>
 
-            <h1 className="mt-1 text-lg font-semibold tracking-tight">
-              Marka Takip Paneli
-            </h1>
-
-            <p className="mt-2 text-xs leading-5 text-muted-foreground">
-              Markalarının AI cevaplarında ne kadar göründüğünü ölç, rakiplerle
-              karşılaştır ve raporla.
-            </p>
-          </div>
-
-          <nav className="mt-6 space-y-2">
-            {navigationItems.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className="block rounded-xl border border-transparent px-4 py-3 transition hover:border-border hover:bg-muted/50"
-              >
-                <p className="text-sm font-medium">
-                  {item.label}
-                </p>
-
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {item.description}
-                </p>
-              </Link>
-            ))}
-          </nav>
-
+              <h1 className="mt-1 text-lg font-semibold tracking-tight">
+                Marka takip paneli
+              </h1>
+            </div>
+          <DashboardNavigation
+              items={navigationItems}
+              variant="desktop"
+            />
           <div className="mt-auto space-y-4 rounded-2xl border bg-muted/20 p-4">
             <div>
               <p className="text-xs text-muted-foreground">
@@ -125,10 +95,6 @@ export default async function DashboardLayout({
                 {user.email}
               </p>
             </div>
-
-            <Badge variant="secondary">
-              Beta sürümü
-            </Badge>
 
             <form action={signOut}>
               <Button
@@ -166,20 +132,10 @@ export default async function DashboardLayout({
               </form>
             </div>
 
-            <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
-              {navigationItems.map((item) => (
-                <Button
-                  key={item.href}
-                  asChild
-                  variant="outline"
-                  size="sm"
-                >
-                  <Link href={item.href}>
-                    {item.label}
-                  </Link>
-                </Button>
-              ))}
-            </div>
+           <DashboardNavigation
+              items={navigationItems}
+              variant="mobile"
+            />
           </header>
 
           <main className="flex-1">
