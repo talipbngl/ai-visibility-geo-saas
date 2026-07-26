@@ -9,10 +9,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import {
-  MetricCard,
-  PageHeader,
-} from "@/features/ui/components";
+import { PageHeader } from "@/features/ui/components";
 import { createClient } from "@/lib/supabase/server";
 
 type GeminiUsage = {
@@ -47,31 +44,6 @@ function formatDate(
   ).format(new Date(value));
 }
 
-function maskEmail(
-  email: string | undefined
-) {
-  if (!email) {
-    return "-";
-  }
-
-  const [name, domain] =
-    email.split("@");
-
-  if (!name || !domain) {
-    return email;
-  }
-
-  const visibleName =
-    name.slice(0, 2);
-
-  const maskedName =
-    `${visibleName}${"*".repeat(
-      Math.max(name.length - 2, 3)
-    )}`;
-
-  return `${maskedName}@${domain}`;
-}
-
 function getDailyGeminiPromptLimit() {
   const configuredLimit = Number(
     process.env
@@ -104,7 +76,7 @@ export default async function SettingsPage() {
     ? await supabase
         .from("profiles")
         .select(
-          "id, email, full_name, created_at"
+          "email, full_name, created_at"
         )
         .eq("id", user.id)
         .maybeSingle()
@@ -114,7 +86,7 @@ export default async function SettingsPage() {
     await supabase
       .from("workspaces")
       .select(
-        "id, name, slug, created_at"
+        "id, name, created_at"
       )
       .order("created_at", {
         ascending: true,
@@ -123,41 +95,6 @@ export default async function SettingsPage() {
 
   const activeWorkspace =
     workspaces?.[0];
-
-  const [
-    brandResult,
-    auditResult,
-    promptResult,
-    competitorResult,
-  ] = await Promise.all([
-    supabase
-      .from("brands")
-      .select("id", {
-        count: "exact",
-        head: true,
-      }),
-
-    supabase
-      .from("audits")
-      .select("id", {
-        count: "exact",
-        head: true,
-      }),
-
-    supabase
-      .from("prompts")
-      .select("id", {
-        count: "exact",
-        head: true,
-      }),
-
-    supabase
-      .from("competitors")
-      .select("id", {
-        count: "exact",
-        head: true,
-      }),
-  ]);
 
   const dailyLimit =
     getDailyGeminiPromptLimit();
@@ -283,20 +220,12 @@ export default async function SettingsPage() {
         ? "bg-amber-500"
         : "bg-emerald-500";
 
-  const hasGeminiKey = Boolean(
-    process.env.GEMINI_API_KEY
-  );
-
-  const geminiModel =
-    process.env.GEMINI_MODEL ??
-    "gemini-3.1-flash-lite";
-
   return (
     <div className="space-y-6">
       <PageHeader
         eyebrow="Ayarlar"
         title="Hesap ve çalışma alanı"
-        description="Hesap bilgilerini, çalışma alanı özetini ve sistem durumunu buradan kontrol edebilirsin."
+        description="Hesap bilgilerini, çalışma alanını ve günlük yapay zekâ kullanımını kontrol et."
         actions={
           <Button
             asChild
@@ -309,47 +238,12 @@ export default async function SettingsPage() {
         }
       />
 
-      <section className="grid gap-4 md:grid-cols-4">
-        <MetricCard
-          title="Markalar"
-          description="Takip edilen toplam marka"
-          value={
-            brandResult.count ?? 0
-          }
-        />
-
-        <MetricCard
-          title="Rakipler"
-          description="Tanımlanan toplam rakip"
-          value={
-            competitorResult.count ??
-            0
-          }
-        />
-
-        <MetricCard
-          title="Test Soruları"
-          description="Oluşturulan toplam soru"
-          value={
-            promptResult.count ?? 0
-          }
-        />
-
-        <MetricCard
-          title="Ölçümler"
-          description="Başlatılan toplam ölçüm"
-          value={
-            auditResult.count ?? 0
-          }
-        />
-      </section>
-
       <Card className="border-primary/20 shadow-sm">
         <CardHeader>
           <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
             <div>
               <CardTitle>
-                Günlük Gemini Kullanımı
+                  Günlük yapay zekâ kullanımı
               </CardTitle>
 
               <CardDescription className="mt-1">
@@ -529,16 +423,6 @@ export default async function SettingsPage() {
 
             <div className="rounded-xl border p-4">
               <p className="text-sm text-muted-foreground">
-                Kullanıcı kimliği
-              </p>
-
-              <p className="mt-1 break-all text-sm font-medium">
-                {user?.id ?? "-"}
-              </p>
-            </div>
-
-            <div className="rounded-xl border p-4">
-              <p className="text-sm text-muted-foreground">
                 Kayıt tarihi
               </p>
 
@@ -577,17 +461,6 @@ export default async function SettingsPage() {
 
             <div className="rounded-xl border p-4">
               <p className="text-sm text-muted-foreground">
-                Sistem kısa adı
-              </p>
-
-              <p className="mt-1 font-medium">
-                {activeWorkspace?.slug ??
-                  "-"}
-              </p>
-            </div>
-
-            <div className="rounded-xl border p-4">
-              <p className="text-sm text-muted-foreground">
                 Oluşturulma
               </p>
 
@@ -595,133 +468,6 @@ export default async function SettingsPage() {
                 {formatDate(
                   activeWorkspace?.created_at
                 )}
-              </p>
-            </div>
-
-            <div className="rounded-xl border bg-muted/20 p-4">
-              <p className="font-medium">
-                Kullanım yapısı
-              </p>
-
-              <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                Şu anda tek kullanıcı
-                odaklı çalışma alanı
-                kullanılıyor. Ekip ve rol
-                yönetimi sonraki aşamada
-                genişletilecek.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      </section>
-
-      <section className="grid gap-6 lg:grid-cols-2">
-        <Card className="shadow-sm">
-          <CardHeader>
-            <CardTitle>
-              Sistem Durumu
-            </CardTitle>
-
-            <CardDescription>
-              Kritik servislerin kısa
-              kontrolü.
-            </CardDescription>
-          </CardHeader>
-
-          <CardContent className="space-y-3">
-            <div className="flex items-center justify-between gap-3 rounded-xl border p-4">
-              <div>
-                <p className="font-medium">
-                  Supabase
-                </p>
-
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Kimlik doğrulama, veritabanı ve erişim bağlantısı.
-                </p>
-              </div>
-
-              <Badge variant="secondary">
-                Aktif
-              </Badge>
-            </div>
-
-            <div className="flex items-center justify-between gap-3 rounded-xl border p-4">
-              <div>
-                <p className="font-medium">
-                  Gemini API
-                </p>
-
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Yapay zekâ cevapları ve test sorusu üretimi.
-                </p>
-              </div>
-
-              <Badge
-                variant={
-                  hasGeminiKey
-                    ? "secondary"
-                    : "destructive"
-                }
-              >
-                {hasGeminiKey
-                  ? "Tanımlı"
-                  : "Eksik"}
-              </Badge>
-            </div>
-
-            <div className="rounded-xl border p-4">
-              <p className="text-sm text-muted-foreground">
-                Aktif model
-              </p>
-
-              <p className="mt-1 font-medium">
-                {geminiModel}
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="shadow-sm">
-          <CardHeader>
-            <CardTitle>
-              Güvenlik Notları
-            </CardTitle>
-
-            <CardDescription>
-              Uygulama için önemli güvenlik kontrolleri.
-            </CardDescription>
-          </CardHeader>
-
-          <CardContent className="space-y-3">
-            <div className="rounded-xl border p-4">
-              <p className="font-medium">
-                Ortam değişkenleri dosyası
-              </p>
-
-              <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                <code>.env.local</code>{" "}
-                GitHub’a gönderilmemeli.
-              </p>
-            </div>
-
-            <div className="rounded-xl border p-4">
-              <p className="font-medium">
-                Gizli bilgiler
-              </p>
-
-              <p className="mt-1 text-sm leading-6 text-muted-foreground">
-               API anahtarı değerleri gösterilmez. Yalnızca tanımlı olup olmadığı kontrol edilir.
-              </p>
-            </div>
-
-            <div className="rounded-xl border p-4">
-              <p className="font-medium">
-                Kullanıcı e-postası
-              </p>
-
-              <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                Maskeli görünüm:{" "}
-                {maskEmail(user?.email)}
               </p>
             </div>
           </CardContent>
