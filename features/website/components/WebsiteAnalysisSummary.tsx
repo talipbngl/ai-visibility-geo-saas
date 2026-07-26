@@ -656,7 +656,7 @@ const importantIssues = unifiedActions
     strengths.push({
       title: "İçerik kapsamı güçlü",
       description:
-        "Ana sayfa markayı ve sunduğu hizmetleri yeterli seviyede açıklıyor.",
+         "İncelenen sayfalar markayı ve sunduğu hizmetleri yeterli seviyede açıklıyor.",
     });
   }
 
@@ -773,7 +773,6 @@ const importantIssues = unifiedActions
           </div>
         </CardContent>
       </Card>
-
       <section className="grid gap-6 lg:grid-cols-[1.3fr_0.7fr]">
               <Card className="shadow-sm">
                 <CardHeader>
@@ -963,7 +962,7 @@ const importantIssues = unifiedActions
         <CardHeader>
           <CardTitle>Kısa içerik özeti</CardTitle>
           <CardDescription>
-            Ana sayfadan çıkarılan temel bilgiler.
+              İncelenen sayfalardan çıkarılan temel bilgiler.
           </CardDescription>
         </CardHeader>
 

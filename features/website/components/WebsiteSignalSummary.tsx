@@ -26,6 +26,7 @@ type WebsiteSnapshot = {
   content_score: number | null;
   service_signals_json: unknown;
   trust_signals_json: unknown;
+  technical_signals_json: unknown;
   created_at: string | null;
 };
 
@@ -52,7 +53,28 @@ function toSignalArray(value: unknown): Signal[] {
     })
     .filter((item): item is Signal => Boolean(item?.keyword));
 }
+function toRecord(value: unknown): Record<string, unknown> {
+  if (
+    !value ||
+    typeof value !== "object" ||
+    Array.isArray(value)
+  ) {
+    return {};
+  }
 
+  return value as Record<string, unknown>;
+}
+
+function getNumber(
+  record: Record<string, unknown>,
+  key: string
+) {
+  const value = Number(record[key] ?? 0);
+
+  return Number.isFinite(value)
+    ? Math.round(value)
+    : 0;
+}
 function formatDate(value: string | null) {
   if (!value) return "-";
 
@@ -95,22 +117,23 @@ export function WebsiteSignalSummary({
     return (
       <Card className="border-dashed shadow-sm">
         <CardHeader>
-          <CardTitle>Website Sinyalleri</CardTitle>
+          <CardTitle>Web Sitesi Sinyalleri</CardTitle>
           <CardDescription>
-            Bu rapora bağlı website analizi henüz yapılmamış.
+            Bu rapora bağlı web site analizi henüz yapılmamış.
           </CardDescription>
         </CardHeader>
 
         <CardContent className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
           <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
             Marka görünürlüğünün neden güçlü veya zayıf olduğunu daha iyi
-            yorumlamak için website analizi yap. Bu analiz ana sayfadaki başlık,
-            metin, hizmet kelimeleri ve güven sinyallerini çıkarır.
+            yorumlamak için web sitesi analizi yap. Analiz; ana sayfa ve
+            erişilebilen önemli alt sayfalardaki teknik, içerik ve güven
+            sinyallerini birlikte değerlendirir.
           </p>
 
           <Button asChild variant="outline">
             <Link href={`/dashboard/brands/${brandId}/website`}>
-              Website analizine git
+              Web sitesi analizine git
             </Link>
           </Button>
         </CardContent>
@@ -121,13 +144,27 @@ export function WebsiteSignalSummary({
   const contentScore = Math.round(Number(snapshot.content_score ?? 0));
   const serviceSignals = toSignalArray(snapshot.service_signals_json);
   const trustSignals = toSignalArray(snapshot.trust_signals_json);
+  const technicalSignals = toRecord(
+    snapshot.technical_signals_json
+  );
 
+  const pagesAnalyzed = Math.max(
+    getNumber(technicalSignals, "pagesAnalyzed"),
+    1
+  );
+
+  const pagesFailed = getNumber(
+    technicalSignals,
+    "pagesFailed"
+  );
   const foundServiceSignals = serviceSignals.filter((signal) => signal.found);
   const missingServiceSignals = serviceSignals.filter((signal) => !signal.found);
 
   const foundTrustSignals = trustSignals.filter((signal) => signal.found);
   const missingTrustSignals = trustSignals.filter((signal) => !signal.found);
-
+  const totalFoundSignals =
+  foundServiceSignals.length +
+  foundTrustSignals.length;
   return (
     <Card className="shadow-sm">
       <CardHeader>
@@ -150,31 +187,36 @@ export function WebsiteSignalSummary({
 
       <CardContent className="space-y-6">
         <section className="grid gap-4 md:grid-cols-4">
-          <MetricCard
-            title="Website Skoru"
-            description="Temel içerik sinyali"
-            value={`${contentScore}/100`}
-            footer={getScoreLabel(contentScore)}
-          />
+  <MetricCard
+    title="Web Sitesi Puanı"
+    description="Genel analiz sonucu"
+    value={`${contentScore}/100`}
+    footer={getScoreLabel(contentScore)}
+  />
 
-          <MetricCard
-            title="Kelime Sayısı"
-            description="Ana sayfa metni"
-            value={snapshot.word_count ?? "-"}
-          />
+  <MetricCard
+    title="İncelenen Sayfa"
+    description="Ana sayfa ve önemli alt sayfalar"
+    value={pagesAnalyzed}
+    footer={
+      pagesFailed > 0
+        ? `${pagesFailed} sayfa alınamadı`
+        : "Tarama tamamlandı"
+    }
+  />
 
-          <MetricCard
-            title="Bulunan Hizmet Sinyali"
-            description="Sektörel kelimeler"
-            value={foundServiceSignals.length}
-          />
+  <MetricCard
+    title="Toplam Kelime"
+    description="İncelenen sayfalardaki içerik"
+    value={snapshot.word_count ?? "-"}
+  />
 
-          <MetricCard
-            title="Bulunan Güven Sinyali"
-            description="Güven unsurları"
-            value={foundTrustSignals.length}
-          />
-        </section>
+  <MetricCard
+    title="Bulunan Sinyal"
+    description="Hizmet ve güven sinyalleri"
+    value={totalFoundSignals}
+  />
+</section>
 
         <div className="rounded-xl border bg-muted/20 p-4">
           <p className="text-sm font-medium">Yorum</p>
@@ -266,10 +308,12 @@ export function WebsiteSignalSummary({
         <div className="rounded-xl border bg-background p-4">
           <p className="text-sm font-medium">Metodoloji notu</p>
           <p className="mt-1 text-sm leading-6 text-muted-foreground">
-            Website analizi bu MVP sürümünde ana sayfa HTML’i üzerinden yapılır.
-            Site içi tüm sayfalar, Google yorumları, backlinkler veya teknik SEO
-            detayları bu analiz kapsamına dahil değildir. Bu nedenle sonuçlar
-            kesin SEO teşhisi değil, içerik sinyali ön değerlendirmesidir.
+           Web sitesi analizi; ana sayfa ile erişilebilen önemli alt
+            sayfalardan en fazla 6 sayfayı inceler. Robots.txt, sitemap,
+            indekslenebilirlik, başlıklar, meta açıklamaları, canonical
+            adresleri, yapısal veri ve AI tarayıcı erişimi değerlendirilir.
+            Google sıralaması, backlinkler, kullanıcı yorumları ve arama
+            motorlarındaki kesin indeks durumu doğrudan ölçülmez.
           </p>
         </div>
       </CardContent>

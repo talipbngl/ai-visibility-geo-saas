@@ -211,9 +211,10 @@ export default async function WebsiteAnalysisPage({
 
             <div className="rounded-xl border bg-muted/20 p-4">
               <p className="text-sm leading-6 text-muted-foreground">
-                Bu analiz yalnızca ana sayfadan erişilebilen
-                sinyalleri değerlendirir. Google sıralaması veya
-                kesin indeks durumu hakkında garanti vermez.
+                Bu analiz ana sayfa ve seçilen önemli alt sayfalardaki
+                teknik, içerik ve güven sinyallerini değerlendirir.
+                Google sıralaması veya arama motorlarındaki kesin indeks
+                durumu doğrudan ölçülmez.
               </p>
             </div>
           </>
@@ -239,8 +240,7 @@ export default async function WebsiteAnalysisPage({
       ) : (
         <EmptyState
           title="Henüz web sitesi analizi yok"
-          description="Markanın ana sayfasındaki teknik, içerik ve güven sinyallerini ücretsiz olarak analiz edin."
-          action={
+          description="Markanın ana sayfa ve önemli alt sayfalarındaki teknik, içerik ve güven sinyallerini ücretsiz olarak analiz edin."          action={
             <form
               action={`/api/brands/${brand.id}/website-analysis`}
               method="post"
