@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { ClientWebsiteScoreComparison } from "@/features/reports/components/ClientWebsiteScoreComparison";
 import { PrintReportButton } from "@/features/reports/components/PrintReportButton";
 import { ThirtyDayActionPlan } from "@/features/reports/components/ThirtyDayActionPlan";
+import { AuditChangeSummary } from "@/features/reports/components/AuditChangeSummary";
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
 import { CompetitorContentGap } from "@/features/website/components/CompetitorContentGap";
@@ -280,7 +281,46 @@ export default async function ClientReportPage({
     )
     .eq("audit_id", audit.id)
     .maybeSingle();
+const { data: previousAuditRows } = await supabase
+  .from("audits")
+  .select("id, total_prompts, created_at")
+  .eq("brand_id", brand.id)
+  .eq("status", "completed")
+  .lt("created_at", audit.created_at)
+  .order("created_at", { ascending: false })
+  .limit(10);
 
+const previousAuditIds = (previousAuditRows ?? []).map(
+  (previousAudit) => previousAudit.id
+);
+
+const previousScoreResult =
+  previousAuditIds.length > 0
+    ? await supabase
+        .from("audit_scores")
+        .select(
+          "audit_id, visibility_score, share_of_voice, average_rank, positive_sentiment_rate"
+        )
+        .in("audit_id", previousAuditIds)
+    : { data: [] };
+
+const previousScoreByAuditId = new Map(
+  (previousScoreResult.data ?? []).map(
+    (previousScoreItem) => [
+      previousScoreItem.audit_id,
+      previousScoreItem,
+    ]
+  )
+);
+
+const previousAudit =
+  (previousAuditRows ?? []).find((previousAuditItem) =>
+    previousScoreByAuditId.has(previousAuditItem.id)
+  ) ?? null;
+
+const previousScore = previousAudit
+  ? previousScoreByAuditId.get(previousAudit.id) ?? null
+  : null;
   const { data: recommendations } = await supabase
     .from("recommendations")
     .select("id, category, title, description, priority, effort, impact")
@@ -739,7 +779,22 @@ const competitorAverageWebsiteScore = getAverageScore(
               ))}
             </div>
           </section>
-          {intentPerformance.length > 0 ? (
+
+              {score ? (
+                <AuditChangeSummary
+                  currentScore={score}
+                  previousScore={previousScore}
+                  currentPromptCount={audit.total_prompts}
+                  previousPromptCount={
+                    previousAudit?.total_prompts ?? null
+                  }
+                  previousDate={
+                    previousAudit?.created_at ?? null
+                  }
+                />
+              ) : null}
+
+              {intentPerformance.length > 0 ? (
             <section>
               <SectionTitle
                 eyebrow="Ek analiz · Soru niyetleri"
