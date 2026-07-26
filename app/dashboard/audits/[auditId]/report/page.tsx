@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { WebsiteSignalSummary } from "@/features/website/components/WebsiteSignalSummary";
 import { EvidenceActionSummary } from "@/features/reports/components/EvidenceActionSummary";
+import { IntentPerformanceSummary } from "@/features/reports/components/IntentPerformanceSummary";
 import { CompetitorWebsiteComparison } from "@/features/website/components/CompetitorWebsiteComparison";
 import { ReportReadinessPanel } from "@/features/reports/components/ReportReadinessPanel";
 import { PrintReportButton } from "@/features/reports/components/PrintReportButton";
@@ -324,6 +325,65 @@ const { data: analyses } = await supabase
 
   const invisibleAnalyses =
     analyses?.filter((analysis) => !analysis.brand_mentioned) ?? [];
+      const intentPerformanceMap = new Map<
+    string,
+    {
+      intent: string;
+      total: number;
+      mentionCount: number;
+      rankSum: number;
+      rankCount: number;
+    }
+  >();
+
+  (analyses ?? []).forEach((analysis) => {
+    const run = getNestedRun(analysis.audit_runs);
+    const intent = getPromptIntent(run) ?? "other";
+
+    const current = intentPerformanceMap.get(intent) ?? {
+      intent,
+      total: 0,
+      mentionCount: 0,
+      rankSum: 0,
+      rankCount: 0,
+    };
+
+    current.total += 1;
+
+    if (analysis.brand_mentioned) {
+      current.mentionCount += 1;
+
+      if (
+        typeof analysis.brand_rank === "number" &&
+        analysis.brand_rank > 0
+      ) {
+        current.rankSum += analysis.brand_rank;
+        current.rankCount += 1;
+      }
+    }
+
+    intentPerformanceMap.set(intent, current);
+  });
+
+  const intentPerformance = Array.from(intentPerformanceMap.values())
+    .map((item) => ({
+      intent: item.intent,
+      total: item.total,
+      mentionCount: item.mentionCount,
+      visibilityRate:
+        item.total > 0
+          ? Math.round((item.mentionCount / item.total) * 100)
+          : 0,
+      averageRank:
+        item.rankCount > 0
+          ? Math.round((item.rankSum / item.rankCount) * 10) / 10
+          : null,
+    }))
+    .sort(
+      (a, b) =>
+        b.total - a.total ||
+        b.visibilityRate - a.visibilityRate
+    );
 
   const competitorStatsMap = new Map<
     string,
@@ -633,6 +693,7 @@ const { data: analyses } = await supabase
   competitorWebsiteSnapshots={latestCompetitorWebsiteSnapshots}
   recommendations={recommendations ?? []}
 />
+<IntentPerformanceSummary items={intentPerformance} />
           {competitorStats.length > 0 ? (
             <Card className="shadow-sm">
               <CardHeader>
