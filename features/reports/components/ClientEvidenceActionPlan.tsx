@@ -93,11 +93,11 @@ function EvidenceCard({
 
         <p>
           <span className="font-semibold text-slate-950">
-            Görünen rakipler:
+            Takip edilen rakip eşleşmesi:
           </span>{" "}
           {item.mentionedCompetitors.length > 0
             ? item.mentionedCompetitors.join(", ")
-            : "Belirgin rakip yok"}
+            : "Yok"}
         </p>
       </div>
     </article>
@@ -221,7 +221,7 @@ export function ClientEvidenceActionPlan({
   return (
     <>
       {evidenceItems.length > 0 ? (
-        <section className="report-page">
+        <section>
           <div className="mb-5">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-indigo-600">
               03 - Kararı Destekleyen Kanıtlar

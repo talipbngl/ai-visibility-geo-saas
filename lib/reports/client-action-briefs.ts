@@ -56,6 +56,161 @@ export type ClientReportBriefs = {
   actionBriefs: ClientActionBrief[];
 };
 
+const reportIntents = [
+  "buying_intent",
+  "comparison",
+  "local_recommendation",
+  "problem_solution",
+  "alternative_search",
+  "budget_friendly",
+  "premium_choice",
+  "trust_reputation",
+] as const;
+
+type ReportIntent = (typeof reportIntents)[number];
+
+function includesAny(value: string, terms: string[]) {
+  return terms.some((term) => value.includes(term));
+}
+
+export function resolveReportIntent(
+  promptText: string,
+  storedIntent: string | null | undefined
+): string | null {
+  const normalizedPrompt = normalizeWhitespace(promptText)
+    .toLocaleLowerCase("tr-TR");
+
+  if (
+    includesAny(normalizedPrompt, [
+      "uygun fiyat",
+      "en ucuz",
+      "ekonomik",
+      "bütçe",
+      "fiyat performans",
+      "fiyat/performans",
+    ])
+  ) {
+    return "budget_friendly";
+  }
+
+  if (
+    includesAny(normalizedPrompt, [
+      "karşılaştır",
+      "karşılaştırma",
+      "arasındaki fark",
+      "farkı nedir",
+      "hangisi daha",
+      "hangisini seç",
+      "versus",
+      " vs ",
+    ])
+  ) {
+    return "comparison";
+  }
+
+  if (
+    includesAny(normalizedPrompt, [
+      "satın al",
+      "almak için",
+      "sipariş",
+      "paket kahve",
+      "kahve çekirdeği",
+      "ürün seç",
+      "hangi ürün",
+      "hangi paket",
+    ])
+  ) {
+    return "buying_intent";
+  }
+
+  if (
+    includesAny(normalizedPrompt, [
+      "istanbul",
+      "ankara",
+      "izmir",
+      "adana",
+      "bursa",
+      "antalya",
+      "diyarbakır",
+      "gaziantep",
+      "konya",
+      "yakınımda",
+      "yakınlarda",
+      "hangi semt",
+      "hangi şehir",
+      "hangi ilçe",
+      "mekan",
+      "mekân",
+      "şube",
+      "laptopla",
+      "çalışmak için",
+    ])
+  ) {
+    return "local_recommendation";
+  }
+
+  if (
+    includesAny(normalizedPrompt, [
+      "güvenilir",
+      "güvenli",
+      "itibar",
+      "yorumları",
+      "şikayet",
+      "sertifika",
+    ])
+  ) {
+    return "trust_reputation";
+  }
+
+  if (
+    includesAny(normalizedPrompt, [
+      "premium",
+      "üst segment",
+      "en kaliteli",
+      "özel üretim",
+    ])
+  ) {
+    return "premium_choice";
+  }
+
+  if (
+    includesAny(normalizedPrompt, [
+      "nasıl çöz",
+      "sorun",
+      "neden olmuyor",
+      "ne yapmalıyım",
+      "çözümü",
+    ])
+  ) {
+    return "problem_solution";
+  }
+
+  if (
+    includesAny(normalizedPrompt, [
+      "alternatif",
+      "hangi markalar",
+      "hangi zincirler",
+      "hangileridir",
+      "hangileri",
+      "önerir misin",
+      "önerirsin",
+      "önerileri",
+      "en iyi",
+    ])
+  ) {
+    return "alternative_search";
+  }
+
+  const normalizedStoredIntent =
+    storedIntent?.trim().toLocaleLowerCase("tr-TR") ?? "";
+
+  return reportIntents.includes(
+    normalizedStoredIntent as ReportIntent
+  )
+    ? normalizedStoredIntent
+    : null;
+}
+
 function toRecord(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return {};
@@ -241,7 +396,10 @@ function buildEvidenceItems({
     return {
       id: run.id,
       promptText: run.promptText,
-      promptIntent: run.promptIntent,
+      promptIntent: resolveReportIntent(
+        run.promptText,
+        run.promptIntent
+      ),
       status: getEvidenceStatus(run),
       brandRank: run.brandRank,
       mentionedCompetitors,
@@ -271,8 +429,29 @@ function getIntentBrief({
   const competitorSlug = strongestCompetitor
     ? slugify(strongestCompetitor.name)
     : "alternatifler";
+  const normalizedPrompt = run.promptText.toLocaleLowerCase("tr-TR");
+  const resolvedIntent = resolveReportIntent(
+    run.promptText,
+    run.promptIntent
+  );
+  const isCoffeeBeanPrompt = includesAny(normalizedPrompt, [
+    "paket kahve",
+    "kahve çekirdeği",
+    "çekirdek kahve",
+  ]);
+  const locationSlug = [
+    "istanbul",
+    "ankara",
+    "izmir",
+    "adana",
+    "bursa",
+    "antalya",
+    "diyarbakır",
+    "gaziantep",
+    "konya",
+  ].find((location) => normalizedPrompt.includes(location));
 
-  switch (run.promptIntent) {
+  switch (resolvedIntent) {
     case "comparison":
       return {
         deliverable: "Tarafsız karşılaştırma rehberi",
@@ -290,7 +469,9 @@ function getIntentBrief({
     case "local_recommendation":
       return {
         deliverable: "Şube bulma ve yerel hizmet sayfası",
-        suggestedPath: "/magazalar/{sehir-veya-ilce}",
+        suggestedPath: locationSlug
+          ? `/magazalar/${slugify(locationSlug)}/calismaya-uygun-subeler`
+          : "/magazalar/{sehir-veya-ilce}",
         requiredSections: [
           "Açık adres, harita bağlantısı ve güncel çalışma saatleri",
           "Wi-Fi, priz, oturma alanı ve çalışma ortamı bilgisi",
@@ -300,6 +481,20 @@ function getIntentBrief({
         ],
       };
     case "buying_intent":
+      if (isCoffeeBeanPrompt) {
+        return {
+          deliverable: "Kahve çekirdeği seçim rehberi",
+          suggestedPath: `/rehber/${brandSlug}-kahve-cekirdegi-secim-rehberi`,
+          requiredSections: [
+            "Satıştaki çekirdek ve paket kahvelerin adları, gramajları ve güncel fiyatları",
+            "Her ürün için kavrum derecesi, menşei ve tat notaları",
+            "Espresso, filtre, moka pot ve French press için ürün eşleştirmesi",
+            "100 gram başına fiyat ve hangi kullanıcıya uygun olduğu",
+            "Stok durumu, satın alma bağlantıları, tazelik bilgisi ve kısa SSS",
+          ],
+        };
+      }
+
       return {
         deliverable: "Satın alma ve ürün seçme rehberi",
         suggestedPath: `/rehber/${brandSlug}-urun-secim-rehberi`,
@@ -309,6 +504,18 @@ function getIntentBrief({
           "Kim için hangi seçeneğin uygun olduğu",
           "Teslimat, iade, üyelik veya satın alma adımları",
           "Kararı hızlandıran kısa karşılaştırma tablosu ve SSS",
+        ],
+      };
+    case "alternative_search":
+      return {
+        deliverable: "Marka seçim ve alternatifler rehberi",
+        suggestedPath: `/rehber/${slugify(run.promptText).slice(0, 54)}`,
+        requiredSections: [
+          "Kullanıcının karar vereceği 4-6 açık seçim kriteri",
+          "Markaların aynı ölçütlerle karşılaştırıldığı kısa tablo",
+          `${brandName} için uygun kullanıcı profili ve güçlü olduğu senaryolar`,
+          "Markanın uygun olmadığı durumların tarafsız açıklaması",
+          "Doğrulanabilir kaynaklar, güncelleme tarihi ve kısa sonuç",
         ],
       };
     case "budget_friendly":

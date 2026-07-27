@@ -3,6 +3,12 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { replaceAuditRecommendations } from "@/lib/recommendations/replace-audit-recommendations";
 import { citationSourceMatchesWebsite } from "@/lib/reports/citation-sources";
+import {
+  buildCompetitorMentionTerms,
+  findFirstMentionIndex,
+  normalizeMentionText,
+  uniqueMentionTerms,
+} from "@/lib/analysis/mention-detection";
 type RouteContext = {
   params: Promise<{
     auditId: string;
@@ -43,49 +49,12 @@ function redirectTo(path: string, requestUrl: string) {
   });
 }
 
-function normalizeText(value: string) {
-  return value
-    .toLowerCase()
-    .replaceAll("ı", "i")
-    .replaceAll("ğ", "g")
-    .replaceAll("ü", "u")
-    .replaceAll("ş", "s")
-    .replaceAll("ö", "o")
-    .replaceAll("ç", "c")
-    .replaceAll("â", "a")
-    .replaceAll("î", "i")
-    .replaceAll("û", "u")
-    .trim();
-}
-
-function uniqueStrings(values: string[]) {
-  return Array.from(
-    new Set(values.map((value) => value.trim()).filter(Boolean))
-  );
-}
-
-function findFirstIndex(answer: string, terms: string[]) {
-  const normalizedAnswer = normalizeText(answer);
-
-  const indexes = terms
-    .map((term) => normalizeText(term))
-    .filter(Boolean)
-    .map((term) => normalizedAnswer.indexOf(term))
-    .filter((index) => index >= 0);
-
-  if (indexes.length === 0) {
-    return null;
-  }
-
-  return Math.min(...indexes);
-}
-
 function detectSentiment(answer: string, brandMentioned: boolean) {
   if (!brandMentioned) {
     return null;
   }
 
-  const normalized = normalizeText(answer);
+  const normalized = normalizeMentionText(answer);
 
   const positiveWords = [
     "iyi",
@@ -142,19 +111,31 @@ function analyzeAnswer(args: {
     title: string;
   }>;
 }) {
-  const brandTerms = uniqueStrings([args.brandName, ...args.brandAliases]);
+  const brandTerms = uniqueMentionTerms([
+    args.brandName,
+    ...args.brandAliases,
+  ]);
 
-  const brandFirstIndex = findFirstIndex(args.answer, brandTerms);
+  const brandFirstIndex = findFirstMentionIndex(
+    args.answer,
+    brandTerms
+  );
   const brandMentioned = brandFirstIndex !== null;
 
   const competitorMentionResults: MentionResult[] = args.competitors.map(
     (competitor) => {
-      const aliases = uniqueStrings([
-        competitor.name,
-        ...(competitor.competitor_aliases ?? []).map((item) => item.alias),
-      ]);
+      const aliases = buildCompetitorMentionTerms({
+        name: competitor.name,
+        aliases: (competitor.competitor_aliases ?? []).map(
+          (item) => item.alias
+        ),
+        websiteUrl: competitor.website_url,
+      });
 
-      const firstIndex = findFirstIndex(args.answer, aliases);
+      const firstIndex = findFirstMentionIndex(
+        args.answer,
+        aliases
+      );
 
       return {
         name: competitor.name,

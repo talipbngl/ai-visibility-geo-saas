@@ -8,7 +8,10 @@ import { CitationSourceIntelligence } from "@/features/reports/components/Citati
 import { ClientEvidenceActionPlan } from "@/features/reports/components/ClientEvidenceActionPlan";
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
-import { buildClientReportBriefs } from "@/lib/reports/client-action-briefs";
+import {
+  buildClientReportBriefs,
+  resolveReportIntent,
+} from "@/lib/reports/client-action-briefs";
 import { buildIntentPerformance } from "@/lib/reports/intent-performance";
 import { getIntentLabel } from "@/lib/ui/labels";
 export const metadata = {
@@ -314,25 +317,33 @@ const currentPromptResults = (analyses ?? []).map(
 );
 const citationRuns = (analyses ?? []).map((analysis) => {
   const run = getNestedRun(analysis.audit_runs);
+  const promptText = getPromptText(run);
 
   return {
     id: analysis.id,
-    promptText: getPromptText(run),
-    promptIntent: getPromptIntent(run),
+    promptText,
+    promptIntent: resolveReportIntent(
+      promptText,
+      getPromptIntent(run)
+    ),
     brandMentioned: analysis.brand_mentioned,
     citationsValue: run?.citations_json ?? null,
   };
 });
 const clientReportRuns = (analyses ?? []).map((analysis) => {
   const run = getNestedRun(analysis.audit_runs);
+  const promptText = getPromptText(run);
   const competitors = Array.isArray(analysis.competitors_json)
     ? (analysis.competitors_json as CompetitorVisibility[])
     : [];
 
   return {
     id: analysis.id,
-    promptText: getPromptText(run),
-    promptIntent: getPromptIntent(run),
+    promptText,
+    promptIntent: resolveReportIntent(
+      promptText,
+      getPromptIntent(run)
+    ),
     promptPriority:
       run?.prompt_priority_snapshot ??
       getNestedPrompt(run)?.priority ??
@@ -467,15 +478,11 @@ created_at: snapshot.created_at,
     analyses?.filter((analysis) => analysis.brand_mentioned) ?? [];
 
   const intentPerformance = buildIntentPerformance(
-    (analyses ?? []).map((analysis) => {
-      const run = getNestedRun(analysis.audit_runs);
-
-      return {
-        intent: getPromptIntent(run),
-        brandMentioned: analysis.brand_mentioned,
-        brandRank: analysis.brand_rank,
-      };
-    })
+    clientReportRuns.map((run) => ({
+      intent: run.promptIntent,
+      brandMentioned: run.brandMentioned,
+      brandRank: run.brandRank,
+    }))
   );
 
   const comparableIntents = intentPerformance.filter(
@@ -664,7 +671,7 @@ const competitorWebsiteScores =
                         {completedPromptCount} tamamlanan soru
                       </span>
                       <span className="rounded-full bg-white/10 px-4 py-2 text-sm text-white ring-1 ring-white/20">
-                        {citationCompetitors?.length ?? 0} takip edilen rakip
+                        {citationCompetitors?.length ?? 0} tanımlı rakip
                       </span>
                       <span className="rounded-full bg-white/10 px-4 py-2 text-sm text-white ring-1 ring-white/20">
                         Kaynak ölçümü:{" "}
@@ -880,7 +887,7 @@ const competitorWebsiteScores =
             </section>
           ) : null}
           {competitorStats.length > 0 ? (
-            <section className="print:break-after-page">
+            <section>
               <SectionTitle
                 eyebrow="02 - Rakip Görünürlüğü"
                 title="AI cevaplarında rakip karşılaştırması"
@@ -944,6 +951,12 @@ const competitorWebsiteScores =
                   </tbody>
                 </table>
               </div>
+
+              <p className="mt-3 text-xs leading-5 text-slate-500">
+                Tanımlanan {citationCompetitors?.length ?? 0} rakip içinden
+                yalnızca AI cevaplarında en az bir kez görünen rakipler
+                listelenmiştir.
+              </p>
             </section>
           ) : null}
           {hasCitationMeasurement ? (
@@ -991,12 +1004,12 @@ const competitorWebsiteScores =
               {websiteSnapshot
                 ? " ve taranabilen marka web sayfaları"
                 : ""}
-              üzerinden hazırlanmıştır. Google yorumları, backlink verileri,
+              {" "}üzerinden hazırlanmıştır. Google yorumları, backlink verileri,
               tüm web’in taranması, canlı harita sonuçları ve diğer AI
               motorları bu ölçümün kapsamına dahil değildir.
             </p>
           </section>
-          <section>
+          <section className="client-report-closing report-page">
   <div className="overflow-hidden rounded-[2rem] bg-gradient-to-br from-slate-950 via-indigo-950 to-blue-900 p-7 text-white">
     <div className="grid gap-6 lg:grid-cols-[1.4fr_0.6fr] lg:items-center">
       <div>
@@ -1033,9 +1046,6 @@ const competitorWebsiteScores =
             >
               15 dakikalık görüşme talep et
             </a>
-            <p className="mt-3 text-xs text-slate-400">
-              {contactEmail}
-            </p>
           </>
         ) : null}
       </div>
