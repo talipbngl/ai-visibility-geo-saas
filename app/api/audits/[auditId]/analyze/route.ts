@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { createClient } from "@/lib/supabase/server";
 import { replaceAuditRecommendations } from "@/lib/recommendations/replace-audit-recommendations";
+import { citationSourceMatchesWebsite } from "@/lib/reports/citation-sources";
 type RouteContext = {
   params: Promise<{
     auditId: string;
@@ -484,51 +485,6 @@ const analyses = completedRuns.map((run) => {
     return data.groundingEnabled === true;
   }
 
-  function getHostname(value: string | null) {
-    if (!value) {
-      return null;
-    }
-
-    try {
-      const url = new URL(
-        value.startsWith("http://") ||
-          value.startsWith("https://")
-          ? value
-          : `https://${value}`
-      );
-
-      return url.hostname.replace(/^www\./, "");
-    } catch {
-      return null;
-    }
-  }
-
-  function sourceMatchesHostname(
-    sourceUri: string,
-    hostname: string | null
-  ) {
-    if (!hostname) {
-      return false;
-    }
-
-    try {
-      const sourceHostname = new URL(sourceUri)
-        .hostname
-        .replace(/^www\./, "");
-
-      return (
-        sourceHostname === hostname ||
-        sourceHostname.endsWith(`.${hostname}`)
-      );
-    } catch {
-      return false;
-    }
-  }
-
-  const brandHostname = getHostname(
-    brand.website_url
-  );
-
   const groundedRuns = completedRuns.filter(
     (run) =>
       hasGroundingEnabled(
@@ -548,11 +504,11 @@ const analyses = completedRuns.map((run) => {
       getCitationSources(
         run.citations_json
       ).some((source) =>
-        sourceMatchesHostname(
-          source.uri,
-          brandHostname
-        )
-      )
+  citationSourceMatchesWebsite(
+    source,
+    brand.website_url
+  )
+)
     ).length;
 
   const citationScore =
