@@ -194,14 +194,29 @@
   }
 
   .client-report .print\:break-after-page {
-    break-after: auto !important;
-    page-break-after: auto !important;
+    break-after: page !important;
+    page-break-after: always !important;
   }
 
   .client-report section {
-    break-inside: avoid-page;
-    page-break-inside: avoid;
     margin-bottom: 18px !important;
+  }
+
+  .client-report .client-report-cover {
+    min-height: 277mm !important;
+    break-after: page !important;
+    page-break-after: always !important;
+    margin-bottom: 0 !important;
+  }
+
+  .client-report .report-page {
+    break-before: page !important;
+    page-break-before: always !important;
+  }
+
+  .client-report .print-avoid {
+    break-inside: avoid-page !important;
+    page-break-inside: avoid !important;
   }
 
   .client-report .space-y-8 > :not([hidden]) ~ :not([hidden]) {
@@ -309,5 +324,10 @@
   .client-report a {
     color: inherit !important;
     text-decoration: none !important;
+  }
+
+  .client-report a.report-cta {
+    color: #0f172a !important;
+    background: #67e8f9 !important;
   }
 }

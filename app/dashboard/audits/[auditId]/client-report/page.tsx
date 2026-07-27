@@ -2,17 +2,17 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ClientWebsiteScoreComparison } from "@/features/reports/components/ClientWebsiteScoreComparison";
 import { PrintReportButton } from "@/features/reports/components/PrintReportButton";
-import { ThirtyDayActionPlan } from "@/features/reports/components/ThirtyDayActionPlan";
 import { AuditChangeSummary } from "@/features/reports/components/AuditChangeSummary";
 import { PromptVisibilityChanges } from "@/features/reports/components/PromptVisibilityChanges";
 import { CitationSourceIntelligence } from "@/features/reports/components/CitationSourceIntelligence";
+import { ClientEvidenceActionPlan } from "@/features/reports/components/ClientEvidenceActionPlan";
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
-import { CompetitorContentGap } from "@/features/website/components/CompetitorContentGap";
+import { buildClientReportBriefs } from "@/lib/reports/client-action-briefs";
 import { buildIntentPerformance } from "@/lib/reports/intent-performance";
 import { getIntentLabel } from "@/lib/ui/labels";
 export const metadata = {
-  title: "AI Görünürlük Ön Teşhis Raporu",
+  title: "AI Yanıt Görünürlüğü Ölçüm Raporu",
 };
 type ClientReportPageProps = {
   params: Promise<{
@@ -33,10 +33,14 @@ type NestedPrompt = {
 };
 
 type NestedRun = {
+  id?: string | null;
   prompt_text_snapshot?: string | null;
   prompt_intent_snapshot?: string | null;
   prompt_priority_snapshot?: number | null;
   citations_json?: unknown;
+  raw_answer?: string | null;
+  engine?: string | null;
+  model?: string | null;
   prompts?: NestedPrompt | NestedPrompt[] | null;
 };
 
@@ -46,30 +50,6 @@ function formatDate(value: string | null) {
   return new Intl.DateTimeFormat("tr-TR", {
     dateStyle: "medium",
   }).format(new Date(value));
-}
-
-function getScoreLevel(score: number) {
-  if (score >= 75) return "Güçlü";
-  if (score >= 50) return "Orta";
-  if (score >= 25) return "Zayıf";
-
-  return "Kritik";
-}
-
-function getScoreComment(score: number, brandName: string) {
-  if (score >= 75) {
-    return `${brandName}, analiz edilen AI cevaplarında güçlü bir görünürlük gösteriyor. Bu durum markanın kategori içinde iyi tanındığını ve öneri cevaplarında yer alma ihtimalinin yüksek olduğunu gösterir.`;
-  }
-
-  if (score >= 50) {
-    return `${brandName}, bazı AI cevaplarında görünür durumda ancak rakiplerle kıyaslandığında iyileştirme alanları bulunuyor.`;
-  }
-
-  if (score >= 25) {
-    return `${brandName} için AI görünürlüğü sınırlı. Marka, birçok önemli kullanıcı niyetinde rakiplerin gerisinde kalabilir.`;
-  }
-
-  return `${brandName}, analiz edilen AI cevaplarında ciddi şekilde düşük görünürlük gösteriyor. Bu durum içerik, otorite ve kategori sinyalleri açısından önemli bir fırsat alanı yaratıyor.`;
 }
 
 function getNestedRun(value: NestedRun | NestedRun[] | null | undefined) {
@@ -100,11 +80,6 @@ function getPromptIntent(run: NestedRun | null) {
 
   return prompt?.intent ?? null;
 }
-function getAverageScore(values: number[]) {
-  if (values.length === 0) return null;
-
-  return Math.round(values.reduce((sum, value) => sum + value, 0) / values.length);
-}
 function toRecord(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return {};
@@ -129,30 +104,6 @@ function hasCategoryScores(value: unknown) {
     Number.isFinite(Number(record[key]))
   );
 }
-function getPriorityText(value: string | null) {
-  if (value === "high") return "Yüksek";
-  if (value === "medium") return "Orta";
-  if (value === "low") return "Düşük";
-
-  return "Belirsiz";
-}
-
-function getImpactText(value: string | null) {
-  if (value === "high") return "Yüksek";
-  if (value === "medium") return "Orta";
-  if (value === "low") return "Düşük";
-
-  return "Belirsiz";
-}
-
-function getEffortText(value: string | null) {
-  if (value === "high") return "Yüksek";
-  if (value === "medium") return "Orta";
-  if (value === "low") return "Düşük";
-
-  return "Belirsiz";
-}
-
 function SectionTitle({
   eyebrow,
   title,
@@ -210,40 +161,6 @@ function MetricBox({
         {value}
       </p>
       {helper ? <p className="mt-2 text-xs leading-5 text-slate-500">{helper}</p> : null}
-    </div>
-  );
-}
-
-function FindingCard({
-  index,
-  title,
-  evidence,
-  action,
-}: {
-  index: number;
-  title: string;
-  evidence: string;
-  action: string;
-}) {
-  return (
-    <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-      <div className="mb-4 flex items-center gap-3">
-        <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-indigo-600 text-sm font-bold text-white">
-          {index}
-        </div>
-        <p className="font-semibold text-slate-950">{title}</p>
-      </div>
-
-      <div className="space-y-3 text-sm leading-6 text-slate-600">
-        <p>
-          <span className="font-semibold text-slate-950">Kanıt: </span>
-          {evidence}
-        </p>
-        <p>
-          <span className="font-semibold text-slate-950">Aksiyon: </span>
-          {action}
-        </p>
-      </div>
     </div>
   );
 }
@@ -328,12 +245,6 @@ const previousAudit =
 const previousScore = previousAudit
   ? previousScoreByAuditId.get(previousAudit.id) ?? null
   : null;
-  const { data: recommendations } = await supabase
-    .from("recommendations")
-    .select("id, category, title, description, priority, effort, impact")
-    .eq("audit_id", audit.id)
-    .order("created_at", { ascending: true });
-
 const { data: analyses } = await supabase
   .from("analyses")
   .select(
@@ -354,6 +265,9 @@ const { data: analyses } = await supabase
       prompt_intent_snapshot,
       prompt_priority_snapshot,
       citations_json,
+      raw_answer,
+      engine,
+      model,
       prompts (
         id,
         text,
@@ -407,6 +321,29 @@ const citationRuns = (analyses ?? []).map((analysis) => {
     promptIntent: getPromptIntent(run),
     brandMentioned: analysis.brand_mentioned,
     citationsValue: run?.citations_json ?? null,
+  };
+});
+const clientReportRuns = (analyses ?? []).map((analysis) => {
+  const run = getNestedRun(analysis.audit_runs);
+  const competitors = Array.isArray(analysis.competitors_json)
+    ? (analysis.competitors_json as CompetitorVisibility[])
+    : [];
+
+  return {
+    id: analysis.id,
+    promptText: getPromptText(run),
+    promptIntent: getPromptIntent(run),
+    promptPriority:
+      run?.prompt_priority_snapshot ??
+      getNestedPrompt(run)?.priority ??
+      null,
+    brandMentioned: analysis.brand_mentioned,
+    brandRank: analysis.brand_rank,
+    brandSentiment: analysis.brand_sentiment,
+    rawAnswer: run?.raw_answer ?? "",
+    engine: run?.engine ?? null,
+    model: run?.model ?? null,
+    competitors,
   };
 });
 
@@ -529,9 +466,7 @@ created_at: snapshot.created_at,
   const visibleAnalyses =
     analyses?.filter((analysis) => analysis.brand_mentioned) ?? [];
 
-  const invisibleAnalyses =
-    analyses?.filter((analysis) => !analysis.brand_mentioned) ?? [];
-      const intentPerformance = buildIntentPerformance(
+  const intentPerformance = buildIntentPerformance(
     (analyses ?? []).map((analysis) => {
       const run = getNestedRun(analysis.audit_runs);
 
@@ -628,48 +563,42 @@ const competitorWebsiteScores =
       getCategoryScore(snapshot.category_scores_json, "overall")
     );
 
-const competitorAverageWebsiteScore = getAverageScore(
-  competitorWebsiteScores
-);
-
-  const topRecommendations = (recommendations ?? []).slice(0, 4);
   const strongestCompetitor = competitorStats[0] ?? null;
-
-  const topFindings = [
-    {
-      title:
-        invisibleAnalyses.length === 0
-          ? "AI görünürlüğü güçlü"
-          : "Bazı AI cevaplarında görünürlük açığı var",
-      evidence:
-        invisibleAnalyses.length === 0
-          ? `${brand.name}, analiz edilen ${audit.total_prompts} sorunun tamamında görünür durumda. Ortalama sıra ${averageRank ?? "-"} olarak ölçüldü.`
-          : `${brand.name}, ${audit.total_prompts} sorunun ${invisibleAnalyses.length} tanesinde görünmedi.`,
-      action:
-        invisibleAnalyses.length === 0
-          ? "Mevcut görünürlüğü korumak için kategori içerikleri ve rakip karşılaştırma içerikleri düzenli güncellenmeli."
-          : "Markanın görünmediği soru niyetleri için hizmet sayfaları, SSS ve karşılaştırma içerikleri hazırlanmalı.",
-    },
-    {
-      title: "Rakipler aynı cevaplarda güçlü şekilde yer alıyor",
-      evidence: strongestCompetitor
-        ? `${strongestCompetitor.name}, ${strongestCompetitor.mentionCount}/${audit.completed_prompts} cevapta görünerek en görünür rakip oldu.`
-        : "Analiz edilen cevaplarda belirgin rakip görünürlüğü tespit edilmedi.",
-      action:
-        "Rakiplerin öne çıktığı cevap tipleri incelenerek markanın farklılaşma mesajları ve kategori otoritesi güçlendirilmeli.",
-    },
-    {
-      title: "Web sitesi puanlarında iyileştirme alanı var",
-      evidence:
-        brandWebsiteScore !== null
-          ? `Marka website skoru ${brandWebsiteScore}/100. Rakip website ortalaması ${
-              competitorAverageWebsiteScore ?? "-"
-            }/100.`
-          : "Marka website analizi henüz yapılmamış.",
-      action:
-         "Önemli sayfaların başlıkları, hizmet açıklamaları, güven unsurları ve sık sorulan sorular alanları güçlendirilmelidir.",
-    },
-  ];
+  const meaningfulIntentPerformance = intentPerformance.filter(
+    (item) => item.total >= 2
+  );
+  const hasWebsiteComparison =
+    brandWebsiteScore !== null &&
+    competitorWebsiteScores.length > 0;
+  const hasCitationMeasurement = citationScore !== null;
+  const clientReportBriefs = buildClientReportBriefs({
+    brandName: brand.name,
+    runs: clientReportRuns,
+    technicalSignalsValue:
+      websiteSnapshot?.technical_signals_json ?? null,
+  });
+  const completedPromptCount = Math.max(
+    audit.completed_prompts,
+    analyses?.length ?? 0
+  );
+  const primaryGap = clientReportRuns.find(
+    (run) => !run.brandMentioned
+  );
+  const productName =
+    process.env.NEXT_PUBLIC_PRODUCT_NAME?.trim() || "ASPEQO";
+  const contactEmail =
+    process.env.NEXT_PUBLIC_CONTACT_EMAIL?.trim() || "";
+  const reportYear = new Date(audit.created_at).getFullYear();
+  const reportNumber = `ASP-${reportYear}-${audit.id
+    .slice(0, 8)
+    .toUpperCase()}`;
+  const executiveSummary = primaryGap
+    ? `${brand.name}, Gemini üzerinde test edilen ${completedPromptCount} sorunun ${visibleAnalyses.length} tanesinde görünürken “${primaryGap.promptText}” sorusunda görünmedi. ${
+        strongestCompetitor
+          ? `${strongestCompetitor.name}, ${strongestCompetitor.mentionCount}/${completedPromptCount} cevapta görünerek en sık görülen rakip oldu.`
+          : "Bu soruda takip edilen rakiplerden belirgin bir görünürlük üstünlüğü tespit edilmedi."
+      } Öncelik, aşağıdaki kanıt kartında belirtilen soruya doğrudan cevap veren kaynak sayfayı yayınlamaktır.`
+    : `${brand.name}, Gemini üzerinde test edilen ${completedPromptCount} sorunun tamamında görünür durumda. Bu sonuç tüm AI aramalarına genellenmez; mevcut soru setindeki görünürlüğü gösterir. Sonraki adım, soru setini genişletmek ve markanın ilk iki öneri arasındaki konumunu korumaktır.`;
 
   return (
     <main className="min-h-screen bg-slate-100 text-slate-950 print:bg-white">
@@ -684,163 +613,159 @@ const competitorAverageWebsiteScore = getAverageScore(
           <PrintReportButton />
         </div>
 
-            <article className="client-report space-y-8 rounded-[2rem] bg-white p-8 shadow-xl print:rounded-none print:p-0 print:shadow-none">   
-            <section className="relative overflow-hidden rounded-[2rem] bg-slate-950 p-8 text-white">            <div className="absolute right-0 top-0 h-64 w-64 rounded-full bg-blue-500/30 blur-3xl" />
-            <div className="absolute bottom-0 left-1/3 h-64 w-64 rounded-full bg-fuchsia-500/20 blur-3xl" />
+          <article className="client-report space-y-8 rounded-[2rem] bg-white p-8 shadow-xl print:rounded-none print:p-0 print:shadow-none">
+            <section className="client-report-cover relative overflow-hidden rounded-[2rem] bg-slate-950 p-8 text-white">
+              <div className="absolute right-0 top-0 h-72 w-72 rounded-full bg-blue-500/30 blur-3xl" />
+              <div className="absolute bottom-0 left-1/3 h-72 w-72 rounded-full bg-fuchsia-500/20 blur-3xl" />
 
-            <div className="relative z-10 grid gap-10 lg:grid-cols-[1.2fr_0.8fr]">
-              <div>
-                <p className="text-sm font-semibold uppercase tracking-[0.22em] text-cyan-300">
-                  AI Görünürlük Ön Teşhis Raporu
-                </p>
+              <div className="relative z-10 flex h-full flex-col justify-between gap-12">
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <span className="flex size-11 items-center justify-center rounded-2xl bg-cyan-300 text-sm font-black text-slate-950">
+                      AS
+                    </span>
+                    <div>
+                      <p className="text-sm font-bold tracking-[0.22em] text-white">
+                        {productName}
+                      </p>
+                      <p className="mt-1 text-xs text-slate-400">
+                        AI yanıt görünürlüğü analizi
+                      </p>
+                    </div>
+                  </div>
 
-                <h1 className="mt-5 max-w-3xl text-5xl font-bold tracking-tight">
-                  {brand.name}
-                </h1>
-
-                <p className="mt-5 max-w-2xl text-lg leading-8 text-slate-300">
-                  Bu rapor; AI cevap görünürlüğü, rakip görünürlüğü, website
-                  içerik sinyalleri ve uygulanabilir aksiyon alanlarını yönetici
-                  özeti formatında sunar.
-                </p>
-
-                <div className="mt-8 flex flex-wrap gap-2">
-                  <span className="rounded-full bg-white/10 px-4 py-2 text-sm text-white ring-1 ring-white/20">
-                    {brand.industry ?? "Sektör belirtilmedi"}
-                  </span>
-                  <span className="rounded-full bg-white/10 px-4 py-2 text-sm text-white ring-1 ring-white/20">
-                    {brand.country ?? "TR"}
-                  </span>
-                  <span className="rounded-full bg-white/10 px-4 py-2 text-sm text-white ring-1 ring-white/20">
-                    {brand.language ?? "tr"}
+                  <span className="rounded-full bg-white/10 px-4 py-2 text-xs text-slate-200 ring-1 ring-white/20">
+                    Müşteriye özel · {reportNumber}
                   </span>
                 </div>
-              </div>
 
-              <div className="rounded-[1.5rem] bg-white/10 p-6 ring-1 ring-white/20 backdrop-blur">
-                <p className="text-sm text-slate-300">Genel görünürlük skoru</p>
-                <p className="mt-3 text-7xl font-bold">{visibilityScore}</p>
-                <p className="mt-1 text-2xl font-semibold text-cyan-200">/100</p>
+                <div className="grid gap-10 lg:grid-cols-[1.2fr_0.8fr] lg:items-end">
+                  <div>
+                    <p className="text-sm font-semibold uppercase tracking-[0.2em] text-cyan-300">
+                      AI Yanıt Görünürlüğü Ölçüm Raporu
+                    </p>
 
-                <div className="mt-6 h-3 overflow-hidden rounded-full bg-white/10">
-                  <div
-                    className="h-full rounded-full bg-gradient-to-r from-cyan-300 to-blue-500"
-                    style={{ width: `${Math.min(visibilityScore, 100)}%` }}
-                  />
+                    <h1 className="mt-5 max-w-3xl text-5xl font-bold tracking-tight">
+                      {brand.name}
+                    </h1>
+
+                    <p className="mt-5 max-w-2xl text-base leading-7 text-slate-300">
+                      Bu rapor, seçilen kullanıcı sorularında markanın ve takip
+                      edilen rakiplerin Gemini cevaplarındaki görünürlüğünü
+                      gösterir. Sonuçlar yalnızca belirtilen test kapsamını
+                      temsil eder.
+                    </p>
+
+                    <div className="mt-8 flex flex-wrap gap-2">
+                      <span className="rounded-full bg-white/10 px-4 py-2 text-sm text-white ring-1 ring-white/20">
+                        Gemini
+                      </span>
+                      <span className="rounded-full bg-white/10 px-4 py-2 text-sm text-white ring-1 ring-white/20">
+                        {completedPromptCount} tamamlanan soru
+                      </span>
+                      <span className="rounded-full bg-white/10 px-4 py-2 text-sm text-white ring-1 ring-white/20">
+                        {citationCompetitors?.length ?? 0} takip edilen rakip
+                      </span>
+                      <span className="rounded-full bg-white/10 px-4 py-2 text-sm text-white ring-1 ring-white/20">
+                        Kaynak ölçümü:{" "}
+                        {hasCitationMeasurement ? "Açık" : "Kapalı"}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="rounded-[1.5rem] bg-white/10 p-6 ring-1 ring-white/20 backdrop-blur">
+                    <p className="text-sm text-slate-300">
+                      Test seti görünürlük oranı
+                    </p>
+                    <p className="mt-3 text-7xl font-bold">
+                      %{visibilityScore}
+                    </p>
+                    <p className="mt-3 text-sm font-semibold text-cyan-200">
+                      {visibleAnalyses.length}/{completedPromptCount} soruda
+                      marka görünür
+                    </p>
+
+                    <div className="mt-6 h-3 overflow-hidden rounded-full bg-white/10">
+                      <div
+                        className="h-full rounded-full bg-gradient-to-r from-cyan-300 to-blue-500"
+                        style={{
+                          width: `${Math.min(visibilityScore, 100)}%`,
+                        }}
+                      />
+                    </div>
+
+                    <div className="mt-6 grid gap-2 text-xs leading-5 text-slate-400">
+                      <p>Rapor tarihi: {formatDate(audit.created_at)}</p>
+                      <p>Sektör: {brand.industry ?? "Belirtilmedi"}</p>
+                      <p>Pazar: {brand.country ?? "TR"} / {brand.language ?? "tr"}</p>
+                    </div>
+                  </div>
                 </div>
-
-                <p className="mt-5 text-sm leading-6 text-slate-300">
-                  Durum:{" "}
-                  <span className="font-semibold text-white">
-                    {getScoreLevel(visibilityScore)}
-                  </span>
-                </p>
-
-                <p className="mt-6 text-xs leading-5 text-slate-400">
-                  Analiz tarihi: {formatDate(audit.created_at)}
-                </p>
               </div>
-            </div>
-          </section>
+            </section>
 
           <section>
             <SectionTitle
               eyebrow="01 - Yönetici Özeti"
-              title="Karar verici özeti"
-              description="Bu bölüm raporun tamamından çıkan en önemli sonuçları kısa ve anlaşılır şekilde özetler."
+              title="Ölçüm sonucu ve alınacak karar"
+              description={`${completedPromptCount} soruluk test setinin sonucu, rakip konumu ve ölçüm kapsamı.`}
             />
 
             <div className="rounded-[2rem] border border-indigo-100 bg-gradient-to-br from-indigo-50 via-white to-cyan-50 p-6">
               <p className="text-lg leading-8 text-slate-700">
-                {getScoreComment(visibilityScore, brand.name)}
+                {executiveSummary}
               </p>
             </div>
 
-            <div className="mt-6 grid gap-4 md:grid-cols-4">
+            <div
+              className={`mt-6 grid gap-4 ${
+                hasCitationMeasurement
+                  ? "md:grid-cols-4"
+                  : "md:grid-cols-3"
+              }`}
+            >
               <MetricBox
-                label="AI Görünürlük"
-                value={`${visibilityScore}/100`}
-                helper="Markanın AI cevaplarında görünme gücü"
+                label="Test seti görünürlüğü"
+                value={`%${visibilityScore}`}
+                helper={`${visibleAnalyses.length}/${completedPromptCount} soruda marka adı geçti`}
                 tone="blue"
               />
 
               <MetricBox
                 label="Görünürlük Payı"
                 value={`${shareOfVoice}%`}
-                helper="Rakiplere göre marka payı"
+                helper="Marka ve takip edilen rakiplerin toplam görünürlüğü içindeki pay"
                 tone="purple"
               />
 
               <MetricBox
                 label="Ortalama Sıra"
                 value={averageRank ?? "-"}
-                helper="Marka geçtiğinde yaklaşık konum"
+                helper="Marka cevapta geçtiğinde rakiplere göre yaklaşık konum"
                 tone="green"
               />
 
-             <MetricBox
+              {hasCitationMeasurement ? (
+                <MetricBox
                   label="Kaynak Kullanımı"
-                  value={
-                    citationScore === null
-                      ? "Ölçülmedi"
-                      : `${citationScore}/100`
-                  }
-                  helper={
-                    citationScore === null
-                      ? "Bu ölçüm web kaynağı kullanılmadan oluşturuldu"
-                      : "Web kaynaklarının kullanım gücü"
-                  }
+                  value={`${citationScore}/100`}
+                  helper="Web kaynağı kullanılan cevaplarda marka sitesinin kaynak gücü"
                   tone="orange"
                 />
+              ) : null}
             </div>
+
             <div className="mt-6 rounded-3xl border border-slate-200 bg-slate-50 p-5">
-            <h3 className="font-semibold text-slate-950">Skorlar nasıl okunmalı?</h3>
-
-            <div className="mt-3 grid gap-3 text-sm leading-6 text-slate-600 md:grid-cols-4">
-                <p>
-                <span className="font-semibold text-slate-950">
-                    AI Görünürlük Skoru:
-                </span>{" "}
-                Markanın analiz edilen test sorularının kaçında AI cevabında geçtiğini
-                gösterir.
-                </p>
-
-                <p>
-                <span className="font-semibold text-slate-950">
-                    Görünürlük Payı:
-                </span>{" "}
-                Marka ve takip edilen rakiplerin toplam görünürlüğü içinde markanın payını
-                gösterir.
-                </p>
-
-                <p>
-                <span className="font-semibold text-slate-950">
-                    Ortalama Sıra:
-                </span>{" "}
-                Marka cevapta geçtiğinde rakiplere göre yaklaşık kaçıncı sırada
-                göründüğünü gösterir.
-                </p>
-                 <p>
-                <span className="font-semibold text-slate-950">
-                  Kaynak Kullanımı:
-                </span>{" "}
-                {citationScore === null
-                  ? "Bu ölçüm web araması kullanılmadan hazırlanmıştır; kaynak başarısı puanlanmamıştır."
-                  : "AI cevabında web kaynaklarının kullanılıp kullanılmadığını ve marka sitesinin kaynaklar arasında yer alıp almadığını gösterir."}
+              <p className="font-semibold text-slate-950">
+                Bu sonuç nasıl yorumlanmalı?
               </p>
-            </div>
-            </div>
-
-            <div className="mt-6 grid gap-4 lg:grid-cols-3">
-              {topFindings.map((finding, index) => (
-                <FindingCard
-                  key={finding.title}
-                  index={index + 1}
-                  title={finding.title}
-                  evidence={finding.evidence}
-                  action={finding.action}
-                />
-              ))}
+              <p className="mt-2 text-sm leading-6 text-slate-600">
+                Yüzde değerleri genel pazar tahmini değildir. Bu raporda
+                kullanılan {completedPromptCount} soru,{" "}
+                {citationCompetitors?.length ?? 0} takip edilen rakip ve Gemini
+                cevaplarının ölçüm anındaki sonucudur. Kapsam dışındaki
+                sorular veya farklı AI motorları farklı sonuç verebilir.
+              </p>
             </div>
           </section>
 
@@ -867,7 +792,7 @@ const competitorAverageWebsiteScore = getAverageScore(
                     currentResults={currentPromptResults}
                     previousResults={previousPromptResults}
                   />
-              {intentPerformance.length > 0 ? (
+              {meaningfulIntentPerformance.length > 0 ? (
             <section>
               <SectionTitle
                 eyebrow="Ek analiz · Soru niyetleri"
@@ -876,7 +801,7 @@ const competitorAverageWebsiteScore = getAverageScore(
               />
 
               <div className="grid gap-4 md:grid-cols-2">
-                {intentPerformance.map((item) => {
+                {meaningfulIntentPerformance.map((item) => {
                   const isStrongest =
                     hasIntentDifference &&
                     strongestIntent?.intent === item.intent;
@@ -909,11 +834,6 @@ const competitorAverageWebsiteScore = getAverageScore(
                               </span>
                             ) : null}
 
-                            {item.total < 3 ? (
-                              <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-medium text-amber-700 ring-1 ring-amber-200">
-                                Az veri
-                              </span>
-                            ) : null}
                           </div>
 
                           <p className="mt-2 text-sm text-slate-600">
@@ -953,94 +873,81 @@ const competitorAverageWebsiteScore = getAverageScore(
                 })}
               </div>
 
-              {hasIntentDifference && weakestIntent ? (
-                <div className="mt-5 rounded-3xl border border-rose-200 bg-rose-50 p-5">
-                  <p className="font-semibold text-rose-900">
-                    Öncelikli görünürlük alanı
-                  </p>
-
-                  <p className="mt-2 text-sm leading-6 text-rose-800">
-                    {getIntentLabel(weakestIntent.intent)} sorularında marka
-                    görünürlüğü %{weakestIntent.visibilityRate}. Bu kullanıcı
-                    ihtiyacına özel hizmet sayfası, karşılaştırma içeriği veya
-                    sık sorulan sorular bölümü hazırlanmalıdır.
-                  </p>
-                </div>
-              ) : null}
-
               <p className="mt-4 text-xs leading-5 text-slate-500">
-                Üçten az sorusu bulunan niyetler sınırlı veri olarak
-                değerlendirilmelidir.
+                Bu bölüm yalnızca en az iki soruyla ölçülen kullanıcı
+                niyetlerini gösterir.
               </p>
             </section>
           ) : null}
-          <section className="print:break-after-page">
-            <SectionTitle
-              eyebrow="02 - Rakip Görünürlüğü"
-              title="AI cevaplarında rakip karşılaştırması"
-              description="Analiz edilen AI cevaplarında markanın ve rakiplerin ne kadar sık geçtiğini gösterir."
-            />
+          {competitorStats.length > 0 ? (
+            <section className="print:break-after-page">
+              <SectionTitle
+                eyebrow="02 - Rakip Görünürlüğü"
+                title="AI cevaplarında rakip karşılaştırması"
+                description={`${completedPromptCount} test sorusunda markanın ve cevapta gerçekten görünen rakiplerin konumu.`}
+              />
 
-            <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
-              <table className="w-full border-collapse text-left text-sm">
-                <thead className="bg-slate-950 text-white">
-                  <tr>
-                    <th className="px-5 py-4 font-semibold">
-                      Marka / Rakip
-                    </th>
-                    <th className="px-5 py-4 font-semibold">
-                      Görünme
-                    </th>
-                    <th className="px-5 py-4 font-semibold">
-                      Ortalama sıra
-                    </th>
-                    <th className="px-5 py-4 font-semibold">
-                      Yorum
-                    </th>
-                  </tr>
-                </thead>
+              <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+                <table className="w-full border-collapse text-left text-sm">
+                  <thead className="bg-slate-950 text-white">
+                    <tr>
+                      <th className="px-5 py-4 font-semibold">
+                        Marka / Rakip
+                      </th>
+                      <th className="px-5 py-4 font-semibold">
+                        Göründüğü soru
+                      </th>
+                      <th className="px-5 py-4 font-semibold">
+                        Ortalama sıra
+                      </th>
+                      <th className="px-5 py-4 font-semibold">
+                        Ölçümdeki rolü
+                      </th>
+                    </tr>
+                  </thead>
 
-                <tbody>
-                  <tr className="border-b bg-indigo-50">
-                    <td className="px-5 py-4 font-semibold text-indigo-900">
-                      {brand.name}
-                    </td>
-                    <td className="px-5 py-4">
-                      {visibleAnalyses.length}/{audit.completed_prompts}
-                    </td>
-                    <td className="px-5 py-4">
-                      {averageRank ?? "-"}
-                    </td>
-                    <td className="px-5 py-4 text-slate-600">
-                      Takip edilen ana marka
-                    </td>
-                  </tr>
-
-                  {competitorStats.map((competitor) => (
-                    <tr
-                      key={competitor.name}
-                      className="border-b last:border-0"
-                    >
-                      <td className="px-5 py-4 font-medium">
-                        {competitor.name}
+                  <tbody>
+                    <tr className="border-b bg-indigo-50">
+                      <td className="px-5 py-4 font-semibold text-indigo-900">
+                        {brand.name}
                       </td>
                       <td className="px-5 py-4">
-                        {competitor.mentionCount}/
-                        {audit.completed_prompts}
+                        {visibleAnalyses.length}/{completedPromptCount}
                       </td>
                       <td className="px-5 py-4">
-                        {competitor.averageRank ?? "-"}
+                        {averageRank ?? "-"}
                       </td>
                       <td className="px-5 py-4 text-slate-600">
-                        AI cevaplarında takip edilen rakip
+                        Ölçülen marka
                       </td>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </section>
-          <CitationSourceIntelligence
+
+                    {competitorStats.map((competitor) => (
+                      <tr
+                        key={competitor.name}
+                        className="border-b last:border-0"
+                      >
+                        <td className="px-5 py-4 font-medium">
+                          {competitor.name}
+                        </td>
+                        <td className="px-5 py-4">
+                          {competitor.mentionCount}/{completedPromptCount}
+                        </td>
+                        <td className="px-5 py-4">
+                          {competitor.averageRank ?? "-"}
+                        </td>
+                        <td className="px-5 py-4 text-slate-600">
+                          AI cevabında görünen rakip
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          ) : null}
+          {hasCitationMeasurement ? (
+            <CitationSourceIntelligence
               brandName={brand.name}
               brandWebsiteUrl={brand.website_url}
               competitors={(citationCompetitors ?? []).map((competitor) => ({
@@ -1050,93 +957,45 @@ const competitorAverageWebsiteScore = getAverageScore(
               runs={citationRuns}
               variant="client"
             />
-          <ClientWebsiteScoreComparison
-            brandName={brand.name}
-            brandScoresValue={
-              websiteSnapshot?.category_scores_json ?? null
-            }
-            competitors={latestCompetitorWebsiteSnapshots.map(
-              (snapshot) => ({
-                id: snapshot.id,
-                name: snapshot.competitor_name,
-                scoresValue: snapshot.category_scores_json,
-              })
-            )}
-          />
-          <CompetitorContentGap
-  brandName={brand.name}
-  brandTechnicalSignalsValue={
-    websiteSnapshot
-      ?.technical_signals_json ?? null
-  }
-  competitors={latestCompetitorWebsiteSnapshots.map(
-    (snapshot) => ({
-      id: snapshot.id,
-      name: snapshot.competitor_name,
-      technicalSignalsValue:
-        snapshot.technical_signals_json,
-    })
-  )}
-/>
-          <section className="print:break-after-page">
-            <SectionTitle
-              eyebrow="04 - Aksiyon Planı"
-              title="Öncelikli iyileştirme önerileri"
-              description="Bu bölüm analiz edilen AI cevapları, website sinyalleri ve rakip karşılaştırmasına göre uygulanabilir aksiyonları özetler."
-            />
+          ) : null}
 
-            <div className="grid gap-4">
-              {topRecommendations.length > 0 ? (
-                topRecommendations.map((recommendation, index) => (
-                  <div
-                    key={recommendation.id}
-                    className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm"
-                  >
-                    <div className="mb-3 flex flex-wrap gap-2">
-                      <span className="rounded-full bg-indigo-600 px-3 py-1 text-xs font-semibold text-white">
-                        {index + 1}. aksiyon
-                      </span>
-                      <span className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-medium text-indigo-700 ring-1 ring-indigo-200">
-                        Öncelik: {getPriorityText(recommendation.priority)}
-                      </span>
-                      <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700 ring-1 ring-emerald-200">
-                        Etki: {getImpactText(recommendation.impact)}
-                      </span>
-                      <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-medium text-amber-700 ring-1 ring-amber-200">
-                        Efor: {getEffortText(recommendation.effort)}
-                      </span>
-                    </div>
-
-                    <h3 className="text-lg font-semibold text-slate-950">
-                      {recommendation.title}
-                    </h3>
-                    <p className="mt-2 text-sm leading-6 text-slate-600">
-                      {recommendation.description}
-                    </p>
-                  </div>
-                ))
-              ) : (
-                <div className="rounded-3xl border border-slate-200 bg-white p-5 text-sm text-slate-600">
-                  Henüz aksiyon önerisi bulunmuyor.
-                </div>
+          {hasWebsiteComparison ? (
+            <ClientWebsiteScoreComparison
+              brandName={brand.name}
+              brandScoresValue={
+                websiteSnapshot?.category_scores_json ?? null
+              }
+              competitors={latestCompetitorWebsiteSnapshots.map(
+                (snapshot) => ({
+                  id: snapshot.id,
+                  name: snapshot.competitor_name,
+                  scoresValue: snapshot.category_scores_json,
+                })
               )}
-            </div>
+            />
+          ) : null}
 
-            <div className="mt-6 rounded-3xl border border-slate-200 bg-slate-50 p-5">
-              <h3 className="font-semibold text-slate-950">Metodoloji notu</h3>
-              <p className="mt-2 text-sm leading-6 text-slate-600">
-               Bu rapor; Gemini tabanlı AI cevap testi, seçilen önemli web
-                sayfalarındaki teknik ve içerik sinyalleri ile analiz edilen
-                rakip web sitesi verileri üzerinden hazırlanmış bir ön teşhis
-                raporudur. Google yorumları,
-                backlinkler, tüm site crawl verisi ve canlı harita verisi bu MVP
-                kapsamına dahil değildir.
-              </p>
-            </div>
-          </section>
-                    <ThirtyDayActionPlan
-            recommendations={recommendations ?? []}
+          <ClientEvidenceActionPlan
+            brandName={brand.name}
+            evidenceItems={clientReportBriefs.evidenceItems}
+            actionBriefs={clientReportBriefs.actionBriefs}
           />
+
+          <section className="print-avoid rounded-3xl border border-slate-200 bg-slate-50 p-5">
+            <h2 className="font-semibold text-slate-950">
+              Ölçüm kapsamı ve sınırlar
+            </h2>
+            <p className="mt-2 text-sm leading-6 text-slate-600">
+              Rapor Gemini cevapları, {completedPromptCount} test sorusu,
+              takip edilen {citationCompetitors?.length ?? 0} rakip
+              {websiteSnapshot
+                ? " ve taranabilen marka web sayfaları"
+                : ""}
+              üzerinden hazırlanmıştır. Google yorumları, backlink verileri,
+              tüm web’in taranması, canlı harita sonuçları ve diğer AI
+              motorları bu ölçümün kapsamına dahil değildir.
+            </p>
+          </section>
           <section>
   <div className="overflow-hidden rounded-[2rem] bg-gradient-to-br from-slate-950 via-indigo-950 to-blue-900 p-7 text-white">
     <div className="grid gap-6 lg:grid-cols-[1.4fr_0.6fr] lg:items-center">
@@ -1146,13 +1005,13 @@ const competitorAverageWebsiteScore = getAverageScore(
         </p>
 
         <h2 className="mt-2 text-3xl font-bold tracking-tight">
-          30 günlük planı uygulamaya başlayalım
+          İlk teslimatı netleştirelim
         </h2>
 
         <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-300">
-          Rapordaki 30 günlük plan; öncelikli içerik, web sitesi ve
-          rakip aksiyonlarını uygulanabilir bir sıraya koyar. İlk adım,
-birinci hafta için belirlenen çalışmaları başlatmaktır.
+          İlk görüşmede genel tavsiyeleri tekrar etmeyeceğiz. Birinci hafta
+          için önerilen teslimatın sayfa yapısını, sorumlusunu ve yayın
+          tarihini birlikte netleştireceğiz.
         </p>
       </div>
 
@@ -1160,18 +1019,25 @@ birinci hafta için belirlenen çalışmaları başlatmaktır.
         <p className="text-sm text-slate-300">Önerilen görüşme</p>
         <p className="mt-1 text-2xl font-bold">15 dakika</p>
         <p className="mt-2 text-sm leading-6 text-slate-300">
-          Raporun sonuçlarını birlikte yorumlamak ve ilk aksiyonları belirlemek
-          için kısa bir görüşme planlanabilir.
+          Hedef soru, önerilen URL ve başarı ölçütü üzerinden ilk teslimatı
+          karara bağlamak için.
         </p>
 
-        <a
-          href={`mailto:${process.env.NEXT_PUBLIC_CONTACT_EMAIL ?? ""}?subject=${encodeURIComponent(
-            `${brand.name} AI görünürlük raporu görüşmesi`
-          )}`}
-          className="mt-4 inline-flex rounded-full bg-white px-4 py-2 text-sm font-semibold text-slate-950"
-        >
-          Görüşme talep et
-        </a>
+        {contactEmail ? (
+          <>
+            <a
+              href={`mailto:${contactEmail}?subject=${encodeURIComponent(
+                `${brand.name} AI görünürlük raporu görüşmesi`
+              )}`}
+              className="report-cta mt-4 inline-flex rounded-full bg-cyan-300 px-4 py-2 text-sm font-semibold text-slate-950"
+            >
+              15 dakikalık görüşme talep et
+            </a>
+            <p className="mt-3 text-xs text-slate-400">
+              {contactEmail}
+            </p>
+          </>
+        ) : null}
       </div>
     </div>
   </div>

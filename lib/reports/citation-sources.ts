@@ -53,6 +53,38 @@ export type CitationIntelligence = {
   citationGaps: CitationGap[];
 };
 
+export type CitationTrendPromptChange = {
+  id: string;
+  promptText: string;
+  promptIntent: string | null;
+  previousSourceHostnames: string[];
+  currentSourceHostnames: string[];
+};
+
+export type CitationTrendSourceChange = {
+  hostname: string;
+  sampleUri: string;
+  category: CitationSourceCategory;
+  competitorName: string | null;
+};
+
+export type CitationTrendComparison = {
+  hasPreviousMeasurement: boolean;
+  comparable: boolean;
+  comparablePromptCount: number;
+  currentSourceUsageRate: number;
+  previousSourceUsageRate: number;
+  sourceUsageDelta: number;
+  currentBrandCitationRate: number;
+  previousBrandCitationRate: number;
+  brandCitationDelta: number;
+  gainedBrandCitations: CitationTrendPromptChange[];
+  lostBrandCitations: CitationTrendPromptChange[];
+  persistentCitationGaps: CitationTrendPromptChange[];
+  newSources: CitationTrendSourceChange[];
+  lostSources: CitationTrendSourceChange[];
+};
+
 const GEMINI_REDIRECT_HOSTS = new Set([
   "vertexaisearch.cloud.google.com",
 ]);
@@ -204,6 +236,263 @@ function toPercentage(value: number, total: number) {
   }
 
   return Math.round((value / total) * 100);
+}
+
+function normalizePromptText(value: string) {
+  return value
+    .trim()
+    .toLocaleLowerCase("tr-TR")
+    .replace(/\s+/g, " ");
+}
+
+function getRunCitationSnapshot(
+  run: CitationRunInput,
+  brandWebsiteUrl: string | null
+) {
+  const citationData = getCitationData(run.citationsValue);
+  const sourceHostnames = Array.from(
+    new Set(
+      citationData.sources
+        .map(getCitationSourceHostname)
+        .filter(
+          (hostname): hostname is string =>
+            hostname !== null
+        )
+    )
+  );
+
+  return {
+    ...run,
+    citationData,
+    sourceHostnames,
+    brandCited: citationData.sources.some((source) =>
+      citationSourceMatchesWebsite(source, brandWebsiteUrl)
+    ),
+  };
+}
+
+export function buildCitationTrendComparison({
+  currentRuns,
+  previousRuns,
+  brandWebsiteUrl,
+  competitors,
+}: {
+  currentRuns: CitationRunInput[];
+  previousRuns: CitationRunInput[];
+  brandWebsiteUrl: string | null;
+  competitors: CitationCompetitorInput[];
+}): CitationTrendComparison {
+  const emptyComparison: CitationTrendComparison = {
+    hasPreviousMeasurement: previousRuns.length > 0,
+    comparable: false,
+    comparablePromptCount: 0,
+    currentSourceUsageRate: 0,
+    previousSourceUsageRate: 0,
+    sourceUsageDelta: 0,
+    currentBrandCitationRate: 0,
+    previousBrandCitationRate: 0,
+    brandCitationDelta: 0,
+    gainedBrandCitations: [],
+    lostBrandCitations: [],
+    persistentCitationGaps: [],
+    newSources: [],
+    lostSources: [],
+  };
+
+  if (currentRuns.length === 0 || previousRuns.length === 0) {
+    return emptyComparison;
+  }
+
+  const previousRunMap = new Map(
+    previousRuns.map((run) => [
+      normalizePromptText(run.promptText),
+      getRunCitationSnapshot(run, brandWebsiteUrl),
+    ])
+  );
+
+  const comparablePairs = currentRuns
+    .map((currentRun) => {
+      const previousRun = previousRunMap.get(
+        normalizePromptText(currentRun.promptText)
+      );
+
+      if (!previousRun) {
+        return null;
+      }
+
+      const currentSnapshot = getRunCitationSnapshot(
+        currentRun,
+        brandWebsiteUrl
+      );
+
+      if (
+        !currentSnapshot.citationData.groundingEnabled ||
+        !previousRun.citationData.groundingEnabled
+      ) {
+        return null;
+      }
+
+      return {
+        current: currentSnapshot,
+        previous: previousRun,
+      };
+    })
+    .filter(
+      (
+        pair
+      ): pair is NonNullable<typeof pair> => pair !== null
+    );
+
+  if (comparablePairs.length === 0) {
+    return emptyComparison;
+  }
+
+  const currentSourceMap = new Map<
+    string,
+    CitationTrendSourceChange
+  >();
+  const previousSourceMap = new Map<
+    string,
+    CitationTrendSourceChange
+  >();
+
+  let currentSourcedPromptCount = 0;
+  let previousSourcedPromptCount = 0;
+  let currentBrandCitedPromptCount = 0;
+  let previousBrandCitedPromptCount = 0;
+
+  const gainedBrandCitations: CitationTrendPromptChange[] = [];
+  const lostBrandCitations: CitationTrendPromptChange[] = [];
+  const persistentCitationGaps: CitationTrendPromptChange[] = [];
+
+  comparablePairs.forEach(({ current, previous }) => {
+    if (current.citationData.sources.length > 0) {
+      currentSourcedPromptCount += 1;
+    }
+
+    if (previous.citationData.sources.length > 0) {
+      previousSourcedPromptCount += 1;
+    }
+
+    if (current.brandCited) {
+      currentBrandCitedPromptCount += 1;
+    }
+
+    if (previous.brandCited) {
+      previousBrandCitedPromptCount += 1;
+    }
+
+    current.citationData.sources.forEach((source) => {
+      const hostname = getCitationSourceHostname(source);
+
+      if (!hostname || currentSourceMap.has(hostname)) {
+        return;
+      }
+
+      const classification = getSourceCategory({
+        source,
+        brandWebsiteUrl,
+        competitors,
+      });
+
+      currentSourceMap.set(hostname, {
+        hostname,
+        sampleUri: source.uri,
+        category: classification.category,
+        competitorName: classification.competitorName,
+      });
+    });
+
+    previous.citationData.sources.forEach((source) => {
+      const hostname = getCitationSourceHostname(source);
+
+      if (!hostname || previousSourceMap.has(hostname)) {
+        return;
+      }
+
+      const classification = getSourceCategory({
+        source,
+        brandWebsiteUrl,
+        competitors,
+      });
+
+      previousSourceMap.set(hostname, {
+        hostname,
+        sampleUri: source.uri,
+        category: classification.category,
+        competitorName: classification.competitorName,
+      });
+    });
+
+    const promptChange: CitationTrendPromptChange = {
+      id: current.id,
+      promptText: current.promptText,
+      promptIntent: current.promptIntent,
+      previousSourceHostnames:
+        previous.sourceHostnames.slice(0, 4),
+      currentSourceHostnames:
+        current.sourceHostnames.slice(0, 4),
+    };
+
+    if (!previous.brandCited && current.brandCited) {
+      gainedBrandCitations.push(promptChange);
+    } else if (previous.brandCited && !current.brandCited) {
+      lostBrandCitations.push(promptChange);
+    } else if (
+      !previous.brandCited &&
+      !current.brandCited &&
+      current.citationData.sources.length > 0
+    ) {
+      persistentCitationGaps.push(promptChange);
+    }
+  });
+
+  const comparablePromptCount = comparablePairs.length;
+  const currentSourceUsageRate = toPercentage(
+    currentSourcedPromptCount,
+    comparablePromptCount
+  );
+  const previousSourceUsageRate = toPercentage(
+    previousSourcedPromptCount,
+    comparablePromptCount
+  );
+  const currentBrandCitationRate = toPercentage(
+    currentBrandCitedPromptCount,
+    comparablePromptCount
+  );
+  const previousBrandCitationRate = toPercentage(
+    previousBrandCitedPromptCount,
+    comparablePromptCount
+  );
+
+  return {
+    hasPreviousMeasurement: true,
+    comparable: true,
+    comparablePromptCount,
+    currentSourceUsageRate,
+    previousSourceUsageRate,
+    sourceUsageDelta:
+      currentSourceUsageRate - previousSourceUsageRate,
+    currentBrandCitationRate,
+    previousBrandCitationRate,
+    brandCitationDelta:
+      currentBrandCitationRate -
+      previousBrandCitationRate,
+    gainedBrandCitations: gainedBrandCitations.slice(0, 4),
+    lostBrandCitations: lostBrandCitations.slice(0, 4),
+    persistentCitationGaps:
+      persistentCitationGaps.slice(0, 4),
+    newSources: Array.from(currentSourceMap.values())
+      .filter(
+        (source) => !previousSourceMap.has(source.hostname)
+      )
+      .slice(0, 6),
+    lostSources: Array.from(previousSourceMap.values())
+      .filter(
+        (source) => !currentSourceMap.has(source.hostname)
+      )
+      .slice(0, 6),
+  };
 }
 
 export function buildCitationIntelligence({

@@ -21,25 +21,25 @@ const scoreItems: Array<{
     key: "technical",
     label: "Teknik",
     action:
-      "İndekslenebilirlik, güvenli bağlantı, canonical ve yapısal veri eksikleri düzeltilmeli.",
+      "Taramada sorun görülen URL’ler için robots/noindex, canonical ve JSON-LD kontrollerini ayrı ayrı tamamlayın; yeniden analizde teknik hata sayısını sıfıra indirin.",
   },
   {
     key: "structure",
     label: "Sayfa yapısı",
     action:
-      "Başlık düzeni, sayfa açıklamaları ve site içi bağlantılar güçlendirilmeli.",
+      "H1 sayısı 1 olmayan ve meta açıklaması bulunmayan taranmış URL’leri düzeltin; her sayfada tek H1, özgün başlık ve 140-160 karakterlik açıklama kullanın.",
   },
   {
     key: "content",
     label: "İçerik",
     action:
-      "Hizmet, ürün, rehber, karşılaştırma ve sık sorulan sorular içerikleri geliştirilmelidir.",
+      "Raporda markanın görünmediği en yüksek öncelikli soru için tek bir karar sayfası yayınlayın; doğrudan cevap, karşılaştırma tablosu, kanıtlar ve SSS bölümlerini aynı URL’de toplayın.",
   },
   {
     key: "trust",
     label: "Güven",
     action:
-      "Hakkımızda, iletişim, referans ve marka güvenini destekleyen bilgiler görünür hâle getirilmelidir.",
+      "`/hakkimizda/guven-ve-kalite` sayfasında şirket unvanı, doğrulanabilir iletişim kanalları, politika bağlantıları, sertifikalar ve tarihli müşteri kanıtlarını tek yerde yayınlayın.",
   },
 ];
 
@@ -86,24 +86,7 @@ export function ClientWebsiteScoreComparison({
   const brandHasScores = hasDetailedScores(brandScoresValue);
 
   if (!brandHasScores || analyzedCompetitors.length === 0) {
-    return (
-      <section className="print:break-after-page">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-indigo-600">
-          03 - Web Sitesi Karşılaştırması
-        </p>
-
-        <h2 className="mt-1 text-2xl font-semibold tracking-tight text-slate-950">
-          Marka ve rakip web sitesi karşılaştırması
-        </h2>
-
-        <div className="mt-5 rounded-3xl border border-slate-200 bg-slate-50 p-5">
-          <p className="text-sm leading-6 text-slate-600">
-            Kategori karşılaştırması için marka ve en az bir rakibin güncel web
-            sitesi analizinin tamamlanması gerekiyor.
-          </p>
-        </div>
-      </section>
-    );
+    return null;
   }
 
   function getCompetitorAverage(key: ScoreKey | "overall") {
@@ -139,7 +122,7 @@ export function ClientWebsiteScoreComparison({
   return (
     <section className="print:break-after-page">
       <p className="text-xs font-semibold uppercase tracking-[0.18em] text-indigo-600">
-        03 - Web Sitesi Karşılaştırması
+        Ek analiz · Web sitesi kıyası
       </p>
 
       <h2 className="mt-1 text-2xl font-semibold tracking-tight text-slate-950">

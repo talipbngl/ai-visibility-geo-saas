@@ -7,6 +7,7 @@ import { ThirtyDayActionPlan } from "@/features/reports/components/ThirtyDayActi
 import { AuditChangeSummary } from "@/features/reports/components/AuditChangeSummary";
 import { PromptVisibilityChanges } from "@/features/reports/components/PromptVisibilityChanges";
 import { CitationSourceIntelligence } from "@/features/reports/components/CitationSourceIntelligence";
+import { CitationTrendComparison } from "@/features/reports/components/CitationTrendComparison";
 import { CompetitorWebsiteComparison } from "@/features/website/components/CompetitorWebsiteComparison";
 import { ReportReadinessPanel } from "@/features/reports/components/ReportReadinessPanel";
 import { PrintReportButton } from "@/features/reports/components/PrintReportButton";
@@ -366,10 +367,14 @@ const { data: analyses } = await supabase
         brand_mentioned,
         brand_rank,
         audit_runs!inner (
-          audit_id,
-          prompt_text_snapshot,
-          prompts (
-            text
+           id,
+            audit_id,
+            prompt_text_snapshot,
+            prompt_intent_snapshot,
+            citations_json,
+            prompts (
+            text,
+            intent
           )
         )
       `
@@ -412,6 +417,19 @@ const previousPromptResults = (
     promptText: getPromptText(run),
     mentioned: analysis.brand_mentioned,
     rank: analysis.brand_rank,
+  };
+});
+const previousCitationRuns = (
+  previousAnalysesResult.data ?? []
+).map((analysis) => {
+  const run = getNestedRun(analysis.audit_runs);
+
+  return {
+    id: analysis.id,
+    promptText: getPromptText(run),
+    promptIntent: getPromptIntent(run),
+    brandMentioned: analysis.brand_mentioned,
+    citationsValue: run?.citations_json ?? null,
   };
 });
   const visibilityScore = Number(score?.visibility_score ?? 0);
@@ -781,6 +799,17 @@ const previousPromptResults = (
     websiteUrl: competitor.website_url,
   }))}
   runs={citationRuns}
+/>
+<CitationTrendComparison
+  brandName={brand.name}
+  brandWebsiteUrl={brand.website_url}
+  competitors={(citationCompetitors ?? []).map((competitor) => ({
+    name: competitor.name,
+    websiteUrl: competitor.website_url,
+  }))}
+  currentRuns={citationRuns}
+  previousRuns={previousCitationRuns}
+  previousDate={previousAudit?.created_at ?? null}
 />
           {competitorStats.length > 0 ? (
             <Card className="shadow-sm">

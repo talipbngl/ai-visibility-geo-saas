@@ -62,30 +62,44 @@ function getAction({
   brandName,
   brandCitationRate,
   citationGapCount,
+  targetPrompt,
+  competingSources,
 }: {
   brandName: string;
   brandCitationRate: number;
   citationGapCount: number;
+  targetPrompt: string | null;
+  competingSources: string[];
 }) {
+  const promptText = targetPrompt
+    ? `“${targetPrompt}”`
+    : "kaynak açığı bulunan öncelikli soru";
+  const sourceText =
+    competingSources.length > 0
+      ? ` AI cevabı şu alan adlarını kullanıyor: ${competingSources.join(
+          ", "
+        )}.`
+      : "";
+
   if (brandCitationRate === 0) {
     return {
       title: `${brandName} henüz kaynak olarak seçilmiyor`,
-      description:
-        "AI cevaplarında başka alan adları kullanılıyor ancak marka sitesi kaynaklar arasında görünmüyor. Öncelik; açık istatistikler, uzman görüşleri, karşılaştırmalar, güncel kategori rehberleri ve doğrudan alıntılanabilir kısa cevaplar üretmek olmalıdır.",
+      description: `İlk teslimat olarak ${promptText} için tek bir kaynak sayfa yayınlayın.${sourceText} Sayfanın ilk paragrafında soruyu doğrudan yanıtlayın; tarihli özgün veri, seçim kriterleri, tarafsız karşılaştırma tablosu, yazar/güncelleme tarihi ve doğrulama bağlantıları ekleyin. Aynı soruyla yeniden ölçümde marka alan adının kaynaklar arasında görünmesini hedefleyin.`,
     };
   }
 
   if (brandCitationRate < 30) {
     return {
       title: "Marka kaynak görünürlüğü sınırlı",
-      description: `${citationGapCount} kaynaklı soruda marka sitesi kullanılmadı. Bu soruların niyetlerine karşılık gelen sayfalarda özgün veri, net ürün veya hizmet açıklamaları ve doğrulanabilir güven unsurları güçlendirilmelidir.`,
+      description: `${citationGapCount} kaynaklı soruda marka sitesi kullanılmadı. Önce ${promptText} için mevcut sayfayı güncelleyin veya yeni bir karar rehberi oluşturun.${sourceText} Sayfaya ölçülebilir veriler, açık karşılaştırma kriterleri, kısa sonuç bölümü ve son güncelleme tarihi ekleyin; yeniden ölçümde marka kaynağı oranının en az bir soru artmasını hedefleyin.`,
     };
   }
 
   return {
     title: "Kaynak görünürlüğünü koruyun ve genişletin",
-    description:
-      "Marka sitesi bazı cevaplarda kaynak olarak kullanılıyor. Sonraki hedef, bu görünürlüğü daha fazla satın alma, karşılaştırma ve güven sorusuna yaymak; tek bir sayfaya bağımlı kalmadan kaynak olabilen içerik sayısını artırmaktır.",
+    description: targetPrompt
+      ? `Marka sitesi bazı cevaplarda kaynak olarak kullanılıyor. Sıradaki teslimat olarak ${promptText} için ayrı bir kaynak sayfa hazırlayın.${sourceText} Mevcut kaynak olan sayfalardaki doğrudan cevap, veri, tarih ve karşılaştırma yapısını bu sayfaya uygulayın.`
+      : "Marka sitesi kaynak kullanılan sorularda görünür durumda. Aynı soru setini değiştirmeden aylık yeniden ölçüm yapın ve kaynak oranında kayıp oluşursa kaynak olan sayfaların güncelliğini kontrol edin.",
   };
 }
 
@@ -104,30 +118,7 @@ export function CitationSourceIntelligence({
 
   if (!intelligence.measured) {
     if (variant === "client") {
-      return (
-        <section className="print:break-inside-avoid">
-          <div className="mb-5">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-indigo-600">
-              Ek analiz · Kaynaklar
-            </p>
-            <h2 className="mt-1 text-2xl font-semibold tracking-tight text-slate-950">
-              Kaynak ve atıf zekâsı
-            </h2>
-          </div>
-
-          <div className="rounded-3xl border border-amber-200 bg-amber-50 p-5">
-            <p className="font-semibold text-amber-950">
-              Kaynak ölçümü yapılmadı
-            </p>
-            <p className="mt-2 text-sm leading-6 text-amber-800">
-              Bu ölçüm web araması etkinleştirilmeden oluşturulduğu için AI
-              cevabında kullanılan kaynaklar ve marka sitesinin atıf oranı
-              değerlendirilemedi. Bu durum sıfır kaynak başarısı anlamına
-              gelmez.
-            </p>
-          </div>
-        </section>
-      );
+      return null;
     }
 
     return (
@@ -154,6 +145,10 @@ export function CitationSourceIntelligence({
     brandName,
     brandCitationRate: intelligence.brandCitationRate,
     citationGapCount: intelligence.citationGaps.length,
+    targetPrompt:
+      intelligence.citationGaps[0]?.promptText ?? null,
+    competingSources:
+      intelligence.citationGaps[0]?.sourceHostnames ?? [],
   });
 
   const metricItems = [
