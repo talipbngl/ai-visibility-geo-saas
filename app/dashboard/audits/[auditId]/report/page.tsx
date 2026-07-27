@@ -6,6 +6,7 @@ import { IntentPerformanceSummary } from "@/features/reports/components/IntentPe
 import { ThirtyDayActionPlan } from "@/features/reports/components/ThirtyDayActionPlan";
 import { AuditChangeSummary } from "@/features/reports/components/AuditChangeSummary";
 import { PromptVisibilityChanges } from "@/features/reports/components/PromptVisibilityChanges";
+import { CitationSourceIntelligence } from "@/features/reports/components/CitationSourceIntelligence";
 import { CompetitorWebsiteComparison } from "@/features/website/components/CompetitorWebsiteComparison";
 import { ReportReadinessPanel } from "@/features/reports/components/ReportReadinessPanel";
 import { PrintReportButton } from "@/features/reports/components/PrintReportButton";
@@ -54,6 +55,7 @@ type NestedRun = {
   prompt_text_snapshot?: string | null;
   prompt_intent_snapshot?: string | null;
   prompt_priority_snapshot?: number | null;
+  citations_json?: unknown;
   prompts?: NestedPrompt | NestedPrompt[] | null;
 };
 
@@ -179,6 +181,10 @@ export default async function AuditReportPage({ params }: AuditReportPageProps) 
   if (!brand) {
     notFound();
   }
+  const { data: citationCompetitors } = await supabase
+  .from("competitors")
+  .select("id, name, website_url")
+  .eq("brand_id", brand.id);
 
   const { data: websiteSnapshots } = await supabase
     .from("brand_website_snapshots")
@@ -340,6 +346,7 @@ const { data: analyses } = await supabase
       prompt_text_snapshot,
       prompt_intent_snapshot,
       prompt_priority_snapshot,
+      citations_json,
       prompts (
         id,
         text,
@@ -384,6 +391,17 @@ const currentPromptResults = (analyses ?? []).map(
     };
   }
 );
+const citationRuns = (analyses ?? []).map((analysis) => {
+  const run = getNestedRun(analysis.audit_runs);
+
+  return {
+    id: analysis.id,
+    promptText: getPromptText(run),
+    promptIntent: getPromptIntent(run),
+    brandMentioned: analysis.brand_mentioned,
+    citationsValue: run?.citations_json ?? null,
+  };
+});
 
 const previousPromptResults = (
   previousAnalysesResult.data ?? []
@@ -755,6 +773,15 @@ const previousPromptResults = (
   recommendations={recommendations ?? []}
 />
 <IntentPerformanceSummary items={intentPerformance} />
+<CitationSourceIntelligence
+  brandName={brand.name}
+  brandWebsiteUrl={brand.website_url}
+  competitors={(citationCompetitors ?? []).map((competitor) => ({
+    name: competitor.name,
+    websiteUrl: competitor.website_url,
+  }))}
+  runs={citationRuns}
+/>
           {competitorStats.length > 0 ? (
             <Card className="shadow-sm">
               <CardHeader>
