@@ -70,12 +70,33 @@ function toRecord(value: unknown): Record<string, unknown> {
   return value as Record<string, unknown>;
 }
 
+const genericOfferKeywords = new Set([
+  "hizmet",
+  "ürün",
+  "çözüm",
+  "paket",
+  "fiyat",
+  "kampanya",
+  "randevu",
+  "online",
+  "destek",
+  "başvuru",
+  "iletişim",
+]);
+
+function normalizeKeyword(value: string) {
+  return value
+    .toLocaleLowerCase("tr-TR")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function getFoundKeywordSignals(value: unknown) {
   if (!Array.isArray(value)) {
     return [];
   }
 
-  return value
+  const foundKeywords = value
     .map((rawSignal) => {
       const signal = toRecord(rawSignal);
       const keyword = String(signal.keyword ?? "").trim();
@@ -85,6 +106,21 @@ function getFoundKeywordSignals(value: unknown) {
       return found && keyword ? keyword : null;
     })
     .filter((keyword): keyword is string => keyword !== null);
+
+  const sectorSpecificKeywords = foundKeywords.filter(
+    (keyword) =>
+      !genericOfferKeywords.has(normalizeKeyword(keyword))
+  );
+
+  /*
+   * Genel tarama kelimeleri preset dizisinin başında yer alır. En az bir
+   * sektörel sinyal bulunduğunda "hizmet, ürün, çözüm" gibi yüzeysel
+   * kelimeleri rapora taşımak yerine doğrudan sektörel sinyalleri kullanırız.
+   * Bilinmeyen sektörlerde ise genel kelimeler güvenli geri dönüş olarak kalır.
+   */
+  return sectorSpecificKeywords.length > 0
+    ? sectorSpecificKeywords
+    : foundKeywords;
 }
 
 function toNullableNumber(value: unknown) {
@@ -261,6 +297,7 @@ function buildEvidenceItems({
       answerExcerpt: getAnswerExcerpt({
         answer: run.rawAnswer,
         terms: [brandName, ...mentionedCompetitors],
+        maximumLength: 240,
       }),
       engineLabel: getEngineLabel(run),
     };

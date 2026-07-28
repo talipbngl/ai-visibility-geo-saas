@@ -240,6 +240,35 @@
     page-break-inside: avoid !important;
   }
 
+  .client-report .action-plan-screen-heading {
+    display: none !important;
+  }
+
+  .client-report .action-plan-print-heading {
+    display: block !important;
+  }
+
+  .client-report .action-plan-cards {
+    display: block !important;
+  }
+
+  .client-report .action-brief-card {
+    break-inside: avoid-page !important;
+    page-break-inside: avoid !important;
+    margin: 0 !important;
+  }
+
+  .client-report .action-brief-card + .action-brief-card {
+    break-before: page !important;
+    page-break-before: always !important;
+  }
+
+  .client-report .action-deliverable {
+    max-width: 48% !important;
+    white-space: normal !important;
+    overflow-wrap: anywhere !important;
+  }
+
   .client-report .space-y-8 > :not([hidden]) ~ :not([hidden]) {
     margin-top: 18px !important;
   }
@@ -335,9 +364,7 @@
   }
 
   .client-report tr,
-  .client-report table,
-  .client-report .rounded-3xl,
-  .client-report .rounded-\[2rem\] {
+  .client-report table {
     break-inside: avoid;
     page-break-inside: avoid;
   }

@@ -106,11 +106,24 @@ function EvidenceCard({
 
 function ActionBriefCard({
   action,
+  printPlanTitle,
 }: {
   action: ClientActionBrief;
+  printPlanTitle?: string | undefined;
 }) {
   return (
-    <article className="print-avoid overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+    <article className="action-brief-card print-avoid overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+      {printPlanTitle ? (
+        <div className="action-plan-print-heading hidden border-b border-slate-200 bg-white px-5 py-3">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-indigo-600">
+            04 - Uygulama Planı
+          </p>
+          <h2 className="mt-1 text-lg font-semibold tracking-tight text-slate-950">
+            {printPlanTitle}
+          </h2>
+        </div>
+      ) : null}
+
       <div className="border-b border-slate-200 bg-slate-950 p-5 text-white">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
@@ -127,7 +140,7 @@ function ActionBriefCard({
             </div>
           </div>
 
-          <span className="rounded-full bg-white/10 px-3 py-1 text-xs ring-1 ring-white/20">
+          <span className="action-deliverable max-w-full rounded-full bg-white/10 px-3 py-1 text-right text-xs leading-5 ring-1 ring-white/20 sm:max-w-[48%]">
             {action.deliverable}
           </span>
         </div>
@@ -244,8 +257,8 @@ export function ClientEvidenceActionPlan({
         </section>
       ) : null}
 
-      <section className="report-page">
-        <div className="mb-5">
+      <section className="action-plan-section report-page">
+        <div className="action-plan-screen-heading mb-5">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-indigo-600">
             04 - Uygulama Planı
           </p>
@@ -259,9 +272,17 @@ export function ClientEvidenceActionPlan({
         </div>
 
         {actionBriefs.length > 0 ? (
-          <div className="grid gap-5">
-            {actionBriefs.map((action) => (
-              <ActionBriefCard action={action} key={action.id} />
+          <div className="action-plan-cards grid gap-5">
+            {actionBriefs.map((action, index) => (
+              <ActionBriefCard
+                action={action}
+                key={action.id}
+                printPlanTitle={
+                  index === 0
+                    ? `${brandName} hangi işi, hangi sırayla yapmalı?`
+                    : undefined
+                }
+              />
             ))}
           </div>
         ) : (

@@ -120,7 +120,7 @@ export function ClientWebsiteScoreComparison({
     .slice(0, 3);
 
   return (
-    <section className="print:break-after-page">
+    <section className="website-score-comparison">
       <p className="text-xs font-semibold uppercase tracking-[0.18em] text-indigo-600">
         Ek analiz · Web sitesi kıyası
       </p>
@@ -130,8 +130,9 @@ export function ClientWebsiteScoreComparison({
       </h2>
 
       <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-        {brandName} ile analiz edilen rakiplerin teknik, yapısal, içerik ve
-        güven puanlarını karşılaştırır.
+        {brandName} ile tam kapsamlı analizi bulunan{" "}
+        {analyzedCompetitors.length} rakibin teknik, yapısal, içerik ve güven
+        puanlarını karşılaştırır.
       </p>
 
       <div className="mt-6 grid gap-4 md:grid-cols-3">
@@ -150,6 +151,9 @@ export function ClientWebsiteScoreComparison({
           </p>
           <p className="mt-2 text-3xl font-bold text-slate-950">
             {competitorOverall}/100
+          </p>
+          <p className="mt-2 text-xs leading-5 text-violet-700">
+            {analyzedCompetitors.length} tam kapsamlı rakip analizi
           </p>
         </div>
 
