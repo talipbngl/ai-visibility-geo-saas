@@ -14,6 +14,11 @@ import {
 } from "@/lib/reports/client-action-briefs";
 import { buildIntentPerformance } from "@/lib/reports/intent-performance";
 import { getIntentLabel } from "@/lib/ui/labels";
+import {
+  buildCompetitorMentionTerms,
+  findFirstMentionIndex,
+  uniqueMentionTerms,
+} from "@/lib/analysis/mention-detection";
 export const metadata = {
   title: "AI Yanıt Görünürlüğü Ölçüm Raporu",
 };
@@ -202,6 +207,24 @@ export default async function ClientReportPage({
   .from("competitors")
   .select("id, name, website_url")
   .eq("brand_id", brand.id);
+  const { data: brandAliasRows } = await supabase
+  .from("brand_aliases")
+  .select("alias")
+  .eq("brand_id", brand.id);
+
+const seededPromptTerms = uniqueMentionTerms([
+  ...buildCompetitorMentionTerms({
+    name: brand.name,
+    aliases: (brandAliasRows ?? []).map((row) => row.alias),
+    websiteUrl: brand.website_url,
+  }),
+  ...(citationCompetitors ?? []).flatMap((competitor) =>
+    buildCompetitorMentionTerms({
+      name: competitor.name,
+      websiteUrl: competitor.website_url,
+    })
+  ),
+]);
 
   const { data: score } = await supabase
     .from("audit_scores")
@@ -354,12 +377,81 @@ const clientReportRuns = (analyses ?? []).map((analysis) => {
     brandRank: analysis.brand_rank,
     brandSentiment: analysis.brand_sentiment,
     rawAnswer: run?.raw_answer ?? "",
-    engine: run?.engine ?? null,
+        engine: run?.engine ?? null,
     model: run?.model ?? null,
     competitors,
+    isSeededPrompt:
+      findFirstMentionIndex(
+        promptText,
+        seededPromptTerms
+      ) !== null,
   };
 });
+const discoveryRuns = clientReportRuns.filter(
+  (run) => !run.isSeededPrompt
+);
 
+const seededRuns = clientReportRuns.filter(
+  (run) => run.isSeededPrompt
+);
+
+const discoveryVisibleRuns = discoveryRuns.filter(
+  (run) => run.brandMentioned
+);
+
+const seededVisibleRuns = seededRuns.filter(
+  (run) => run.brandMentioned
+);
+
+const discoveryPromptCount = discoveryRuns.length;
+
+const discoveryVisibilityScore =
+  discoveryPromptCount > 0
+    ? Math.round(
+        (discoveryVisibleRuns.length /
+          discoveryPromptCount) *
+          100
+      )
+    : 0;
+
+const discoveryCompetitorMentionCount =
+  discoveryRuns.reduce(
+    (total, run) =>
+      total +
+      run.competitors.filter(
+        (competitor) => competitor.mentioned
+      ).length,
+    0
+  );
+
+const discoveryTotalMentions =
+  discoveryVisibleRuns.length +
+  discoveryCompetitorMentionCount;
+
+const discoveryShareOfVoice =
+  discoveryTotalMentions > 0
+    ? Math.round(
+        (discoveryVisibleRuns.length /
+          discoveryTotalMentions) *
+          100
+      )
+    : 0;
+
+const discoveryRanks = discoveryVisibleRuns
+  .map((run) => run.brandRank)
+  .filter((rank): rank is number => rank !== null);
+
+const discoveryAverageRank =
+  discoveryRanks.length > 0
+    ? Math.round(
+        (discoveryRanks.reduce(
+          (total, rank) => total + rank,
+          0
+        ) /
+          discoveryRanks.length) *
+          10
+      ) / 10
+    : null;
 const previousPromptResults = (
   previousAnalysesResult.data ?? []
 ).map((analysis) => {
@@ -456,15 +548,6 @@ category_scores_json: snapshot.category_scores_json,
 created_at: snapshot.created_at,
     };
   });
-
-    const visibilityScore = Math.round(
-    Number(score?.visibility_score ?? 0)
-  );
-
-  const shareOfVoice = Math.round(
-    Number(score?.share_of_voice ?? 0)
-  );
-
   const citationScore =
     score?.citation_score === null ||
     score?.citation_score === undefined
@@ -472,15 +555,8 @@ created_at: snapshot.created_at,
       : Math.round(
           Number(score.citation_score)
         );
-
-  const averageRank =
-    score?.average_rank ?? null;
-
-  const visibleAnalyses =
-    analyses?.filter((analysis) => analysis.brand_mentioned) ?? [];
-
   const intentPerformance = buildIntentPerformance(
-    clientReportRuns.map((run) => ({
+  discoveryRuns.map((run) => ({
       intent: run.promptIntent,
       brandMentioned: run.brandMentioned,
       brandRank: run.brandRank,
@@ -518,31 +594,32 @@ created_at: snapshot.created_at,
     }
   >();
 
-  (analyses ?? []).forEach((analysis) => {
-    const competitors = Array.isArray(analysis.competitors_json)
-      ? (analysis.competitors_json as CompetitorVisibility[])
-      : [];
+  discoveryRuns.forEach((run) => {
+  run.competitors.forEach((competitor) => {
+    if (!competitor.mentioned) return;
 
-    competitors.forEach((competitor) => {
-      if (!competitor.mentioned) return;
+    const current = competitorStatsMap.get(
+      competitor.name
+    ) ?? {
+      name: competitor.name,
+      mentionCount: 0,
+      rankSum: 0,
+      rankCount: 0,
+    };
 
-      const current = competitorStatsMap.get(competitor.name) ?? {
-        name: competitor.name,
-        mentionCount: 0,
-        rankSum: 0,
-        rankCount: 0,
-      };
+    current.mentionCount += 1;
 
-      current.mentionCount += 1;
+    if (competitor.rank) {
+      current.rankSum += competitor.rank;
+      current.rankCount += 1;
+    }
 
-      if (competitor.rank) {
-        current.rankSum += competitor.rank;
-        current.rankCount += 1;
-      }
-
-      competitorStatsMap.set(competitor.name, current);
-    });
+    competitorStatsMap.set(
+      competitor.name,
+      current
+    );
   });
+});
 
   const competitorStats = Array.from(competitorStatsMap.values())
     .map((competitor) => ({
@@ -588,7 +665,7 @@ const competitorWebsiteScores =
       targetAudience: brand.target_audience,
       primaryOffer: brand.primary_offer,
     },
-    runs: clientReportRuns,
+    runs: discoveryRuns,
     serviceSignalsValue:
       websiteSnapshot?.service_signals_json ?? null,
     technicalSignalsValue:
@@ -598,9 +675,9 @@ const competitorWebsiteScores =
     audit.completed_prompts,
     analyses?.length ?? 0
   );
-  const primaryGap = clientReportRuns.find(
-    (run) => !run.brandMentioned
-  );
+  const primaryGap = discoveryRuns.find(
+  (run) => !run.brandMentioned
+);
   const productName =
     process.env.NEXT_PUBLIC_PRODUCT_NAME?.trim() || "ASPEQO";
   const contactEmail =
@@ -609,14 +686,21 @@ const competitorWebsiteScores =
   const reportNumber = `ASP-${reportYear}-${audit.id
     .slice(0, 8)
     .toUpperCase()}`;
-  const executiveSummary = primaryGap
-    ? `${brand.name}, Gemini üzerinde test edilen ${completedPromptCount} sorunun ${visibleAnalyses.length} tanesinde görünürken “${primaryGap.promptText}” sorusunda görünmedi. ${
-        strongestCompetitor
-          ? `${strongestCompetitor.name}, ${strongestCompetitor.mentionCount}/${completedPromptCount} cevapta görünerek en sık görülen rakip oldu.`
-          : "Bu soruda takip edilen rakiplerden belirgin bir görünürlük üstünlüğü tespit edilmedi."
-      } Öncelik, aşağıdaki kanıt kartında belirtilen soruya doğrudan cevap veren kaynak sayfayı yayınlamaktır.`
-    : `${brand.name}, Gemini üzerinde test edilen ${completedPromptCount} sorunun tamamında görünür durumda. Bu sonuç tüm AI aramalarına genellenmez; mevcut soru setindeki görünürlüğü gösterir. Sonraki adım, soru setini genişletmek ve markanın ilk iki öneri arasındaki konumunu korumaktır.`;
+  const seededTestNote =
+  seededRuns.length > 0
+    ? ` Marka veya takip edilen rakip adının soru metninde açıkça geçtiği ${seededRuns.length} kontrol sorusunun ${seededVisibleRuns.length} tanesinde marka görünmüştür. Bu sorular yönlendirmesiz keşif oranına dahil edilmemiştir.`
+    : "";
 
+const executiveSummary =
+  discoveryPromptCount === 0
+    ? `Bu ölçüm setinde marka veya takip edilen rakip adı geçmeyen yönlendirmesiz bir keşif sorusu bulunmuyor. Doğal görünürlüğü ölçebilmek için en az beş tarafsız kullanıcı sorusu eklenmelidir.${seededTestNote}`
+    : primaryGap
+      ? `${brand.name}, marka veya takip edilen rakip adı geçmeyen ${discoveryPromptCount} yönlendirmesiz sorunun ${discoveryVisibleRuns.length} tanesinde görünürken “${primaryGap.promptText}” sorusunda görünmedi. ${
+          strongestCompetitor
+            ? `${strongestCompetitor.name}, yönlendirmesiz soruların ${strongestCompetitor.mentionCount}/${discoveryPromptCount} tanesinde görünerek en sık görülen takip edilen rakip oldu.`
+            : "Yönlendirmesiz sorularda takip edilen rakiplerden belirgin bir görünürlük üstünlüğü tespit edilmedi."
+        } Öncelik, aşağıdaki kanıt kartında belirtilen kullanıcı ihtiyacını doğrudan karşılayan mevcut sayfayı güçlendirmek veya uygun sayfa bulunmuyorsa yeni bir karar sayfası hazırlamaktır.${seededTestNote}`
+      : `${brand.name}, marka veya takip edilen rakip adı geçmeyen ${discoveryPromptCount} yönlendirmesiz sorunun tamamında görünür durumda. Sonraki adım, bu konumu daha geniş bir tarafsız soru setinde doğrulamak ve ilk iki öneri arasındaki yerini korumaktır.${seededTestNote}`;
   return (
     <main className="min-h-screen bg-slate-100 text-slate-950 print:bg-white">
       <div className="mx-auto max-w-6xl px-6 py-6 print:max-w-none print:px-0 print:py-0">
@@ -693,32 +777,41 @@ const competitorWebsiteScores =
                   </div>
 
                   <div className="rounded-[1.5rem] bg-white/10 p-6 ring-1 ring-white/20 backdrop-blur">
-                    <p className="text-sm text-slate-300">
-                      Test seti görünürlük oranı
-                    </p>
-                    <p className="mt-3 text-7xl font-bold">
-                      %{visibilityScore}
-                    </p>
-                    <p className="mt-3 text-sm font-semibold text-cyan-200">
-                      {visibleAnalyses.length}/{completedPromptCount} soruda
-                      marka görünür
-                    </p>
+  <p className="text-sm text-slate-300">
+    Yönlendirmesiz keşif görünürlüğü
+  </p>
 
-                    <div className="mt-6 h-3 overflow-hidden rounded-full bg-white/10">
-                      <div
-                        className="h-full rounded-full bg-gradient-to-r from-cyan-300 to-blue-500"
-                        style={{
-                          width: `${Math.min(visibilityScore, 100)}%`,
-                        }}
-                      />
-                    </div>
+  <p className="mt-3 text-7xl font-bold">
+    %{discoveryVisibilityScore}
+  </p>
 
-                    <div className="mt-6 grid gap-2 text-xs leading-5 text-slate-400">
-                      <p>Rapor tarihi: {formatDate(audit.created_at)}</p>
-                      <p>Sektör: {brand.industry ?? "Belirtilmedi"}</p>
-                      <p>Pazar: {brand.country ?? "TR"} / {brand.language ?? "tr"}</p>
-                    </div>
-                  </div>
+  <p className="mt-3 text-sm font-semibold text-cyan-200">
+    {discoveryVisibleRuns.length}/
+    {discoveryPromptCount} tarafsız soruda marka
+    görünür
+  </p>
+
+  <div className="mt-6 h-3 overflow-hidden rounded-full bg-white/10">
+    <div
+      className="h-full rounded-full bg-gradient-to-r from-cyan-300 to-blue-500"
+      style={{
+        width: `${Math.min(
+          discoveryVisibilityScore,
+          100
+        )}%`,
+      }}
+    />
+  </div>
+
+  <div className="mt-6 grid gap-2 text-xs leading-5 text-slate-400">
+    <p>Rapor tarihi: {formatDate(audit.created_at)}</p>
+    <p>Sektör: {brand.industry ?? "Belirtilmedi"}</p>
+    <p>
+      Pazar: {brand.country ?? "TR"} /{" "}
+      {brand.language ?? "tr"}
+    </p>
+  </div>
+</div>
                 </div>
               </div>
             </section>
@@ -744,25 +837,25 @@ const competitorWebsiteScores =
               }`}
             >
               <MetricBox
-                label="Test seti görünürlüğü"
-                value={`%${visibilityScore}`}
-                helper={`${visibleAnalyses.length}/${completedPromptCount} soruda marka adı geçti`}
-                tone="blue"
-              />
+                  label="Yönlendirmesiz görünürlük"
+                  value={`%${discoveryVisibilityScore}`}
+                  helper={`${discoveryVisibleRuns.length}/${discoveryPromptCount} tarafsız soruda marka adı geçti`}
+                  tone="blue"
+                />
 
-              <MetricBox
-                label="Görünürlük Payı"
-                value={`${shareOfVoice}%`}
-                helper="Marka ve takip edilen rakiplerin toplam görünürlüğü içindeki pay"
-                tone="purple"
-              />
+                <MetricBox
+                  label="Yönlendirmesiz görünürlük payı"
+                  value={`${discoveryShareOfVoice}%`}
+                  helper="Tarafsız sorularda marka ve takip edilen rakiplerin toplam görünürlüğü içindeki pay"
+                  tone="purple"
+                />
 
-              <MetricBox
-                label="Ortalama Sıra"
-                value={averageRank ?? "-"}
-                helper="Marka cevapta geçtiğinde rakiplere göre yaklaşık konum"
-                tone="green"
-              />
+                <MetricBox
+                  label="Yönlendirmesiz ortalama sıra"
+                  value={discoveryAverageRank ?? "-"}
+                  helper="Marka tarafsız cevapta geçtiğinde rakiplere göre yaklaşık konum"
+                  tone="green"
+                />
 
               {hasCitationMeasurement ? (
                 <MetricBox
@@ -773,6 +866,21 @@ const competitorWebsiteScores =
                 />
               ) : null}
             </div>
+            {seededRuns.length > 0 ? (
+                  <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+                    <p className="font-semibold text-amber-950">
+                      İsim içeren kontrol soruları ayrı hesaplandı
+                    </p>
+
+                    <p className="mt-1 text-sm leading-6 text-amber-800">
+                      Marka veya takip edilen rakip adının soru
+                      metninde geçtiği {seededRuns.length} sorunun{" "}
+                      {seededVisibleRuns.length} tanesinde marka
+                      görünmüştür. Bu sonuçlar yönlendirmesiz keşif
+                      skoruna eklenmemiştir.
+                    </p>
+                  </div>
+                ) : null}
 
             <div className="mt-6 rounded-3xl border border-slate-200 bg-slate-50 p-5">
               <p className="font-semibold text-slate-950">
@@ -900,7 +1008,8 @@ const competitorWebsiteScores =
               </div>
 
               <p className="mt-4 text-xs leading-5 text-slate-500">
-                Bu bölüm yalnızca en az iki soruyla ölçülen kullanıcı
+                Bu bölüm yalnızca marka veya takip edilen rakip adının soru
+                metninde geçmediği ve en az iki soruyla ölçülen kullanıcı
                 niyetlerini gösterir.
               </p>
             </section>
@@ -910,7 +1019,7 @@ const competitorWebsiteScores =
               <SectionTitle
                 eyebrow="02 - Rakip Görünürlüğü"
                 title="AI cevaplarında rakip karşılaştırması"
-                description={`${completedPromptCount} test sorusunda markanın ve cevapta gerçekten görünen rakiplerin konumu.`}
+description={`${discoveryPromptCount} yönlendirmesiz soruda markanın ve cevapta gerçekten görünen rakiplerin konumu.`}
               />
 
               <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
@@ -938,10 +1047,10 @@ const competitorWebsiteScores =
                         {brand.name}
                       </td>
                       <td className="px-5 py-4">
-                        {visibleAnalyses.length}/{completedPromptCount}
+                       {discoveryVisibleRuns.length}/{discoveryPromptCount}
                       </td>
                       <td className="px-5 py-4">
-                        {averageRank ?? "-"}
+                        {discoveryAverageRank ?? "-"}
                       </td>
                       <td className="px-5 py-4 text-slate-600">
                         Ölçülen marka
@@ -957,7 +1066,7 @@ const competitorWebsiteScores =
                           {competitor.name}
                         </td>
                         <td className="px-5 py-4">
-                          {competitor.mentionCount}/{completedPromptCount}
+                          {competitor.mentionCount}/{discoveryPromptCount}
                         </td>
                         <td className="px-5 py-4">
                           {competitor.averageRank ?? "-"}
@@ -1019,13 +1128,17 @@ const competitorWebsiteScores =
   </h2>
 
   <p className="mt-2 text-sm leading-6 text-slate-600">
-    Rapor; Gemini üzerinde çalıştırılan {completedPromptCount} test
-    sorusu, takip edilen {citationCompetitors?.length ?? 0} rakip
-    {websiteSnapshot
-      ? " ve otomatik olarak taranabilen marka web sayfaları"
-      : ""}
-    {" "}kullanılarak hazırlanmıştır.
-  </p>
+  Rapor; Gemini üzerinde çalıştırılan{" "}
+  {completedPromptCount} test sorusundan{" "}
+  {discoveryPromptCount} yönlendirmesiz keşif sorusu ve{" "}
+  {seededRuns.length} isim içeren kontrol sorusu kullanılarak
+  hazırlanmıştır. Takip edilen{" "}
+  {citationCompetitors?.length ?? 0} rakip
+  {websiteSnapshot
+    ? " ve otomatik olarak taranabilen marka web sayfaları"
+    : ""}
+  {" "}analize dahil edilmiştir.
+</p>
 
   <p className="mt-3 text-sm leading-6 text-slate-600">
     {hasCitationMeasurement

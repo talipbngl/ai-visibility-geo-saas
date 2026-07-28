@@ -318,7 +318,16 @@ function slugify(value: string) {
     .replace(/\s+/g, "-")
     .replace(/^-+|-+$/g, "");
 }
-
+function removeLeadingAlternativeSeed(
+  value: string
+) {
+  return value
+    .replace(
+      /^.+?\s+dışında\s*,?\s*/iu,
+      ""
+    )
+    .trim();
+}
 function getTopicSlug({
   promptText,
   brandContext,
@@ -326,8 +335,16 @@ function getTopicSlug({
   promptText: string;
   brandContext: BrandStrategyContext;
 }) {
-  const location = findTurkishLocation(promptText);
-  const promptTokens = normalizeStrategyText(promptText)
+    const cleanedPromptText =
+    removeLeadingAlternativeSeed(promptText);
+
+  const location = findTurkishLocation(
+    cleanedPromptText
+  );
+
+  const promptTokens = normalizeStrategyText(
+    cleanedPromptText
+  )
     .split(" ")
     .filter(
       (token) =>
@@ -347,7 +364,8 @@ function getTopicSlug({
 }
 
 function getPromptTopicLabel(promptText: string) {
-  const normalizedPrompt = promptText
+  const normalizedPrompt =
+  removeLeadingAlternativeSeed(promptText)
     .replace(/\s+/g, " ")
     .replace(/[?!.]+$/g, "")
     .trim();
