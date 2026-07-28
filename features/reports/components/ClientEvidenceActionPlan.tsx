@@ -43,6 +43,14 @@ function getStatusPresentation(
   };
 }
 
+function toSentenceCase(value: string) {
+  if (!value) return value;
+
+  return `${value
+    .charAt(0)
+    .toLocaleUpperCase("tr-TR")}${value.slice(1)}`;
+}
+
 function EvidenceCard({
   item,
 }: {
@@ -174,7 +182,7 @@ function ActionBriefCard({
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-cyan-700">
               Önerilen adres
             </p>
-            <p className="mt-2 break-all font-mono text-sm text-cyan-950">
+            <p className="mt-2 break-words font-mono text-sm text-cyan-950">
               {action.suggestedPath}
             </p>
           </div>
@@ -201,7 +209,7 @@ function ActionBriefCard({
                   className="mt-0.5 size-4 shrink-0 text-emerald-600"
                   aria-hidden="true"
                 />
-                {section}
+                {toSentenceCase(section)}
               </li>
             ))}
           </ul>
