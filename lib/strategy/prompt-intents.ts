@@ -113,23 +113,118 @@ export function normalizeStrategyText(value: string) {
 }
 
 function includesAny(value: string, terms: string[]) {
-  return terms.some((term) => value.includes(term));
+  return terms.some((term) =>
+    matchesNormalizedPattern(value, term)
+  );
+}
+
+function matchesNormalizedPattern(value: string, pattern: string) {
+  const valueTokens = normalizeStrategyText(value)
+    .split(" ")
+    .filter(Boolean);
+  const patternParts = pattern
+    .trim()
+    .split(/\s+/)
+    .map((part) => {
+      const prefix = part.endsWith("*");
+      const normalizedPart = normalizeStrategyText(
+        prefix ? part.slice(0, -1) : part
+      );
+
+      return {
+        value: normalizedPart,
+        prefix: prefix && normalizedPart.length >= 4,
+      };
+    })
+    .filter((part) => part.value.length > 0);
+
+  if (valueTokens.length === 0 || patternParts.length === 0) {
+    return false;
+  }
+
+  for (
+    let startIndex = 0;
+    startIndex <= valueTokens.length - patternParts.length;
+    startIndex += 1
+  ) {
+    const matches = patternParts.every((part, partIndex) => {
+      const token = valueTokens[startIndex + partIndex];
+
+      return part.prefix
+        ? token.startsWith(part.value)
+        : token === part.value;
+    });
+
+    if (matches) return true;
+  }
+
+  return false;
 }
 
 export function findTurkishLocation(value: string) {
-  const normalizedValue = normalizeStrategyText(value);
-
   return (
     turkishLocations.find((location) =>
-      normalizedValue.includes(location)
+      matchesNormalizedPattern(value, location)
     ) ?? null
   );
+}
+
+const storedIntentAliases: Record<string, PromptIntent> = {
+  "satin alma": "buying_intent",
+  "satin alma niyeti": "buying_intent",
+  "buying intent": "buying_intent",
+  karsilastirma: "comparison",
+  comparison: "comparison",
+  "yerel oneri": "local_recommendation",
+  "local recommendation": "local_recommendation",
+  "sorun ve cozum": "problem_solution",
+  "problem solution": "problem_solution",
+  "alternatif arama": "alternative_search",
+  "alternative search": "alternative_search",
+  "butce dostu": "budget_friendly",
+  "budget friendly": "budget_friendly",
+  "premium secim": "premium_choice",
+  "premium choice": "premium_choice",
+  "guven ve itibar": "trust_reputation",
+  "trust reputation": "trust_reputation",
+};
+
+function resolveStoredPromptIntent(
+  storedIntent: string | null | undefined
+): PromptIntent | null {
+  const trimmedIntent = storedIntent?.trim();
+
+  if (
+    trimmedIntent &&
+    promptIntents.includes(trimmedIntent as PromptIntent)
+  ) {
+    return trimmedIntent as PromptIntent;
+  }
+
+  const normalizedIntent = normalizeStrategyText(
+    storedIntent ?? ""
+  );
+
+  return storedIntentAliases[normalizedIntent] ?? null;
 }
 
 export function resolvePromptIntent(
   promptText: string,
   storedIntent: string | null | undefined
 ): PromptIntent | null {
+  /*
+   * Veritabanındaki geçerli niyet kullanıcı veya soru üretim sistemi
+   * tarafından bilinçli olarak seçilmiştir. Önce onu koruruz. Böylece
+   * problem_solution değerinin normalizasyon sırasında "problem solution"
+   * olup kaybolması ve soruların "Diğer" altında toplanması önlenir.
+   */
+  const resolvedStoredIntent =
+    resolveStoredPromptIntent(storedIntent);
+
+  if (resolvedStoredIntent) {
+    return resolvedStoredIntent;
+  }
+
   const normalizedPrompt = normalizeStrategyText(promptText);
 
   if (
@@ -140,6 +235,7 @@ export function resolvePromptIntent(
       "butce",
       "fiyat performans",
       "hesapli",
+      "dusuk maliyet*",
     ])
   ) {
     return "budget_friendly";
@@ -154,7 +250,7 @@ export function resolvePromptIntent(
       "hangisi daha",
       "hangisini sec",
       "versus",
-      " vs ",
+      "vs",
     ])
   ) {
     return "comparison";
@@ -172,6 +268,8 @@ export function resolvePromptIntent(
       "paket sec",
       "abonelik",
       "fiyat teklifi",
+      "secerken hangi",
+      "hangi teknik ozellik*",
     ])
   ) {
     return "buying_intent";
@@ -202,9 +300,13 @@ export function resolvePromptIntent(
       "itibar",
       "yorumlari",
       "sikayet",
-      "sertifika",
+      "sertifika*",
       "lisansli",
       "yetkili",
+      "yetkinlik",
+      "uzmanlig* nasil dogrulan*",
+      "uzmanlik nasil dogrulan*",
+      "dogrulanabilir",
     ])
   ) {
     return "trust_reputation";
@@ -227,9 +329,13 @@ export function resolvePromptIntent(
       "nasil cozulur",
       "nasil cozerim",
       "sorun",
+      "problem",
+      "ariza",
+      "plansiz durus",
+      "onceden tespit",
       "neden olmuyor",
       "ne yapmaliyim",
-      "cozumu",
+      "cozum*",
       "nasil giderilir",
     ])
   ) {
@@ -254,13 +360,5 @@ export function resolvePromptIntent(
     return "alternative_search";
   }
 
-  const normalizedStoredIntent = normalizeStrategyText(
-    storedIntent ?? ""
-  );
-
-  return promptIntents.includes(
-    normalizedStoredIntent as PromptIntent
-  )
-    ? (normalizedStoredIntent as PromptIntent)
-    : null;
+  return null;
 }

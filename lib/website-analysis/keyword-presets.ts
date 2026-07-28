@@ -1,4 +1,8 @@
-import { resolveBusinessArchetype } from "@/lib/strategy/business-archetypes";
+import {
+  matchesStrategyTerm,
+  resolveBusinessArchetype,
+  type BusinessArchetype,
+} from "@/lib/strategy/business-archetypes";
 
 type KeywordPreset = {
   serviceKeywords: string[];
@@ -391,16 +395,270 @@ const marketplacePreset: KeywordPreset = {
   ],
 };
 
-function normalizeIndustry(value: string | null | undefined) {
-  return (value ?? "")
-    .toLocaleLowerCase("tr-TR")
-    .replace(/ı/g, "i")
-    .replace(/ğ/g, "g")
-    .replace(/ü/g, "u")
-    .replace(/ş/g, "s")
-    .replace(/ö/g, "o")
-    .replace(/ç/g, "c");
-}
+const industrialB2bPreset: KeywordPreset = {
+  serviceKeywords: [
+    "kestirimci bakım",
+    "vibrasyon analizi",
+    "durum izleme",
+    "online izleme",
+    "titreşim sensörü",
+    "lazerli kaplin ayarı",
+    "yerinde balans",
+    "ultrasonik kontrol",
+    "termal kamera",
+    "kalibrasyon",
+    "devreye alma",
+    "teknik eğitim",
+    "saha hizmeti",
+    "ölçüm raporu",
+    "bakım planı",
+  ],
+  trustKeywords: [
+    "iso 18436",
+    "sertifikalı uzman",
+    "kalibrasyon sertifikası",
+    "yetkili distribütör",
+    "teknik ekip",
+    "referans proje",
+    "vaka çalışması",
+    "örnek rapor",
+    "cihaz parkı",
+    "servis merkezi",
+    "garanti",
+    "teknik destek",
+  ],
+};
+
+const energyEnvironmentPreset: KeywordPreset = {
+  serviceKeywords: [
+    "ön fizibilite",
+    "saha keşfi",
+    "projelendirme",
+    "kurulum",
+    "devreye alma",
+    "enerji izleme",
+    "bakım",
+    "üretim tahmini",
+    "tasarruf hesabı",
+    "karbon hesabı",
+    "atık yönetimi",
+    "arıtma",
+  ],
+  trustKeywords: [
+    "yetki belgesi",
+    "lisans",
+    "mühendislik ekibi",
+    "ekipman garantisi",
+    "performans garantisi",
+    "üretim raporu",
+    "tasarruf raporu",
+    "proje referansı",
+    "çevre izni",
+    "iş güvenliği",
+  ],
+};
+
+const agricultureFoodPreset: KeywordPreset = {
+  serviceKeywords: [
+    "ürün grubu",
+    "üretim kapasitesi",
+    "hasat",
+    "tedarik",
+    "numune",
+    "analiz",
+    "depolama",
+    "soğuk zincir",
+    "paketleme",
+    "izlenebilirlik",
+    "toptan satış",
+    "ihracat",
+  ],
+  trustKeywords: [
+    "üretim tesisi",
+    "menşei",
+    "parti numarası",
+    "analiz sertifikası",
+    "kalite belgesi",
+    "gıda güvenliği",
+    "organik sertifika",
+    "halal",
+    "iso 22000",
+    "üretici belgesi",
+    "referans",
+  ],
+};
+
+const logisticsTransportPreset: KeywordPreset = {
+  serviceKeywords: [
+    "taşıma türü",
+    "hizmet hattı",
+    "çıkış noktası",
+    "varış noktası",
+    "teslim süresi",
+    "yük takibi",
+    "depolama",
+    "gümrükleme",
+    "sigorta",
+    "parsiyel",
+    "komple yük",
+    "teklif",
+  ],
+  trustKeywords: [
+    "yetki belgesi",
+    "araç filosu",
+    "taşıyıcı ağı",
+    "teslimat kanıtı",
+    "hizmet seviyesi",
+    "hasar prosedürü",
+    "sigorta kapsamı",
+    "iso 9001",
+    "referans",
+    "canlı takip",
+  ],
+};
+
+const automotivePreset: KeywordPreset = {
+  serviceKeywords: [
+    "araç uyumluluğu",
+    "model",
+    "şasi",
+    "yedek parça",
+    "bakım",
+    "onarım",
+    "servis randevusu",
+    "stok",
+    "işçilik",
+    "garanti",
+    "fiyat teklifi",
+    "teslim süresi",
+  ],
+  trustKeywords: [
+    "yetkili servis",
+    "usta belgesi",
+    "orijinal parça",
+    "parça garantisi",
+    "işçilik garantisi",
+    "servis kaydı",
+    "test sonucu",
+    "müşteri yorumu",
+    "açık adres",
+    "telefon",
+  ],
+};
+
+const realEstateConstructionPreset: KeywordPreset = {
+  serviceKeywords: [
+    "proje",
+    "konum",
+    "net alan",
+    "brüt alan",
+    "kat planı",
+    "teknik şartname",
+    "teslim tarihi",
+    "ödeme planı",
+    "fiyat",
+    "satılık",
+    "kiralık",
+    "randevu",
+  ],
+  trustKeywords: [
+    "tapu",
+    "ruhsat",
+    "iskan",
+    "yapı denetim",
+    "şirket unvanı",
+    "teslim edilmiş proje",
+    "proje referansı",
+    "sözleşme",
+    "açık adres",
+    "iletişim",
+  ],
+};
+
+const financeInsurancePreset: KeywordPreset = {
+  serviceKeywords: [
+    "uygunluk koşulları",
+    "faiz oranı",
+    "getiri",
+    "prim",
+    "vade",
+    "teminat",
+    "istisna",
+    "ücret",
+    "komisyon",
+    "hesaplama",
+    "başvuru",
+    "iptal",
+  ],
+  trustKeywords: [
+    "lisans",
+    "yetkili kurum",
+    "bddk",
+    "spk",
+    "seddk",
+    "risk bildirimi",
+    "sözleşme",
+    "poliçe",
+    "güncelleme tarihi",
+    "gizlilik",
+    "kvkk",
+    "iletişim",
+  ],
+};
+
+const mediaPublishingPreset: KeywordPreset = {
+  serviceKeywords: [
+    "konular",
+    "haber",
+    "makale",
+    "dosya",
+    "bülten",
+    "abonelik",
+    "podcast",
+    "video",
+    "arşiv",
+    "yazar",
+  ],
+  trustKeywords: [
+    "künye",
+    "editör",
+    "yazar profili",
+    "kaynakça",
+    "yayın tarihi",
+    "güncelleme tarihi",
+    "düzeltme politikası",
+    "sahiplik",
+    "iletişim",
+    "gizlilik",
+  ],
+};
+
+const nonprofitPublicPreset: KeywordPreset = {
+  serviceKeywords: [
+    "hizmet",
+    "program",
+    "başvuru",
+    "üyelik",
+    "gerekli belgeler",
+    "işlem süresi",
+    "duyuru",
+    "etkinlik",
+    "mevzuat",
+    "bağış",
+  ],
+  trustKeywords: [
+    "hukuki statü",
+    "yönetim",
+    "faaliyet raporu",
+    "mali rapor",
+    "resmi belge",
+    "karar",
+    "mevzuat",
+    "açık adres",
+    "iletişim",
+    "kvkk",
+  ],
+};
 
 function mergePresets(...presets: KeywordPreset[]): KeywordPreset {
   return {
@@ -418,52 +676,66 @@ function mergePresets(...presets: KeywordPreset[]): KeywordPreset {
 }
 
 export function getWebsiteKeywordPreset(industry: string | null | undefined) {
-  const normalizedIndustry = normalizeIndustry(industry);
   const genericPreset = {
     serviceKeywords: genericServiceKeywords,
     trustKeywords: genericTrustKeywords,
   };
+  const matchesAny = (terms: string[]) =>
+    terms.some((term) =>
+      matchesStrategyTerm(industry ?? "", term)
+    );
 
   if (
-    normalizedIndustry.includes("dis") ||
-    normalizedIndustry.includes("dental") ||
-    normalizedIndustry.includes("klinik")
+    matchesAny([
+      "dis",
+      "dis hekim*",
+      "dis klinigi",
+      "agiz ve dis sagligi",
+      "dental",
+    ])
   ) {
     return mergePresets(genericPreset, dentalPreset);
   }
 
   if (
-    normalizedIndustry.includes("kahve") ||
-    normalizedIndustry.includes("cafe") ||
-    normalizedIndustry.includes("kafe") ||
-    normalizedIndustry.includes("coffee")
+    matchesAny(["kahve", "cafe", "kafe", "coffee"])
   ) {
     return mergePresets(genericPreset, coffeePreset);
   }
 
   if (
-    normalizedIndustry.includes("egitim") ||
-    normalizedIndustry.includes("kurs") ||
-    normalizedIndustry.includes("okul") ||
-    normalizedIndustry.includes("lgs") ||
-    normalizedIndustry.includes("yks")
+    matchesAny([
+      "egitim",
+      "kurs",
+      "okul",
+      "lgs",
+      "yks",
+      "tyt",
+      "ayt",
+    ])
   ) {
     return mergePresets(genericPreset, educationPreset);
   }
 
   if (
-    normalizedIndustry.includes("e-ticaret") ||
-    normalizedIndustry.includes("eticaret") ||
-    normalizedIndustry.includes("ecommerce") ||
-    normalizedIndustry.includes("magaza")
+    matchesAny([
+      "e ticaret",
+      "eticaret",
+      "ecommerce",
+      "online magaza",
+    ])
   ) {
     return mergePresets(genericPreset, ecommercePreset);
   }
 
   if (
-    normalizedIndustry.includes("estetik") ||
-    normalizedIndustry.includes("guzellik") ||
-    normalizedIndustry.includes("medikal")
+    matchesAny([
+      "medikal estetik",
+      "estetik klinigi",
+      "guzellik merkezi",
+      "botoks",
+      "sac ekimi",
+    ])
   ) {
     return mergePresets(genericPreset, aestheticPreset);
   }
@@ -473,8 +745,15 @@ export function getWebsiteKeywordPreset(industry: string | null | undefined) {
   });
 
   const archetypePresets: Partial<
-    Record<typeof archetype, KeywordPreset>
+    Record<BusinessArchetype, KeywordPreset>
   > = {
+    industrial_b2b: industrialB2bPreset,
+    energy_environment: energyEnvironmentPreset,
+    agriculture_food_production: agricultureFoodPreset,
+    logistics_transport: logisticsTransportPreset,
+    automotive: automotivePreset,
+    real_estate_construction: realEstateConstructionPreset,
+    finance_insurance: financeInsurancePreset,
     saas: saasPreset,
     hospitality: hospitalityPreset,
     professional_service: professionalServicePreset,
@@ -484,6 +763,8 @@ export function getWebsiteKeywordPreset(industry: string | null | undefined) {
     education: educationPreset,
     healthcare: healthcarePreset,
     consumer_brand: consumerBrandPreset,
+    media_publishing: mediaPublishingPreset,
+    nonprofit_public: nonprofitPublicPreset,
   };
   const archetypePreset = archetypePresets[archetype];
 

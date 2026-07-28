@@ -37,6 +37,83 @@ const archetypeProfiles: Record<
   BusinessArchetype,
   ArchetypeProfile
 > = {
+  industrial_b2b: {
+    categoryLabel: "endüstriyel çözüm",
+    decisionCriteria:
+      "ölçüm veya çalışma yöntemi, desteklenen makine ve tesis türleri, teknik uyumluluk, veri toplama sıklığı, entegrasyon, alarm ve raporlama yetenekleri, kurulum süresi ve toplam sahip olma maliyeti",
+    proofRequirements:
+      "uzman ekibin ilgili sertifikaları, kullanılan cihaz ve kalibrasyon bilgileri, örnek ölçüm veya analiz raporu, benzer tesis referansları, kapsamı açıklanmış vaka sonuçları ve satış sonrası destek koşulları",
+    conversionStep:
+      "makine envanteri ve ihtiyaç formu, saha keşfi, pilot ölçüm, teknik teklif, devreye alma ve kabul kriterleri",
+    mainPath: "endustriyel-cozumler",
+    localPath: "saha-hizmetleri",
+  },
+  energy_environment: {
+    categoryLabel: "enerji veya çevre çözümü",
+    decisionCriteria:
+      "tesis kapasitesi, saha uygunluğu, kullanılan teknoloji, beklenen üretim veya tasarruf, bağlantı ve izin gereksinimleri, bakım süreci, geri ödeme süresi ve toplam proje maliyeti",
+    proofRequirements:
+      "yetki ve yeterlilik belgeleri, keşif verileri, üretim veya tasarruf hesabının varsayımları, ekipman garantileri, izleme raporları ve doğrulanabilir proje referansları",
+    conversionStep:
+      "ön fizibilite, saha keşfi, projelendirme, izin ve bağlantı adımları, teklif, kurulum ve performans kabulü",
+    mainPath: "enerji-cevre-cozumleri",
+    localPath: "proje-bolgeleri",
+  },
+  agriculture_food_production: {
+    categoryLabel: "tarım veya üretim çözümü",
+    decisionCriteria:
+      "ürün veya üretim türü, kapasite, iklim ve saha koşulları, girdi gereksinimleri, verim, izlenebilirlik, kalite standardı, teslimat ve toplam maliyet",
+    proofRequirements:
+      "üretim yeri ve süreç bilgileri, analiz veya kalite belgeleri, parti ve menşe izlenebilirliği, saha denemeleri, verim sonuçları ve doğrulanabilir üretici referansları",
+    conversionStep:
+      "ihtiyaç ve kapasite tespiti, numune veya saha denemesi, sezon ve teslimat planı, teklif ve kalite kabul kriterleri",
+    mainPath: "tarim-uretim-cozumleri",
+    localPath: "uretim-bolgeleri",
+  },
+  logistics_transport: {
+    categoryLabel: "lojistik hizmeti",
+    decisionCriteria:
+      "taşıma türü, çıkış ve varış noktaları, kapasite, teslim süresi, takip imkânı, aktarma ve depolama koşulları, sigorta, hasar sorumluluğu ve toplam maliyet",
+    proofRequirements:
+      "yetki belgeleri, araç veya taşıyıcı ağı, takip ve teslim kanıtı, hizmet seviyesi verileri, sigorta kapsamı, hasar prosedürü ve benzer hat referansları",
+    conversionStep:
+      "yük ve rota bilgilerinin alınması, kapasite kontrolü, fiyat teklifi, rezervasyon, takip ve teslim onayı",
+    mainPath: "lojistik-cozumleri",
+    localPath: "hizmet-hatlari",
+  },
+  automotive: {
+    categoryLabel: "otomotiv ürünü veya hizmeti",
+    decisionCriteria:
+      "araç uyumluluğu, teknik özellikler, parça veya işçilik kapsamı, bakım aralığı, garanti, teslim süresi, servis ağı ve toplam kullanım maliyeti",
+    proofRequirements:
+      "şasi veya model bazlı uyumluluk verisi, parça ve işçilik garantisi, yetkili servis veya ustalık belgeleri, test sonuçları, servis kayıtları ve doğrulanabilir müşteri kanıtları",
+    conversionStep:
+      "araç bilgilerinin doğrulanması, uygunluk ve stok kontrolü, randevu veya teklif, işlem onayı ve servis sonrası kayıt",
+    mainPath: "otomotiv-cozumleri",
+    localPath: "servis-noktalari",
+  },
+  real_estate_construction: {
+    categoryLabel: "gayrimenkul veya yapı çözümü",
+    decisionCriteria:
+      "konum, tapu ve ruhsat durumu, net ve brüt alan, teknik şartname, teslim tarihi, kullanım veya kira potansiyeli, ödeme planı ve toplam maliyet",
+    proofRequirements:
+      "açık proje ve şirket bilgileri, tapu veya ruhsat doğrulaması, teknik şartname, güncel görseller, teslim edilmiş proje referansları ve sözleşme koşulları",
+    conversionStep:
+      "uygunluk ve bütçe görüşmesi, belge paylaşımı, yer veya proje ziyareti, teklif, sözleşme ve teslim adımları",
+    mainPath: "projeler",
+    localPath: "bolgeler",
+  },
+  finance_insurance: {
+    categoryLabel: "finansal ürün veya sigorta",
+    decisionCriteria:
+      "uygunluk koşulları, faiz veya getiri yapısı, prim ve ücretler, vade, teminatlar, istisnalar, risk düzeyi, cayma veya iptal koşulları ve toplam maliyet",
+    proofRequirements:
+      "yetkili kurum ve lisans bilgileri, güncel oran ve ücret tarihi, sözleşme ve poliçe koşulları, risk bildirimleri, hesaplama örnekleri ve resmi doküman bağlantıları",
+    conversionStep:
+      "uygunluk kontrolü, teklif veya hesaplama, zorunlu bilgilendirmeler, kimlik doğrulama, başvuru ve onay adımları",
+    mainPath: "finansal-cozumler",
+    localPath: "subeler",
+  },
   local_service: {
     categoryLabel: "hizmet",
     decisionCriteria:
@@ -135,6 +212,28 @@ const archetypeProfiles: Record<
       "arama, karşılaştırma, teklif veya işlem başlatma adımları",
     mainPath: "kategoriler",
     localPath: "bolgeler",
+  },
+  media_publishing: {
+    categoryLabel: "yayın veya içerik kaynağı",
+    decisionCriteria:
+      "konu kapsamı, yayın sıklığı, editoryal yöntem, yazar uzmanlığı, kaynak kullanımı, düzeltme politikası, erişim biçimi ve abonelik koşulları",
+    proofRequirements:
+      "yazar ve editör bilgileri, açık kaynak bağlantıları, yayın ve güncelleme tarihi, düzeltme politikası, sahiplik bilgisi ve doğrulanabilir yayın geçmişi",
+    conversionStep:
+      "ilgili içerik serisine erişim, bülten veya abonelik seçimi, kurumsal kullanım koşulları ve iletişim adımı",
+    mainPath: "konular",
+    localPath: "yerel-yayinlar",
+  },
+  nonprofit_public: {
+    categoryLabel: "kamu veya sivil toplum hizmeti",
+    decisionCriteria:
+      "yararlanma veya üyelik koşulları, hizmet kapsamı, yetki alanı, gerekli belgeler, başvuru kanalı, işlem süresi, ücretler ve itiraz yolu",
+    proofRequirements:
+      "kuruluşun hukuki statüsü, yönetim ve iletişim bilgileri, resmi belgeler, faaliyet ve mali raporlar, güncel mevzuat veya karar bağlantıları ve ölçülebilir etki sonuçları",
+    conversionStep:
+      "uygunluk kontrolü, gerekli belgelerin hazırlanması, resmi başvuru veya üyelik, takip ve sonuç bildirim adımları",
+    mainPath: "hizmetler-ve-programlar",
+    localPath: "hizmet-birimleri",
   },
   generic_business: {
     categoryLabel: "ürün veya hizmet",
