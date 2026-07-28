@@ -67,7 +67,7 @@ export default async function EditCompetitorPage({
       <PageHeader
         eyebrow="Rakip Düzenleme"
         title={`${competitor.name} bilgilerini düzenle`}
-        description={`${brand.name} markası için rakip bilgilerini ve aliasları güncelle.`}
+        description={`${brand.name} markası için rakip bilgilerini ve farklı yazımlarını güncelle.`}
         actions={
           <Button asChild variant="outline">
             <Link href={`/dashboard/brands/${brand.id}/competitors`}>
@@ -95,7 +95,9 @@ export default async function EditCompetitorPage({
 
           <CardContent className="space-y-4 text-sm">
             <div className="rounded-xl border bg-background/80 p-4">
-              <p className="font-medium">Aliaslar önemli</p>
+              <p className="font-medium">
+                Farklı yazımlar önemli
+              </p>
               <p className="mt-1 text-muted-foreground">
                 AI cevabında rakip farklı yazımlarla geçebilir. Her satıra bir
                 farklı yazım ekle.
@@ -105,8 +107,8 @@ export default async function EditCompetitorPage({
             <div className="rounded-xl border bg-background/80 p-4">
               <p className="font-medium">Rakip adı net olmalı</p>
               <p className="mt-1 text-muted-foreground">
-                Analiz motoru rakip görünürlüğünü bu ad ve aliaslar üzerinden
-                yakalar.
+                Analiz motoru rakip görünürlüğünü bu ad ve farklı yazımlar
+                üzerinden yakalar.
               </p>
             </div>
           </CardContent>
@@ -158,7 +160,9 @@ export default async function EditCompetitorPage({
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="aliases">Rakip aliasları</Label>
+                <Label htmlFor="aliases">
+                  Rakip adının farklı yazımları
+                </Label>
                 <Textarea
                   id="aliases"
                   name="aliases"

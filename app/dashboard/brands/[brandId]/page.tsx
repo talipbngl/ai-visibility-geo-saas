@@ -339,7 +339,7 @@ export default async function BrandDetailPage({
 
         <Card className="shadow-sm">
           <CardHeader>
-            <CardTitle>Marka Aliasları</CardTitle>
+            <CardTitle>Marka Adının Farklı Yazımları</CardTitle>
             <CardDescription>
               AI cevaplarında markayı yakalamak için kullanılan farklı yazımlar.
             </CardDescription>
@@ -356,7 +356,7 @@ export default async function BrandDetailPage({
               </div>
             ) : (
               <EmptyState
-                title="Henüz alias eklenmedi"
+                title="Henüz farklı bir yazım eklenmedi"
                 description="Markanın farklı yazımları analiz kalitesini artırır."
               />
             )}

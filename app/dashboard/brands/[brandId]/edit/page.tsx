@@ -87,9 +87,11 @@ export default async function EditBrandPage({
 
           <CardContent className="space-y-4 text-sm">
             <div className="rounded-xl border bg-background/80 p-4">
-              <p className="font-medium">Aliasları dikkatli gir</p>
+              <p className="font-medium">
+                Farklı yazımları dikkatli gir
+              </p>
               <p className="mt-1 text-muted-foreground">
-                Marka farklı yazımlarla geçiyorsa her satıra bir alias ekle.
+                Marka farklı biçimlerde geçiyorsa her satıra bir yazım ekle.
               </p>
             </div>
 
@@ -145,7 +147,7 @@ export default async function EditBrandPage({
                     id="industry"
                     name="industry"
                     defaultValue={brand.industry ?? ""}
-                    placeholder="Kahve / E-ticaret"
+                    placeholder="Örn. diş kliniği, SaaS, eğitim, e-ticaret"
                   />
                 </div>
 
@@ -201,7 +203,9 @@ export default async function EditBrandPage({
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="aliases">Marka aliasları</Label>
+                <Label htmlFor="aliases">
+                  Marka adının farklı yazımları
+                </Label>
                 <Textarea
                   id="aliases"
                   name="aliases"

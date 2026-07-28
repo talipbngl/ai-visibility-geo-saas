@@ -1,3 +1,5 @@
+import { resolveBusinessArchetype } from "@/lib/strategy/business-archetypes";
+
 type KeywordPreset = {
   serviceKeywords: string[];
   trustKeywords: string[];
@@ -202,6 +204,193 @@ const aestheticPreset: KeywordPreset = {
   ],
 };
 
+const saasPreset: KeywordPreset = {
+  serviceKeywords: [
+    "özellikler",
+    "entegrasyon",
+    "fiyatlandırma",
+    "ücretsiz deneme",
+    "demo",
+    "api",
+    "mobil uygulama",
+    "raporlama",
+    "otomasyon",
+    "destek",
+    "kurulum",
+    "abonelik",
+  ],
+  trustKeywords: [
+    "güvenlik",
+    "kvkk",
+    "gdpr",
+    "durum sayfası",
+    "hizmet seviyesi",
+    "sla",
+    "müşteri hikayesi",
+    "entegrasyon",
+    "dokümantasyon",
+    "destek",
+  ],
+};
+
+const hospitalityPreset: KeywordPreset = {
+  serviceKeywords: [
+    "rezervasyon",
+    "müsaitlik",
+    "oda",
+    "menü",
+    "konum",
+    "olanaklar",
+    "kahvaltı",
+    "etkinlik",
+    "check-in",
+    "iptal",
+    "fiyat",
+    "paket",
+  ],
+  trustKeywords: [
+    "misafir yorumu",
+    "adres",
+    "harita",
+    "iletişim",
+    "iptal koşulları",
+    "erişilebilirlik",
+    "hijyen",
+    "ruhsat",
+    "gizlilik",
+  ],
+};
+
+const professionalServicePreset: KeywordPreset = {
+  serviceKeywords: [
+    "hizmet alanı",
+    "danışmanlık",
+    "uzmanlık",
+    "süreç",
+    "teklif",
+    "ücret",
+    "randevu",
+    "ön görüşme",
+    "proje",
+    "teslimat",
+  ],
+  trustKeywords: [
+    "ekip",
+    "uzman",
+    "yetki belgesi",
+    "referans",
+    "vaka çalışması",
+    "müşteri yorumu",
+    "gizlilik",
+    "sözleşme",
+    "iletişim",
+  ],
+};
+
+const localServicePreset: KeywordPreset = {
+  serviceKeywords: [
+    "hizmet bölgesi",
+    "randevu",
+    "çalışma saati",
+    "fiyat",
+    "teklif",
+    "acil hizmet",
+    "bakım",
+    "kurulum",
+    "servis",
+    "garanti",
+  ],
+  trustKeywords: [
+    "adres",
+    "harita",
+    "telefon",
+    "ekip",
+    "yetkili servis",
+    "ruhsat",
+    "garanti",
+    "müşteri yorumu",
+    "referans",
+  ],
+};
+
+const healthcarePreset: KeywordPreset = {
+  serviceKeywords: [
+    "uzmanlık alanı",
+    "muayene",
+    "ön değerlendirme",
+    "tedavi",
+    "randevu",
+    "doktor",
+    "klinik",
+    "hasta kabul",
+    "ücret",
+    "sigorta",
+  ],
+  trustKeywords: [
+    "hekim",
+    "uzman",
+    "diploma",
+    "ruhsat",
+    "bilimsel kaynak",
+    "hasta hakları",
+    "aydınlatılmış onam",
+    "kvkk",
+    "adres",
+    "iletişim",
+  ],
+};
+
+const consumerBrandPreset: KeywordPreset = {
+  serviceKeywords: [
+    "ürünler",
+    "çeşitler",
+    "içindekiler",
+    "teknik özellikler",
+    "kullanım",
+    "fiyat",
+    "stok",
+    "satış noktası",
+    "mağaza",
+    "sipariş",
+  ],
+  trustKeywords: [
+    "kalite",
+    "sertifika",
+    "üretim",
+    "menşei",
+    "garanti",
+    "iade",
+    "müşteri hizmetleri",
+    "yorum",
+    "iletişim",
+  ],
+};
+
+const marketplacePreset: KeywordPreset = {
+  serviceKeywords: [
+    "kategori",
+    "arama",
+    "filtre",
+    "satıcı",
+    "hizmet veren",
+    "teklif",
+    "komisyon",
+    "ücret",
+    "ödeme",
+    "teslimat",
+  ],
+  trustKeywords: [
+    "doğrulanmış profil",
+    "güvenli ödeme",
+    "yorum",
+    "puan",
+    "alıcı koruması",
+    "satıcı politikası",
+    "uyuşmazlık",
+    "destek",
+  ],
+};
+
 function normalizeIndustry(value: string | null | undefined) {
   return (value ?? "")
     .toLocaleLowerCase("tr-TR")
@@ -213,15 +402,34 @@ function normalizeIndustry(value: string | null | undefined) {
     .replace(/ç/g, "c");
 }
 
+function mergePresets(...presets: KeywordPreset[]): KeywordPreset {
+  return {
+    serviceKeywords: Array.from(
+      new Set(
+        presets.flatMap((preset) => preset.serviceKeywords)
+      )
+    ),
+    trustKeywords: Array.from(
+      new Set(
+        presets.flatMap((preset) => preset.trustKeywords)
+      )
+    ),
+  };
+}
+
 export function getWebsiteKeywordPreset(industry: string | null | undefined) {
   const normalizedIndustry = normalizeIndustry(industry);
+  const genericPreset = {
+    serviceKeywords: genericServiceKeywords,
+    trustKeywords: genericTrustKeywords,
+  };
 
   if (
     normalizedIndustry.includes("dis") ||
     normalizedIndustry.includes("dental") ||
     normalizedIndustry.includes("klinik")
   ) {
-    return dentalPreset;
+    return mergePresets(genericPreset, dentalPreset);
   }
 
   if (
@@ -230,7 +438,7 @@ export function getWebsiteKeywordPreset(industry: string | null | undefined) {
     normalizedIndustry.includes("kafe") ||
     normalizedIndustry.includes("coffee")
   ) {
-    return coffeePreset;
+    return mergePresets(genericPreset, coffeePreset);
   }
 
   if (
@@ -240,7 +448,7 @@ export function getWebsiteKeywordPreset(industry: string | null | undefined) {
     normalizedIndustry.includes("lgs") ||
     normalizedIndustry.includes("yks")
   ) {
-    return educationPreset;
+    return mergePresets(genericPreset, educationPreset);
   }
 
   if (
@@ -249,7 +457,7 @@ export function getWebsiteKeywordPreset(industry: string | null | undefined) {
     normalizedIndustry.includes("ecommerce") ||
     normalizedIndustry.includes("magaza")
   ) {
-    return ecommercePreset;
+    return mergePresets(genericPreset, ecommercePreset);
   }
 
   if (
@@ -257,11 +465,29 @@ export function getWebsiteKeywordPreset(industry: string | null | undefined) {
     normalizedIndustry.includes("guzellik") ||
     normalizedIndustry.includes("medikal")
   ) {
-    return aestheticPreset;
+    return mergePresets(genericPreset, aestheticPreset);
   }
 
-  return {
-    serviceKeywords: genericServiceKeywords,
-    trustKeywords: genericTrustKeywords,
+  const archetype = resolveBusinessArchetype({
+    industry,
+  });
+
+  const archetypePresets: Partial<
+    Record<typeof archetype, KeywordPreset>
+  > = {
+    saas: saasPreset,
+    hospitality: hospitalityPreset,
+    professional_service: professionalServicePreset,
+    local_service: localServicePreset,
+    marketplace: marketplacePreset,
+    ecommerce: ecommercePreset,
+    education: educationPreset,
+    healthcare: healthcarePreset,
+    consumer_brand: consumerBrandPreset,
   };
+  const archetypePreset = archetypePresets[archetype];
+
+  return archetypePreset
+    ? mergePresets(genericPreset, archetypePreset)
+    : genericPreset;
 }

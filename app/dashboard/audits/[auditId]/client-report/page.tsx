@@ -189,7 +189,9 @@ export default async function ClientReportPage({
 
   const { data: brand } = await supabase
     .from("brands")
-    .select("id, name, website_url, industry, country, language")
+    .select(
+      "id, name, website_url, industry, country, language, description, target_audience, primary_offer"
+    )
     .eq("id", audit.brand_id)
     .maybeSingle();
 
@@ -580,7 +582,15 @@ const competitorWebsiteScores =
   const hasCitationMeasurement = citationScore !== null;
   const clientReportBriefs = buildClientReportBriefs({
     brandName: brand.name,
+    brandContext: {
+      industry: brand.industry,
+      description: brand.description,
+      targetAudience: brand.target_audience,
+      primaryOffer: brand.primary_offer,
+    },
     runs: clientReportRuns,
+    serviceSignalsValue:
+      websiteSnapshot?.service_signals_json ?? null,
     technicalSignalsValue:
       websiteSnapshot?.technical_signals_json ?? null,
   });

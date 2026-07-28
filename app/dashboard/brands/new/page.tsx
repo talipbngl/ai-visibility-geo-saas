@@ -97,7 +97,7 @@ export default async function NewBrandPage({
                   <Input
                     id="name"
                     name="name"
-                    placeholder="Fit Kahve"
+                    placeholder="Marka veya işletme adı"
                     required
                   />
                 </div>
@@ -107,7 +107,7 @@ export default async function NewBrandPage({
                   <Input
                     id="websiteUrl"
                     name="websiteUrl"
-                    placeholder="https://www.fitkahve.com"
+                    placeholder="https://www.ornekmarka.com"
                   />
                 </div>
               </div>
@@ -118,7 +118,7 @@ export default async function NewBrandPage({
                   <Input
                     id="industry"
                     name="industry"
-                    placeholder="Kahve / E-ticaret"
+                    placeholder="Örn. diş kliniği, SaaS, eğitim, e-ticaret"
                   />
                 </div>
 
@@ -138,7 +138,7 @@ export default async function NewBrandPage({
                 <Textarea
                   id="description"
                   name="description"
-                  placeholder="Türkiye'de taze kavrulmuş kahve satan online marka."
+                  placeholder="Markanın ne sunduğunu, hangi pazarda çalıştığını ve temel farkını kısaca yazın."
                   rows={3}
                 />
               </div>
@@ -149,7 +149,7 @@ export default async function NewBrandPage({
                   <Textarea
                     id="targetAudience"
                     name="targetAudience"
-                    placeholder="Evde kaliteli kahve içmek isteyen 25-40 yaş arası kullanıcılar"
+                    placeholder="Ürünü veya hizmeti kimlerin, hangi ihtiyaçla tercih ettiğini yazın."
                     rows={3}
                   />
                 </div>
@@ -159,18 +159,22 @@ export default async function NewBrandPage({
                   <Textarea
                     id="primaryOffer"
                     name="primaryOffer"
-                    placeholder="Uygun fiyatlı, taze kavrulmuş filtre kahve ve abonelik paketi"
+                    placeholder="Ölçümde öne çıkarmak istediğiniz ana ürün, hizmet veya paket"
                     rows={3}
                   />
                 </div>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="aliases">Marka aliasları</Label>
+                <Label htmlFor="aliases">
+                  Marka adının farklı yazımları
+                </Label>
                 <Textarea
                   id="aliases"
                   name="aliases"
-                  placeholder={"Fit Kahve\nfitkahve.com\nFitKahve Türkiye"}
+                  placeholder={
+                    "Marka Adı\nmarkaadi.com\nMarka Adı Türkiye"
+                  }
                   rows={4}
                 />
                 <p className="text-xs text-muted-foreground">

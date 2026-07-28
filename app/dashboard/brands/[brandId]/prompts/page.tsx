@@ -291,7 +291,7 @@ const passivePromptCount = visiblePrompts.filter(
                     <Textarea
                       id="text"
                       name="text"
-                      placeholder="Türkiye'de alınabilecek en iyi filtre kahve markaları hangileri?"
+                      placeholder="Küçük işletmeler için müşteri takibini kolaylaştıran çözümler hangileri?"
                       rows={4}
                       required
                     />

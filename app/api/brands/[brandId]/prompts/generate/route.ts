@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { fetchWithTimeout } from "@/lib/gemini/fetch-with-timeout";
+import {
+  businessArchetypeLabels,
+  resolveBusinessArchetype,
+} from "@/lib/strategy/business-archetypes";
+import { resolvePromptIntent } from "@/lib/strategy/prompt-intents";
 import { createClient } from "@/lib/supabase/server";
 
 const generatedPromptSchema = z.object({
@@ -312,6 +317,12 @@ export async function POST(request: Request, context: RouteContext) {
     brandName: brand.name,
     aliases: brandAliases,
   });
+  const brandArchetype = resolveBusinessArchetype({
+    industry: brand.industry,
+    description: brand.description,
+    targetAudience: brand.target_audience,
+    primaryOffer: brand.primary_offer,
+  });
 
   const neutralPromptCount = Math.ceil(promptCount * 0.7);
   const maxBrandMentionedPromptCount = promptCount - neutralPromptCount;
@@ -333,6 +344,9 @@ Kesin kurallar:
 - "Marka nerede?", "Marka saat kaça kadar açık?", "Marka neden tercih edilmeli?", "Marka fiyatları nedir?" gibi doğrudan marka/navigasyon soruları üretme.
 - Satın alma niyeti yüksek ama tarafsız sorular üret.
 - Rakip karşılaştırması yapılabilecek doğal promptlar üret.
+- Marka profiline göre gerçek karar ölçütlerini kullan; sektör bilgisini genel kelimelerle geçiştirme.
+- Aynı soru setinde ihtiyaç, seçim, karşılaştırma ve güven gibi farklı karar aşamalarını kapsa.
+- Aşağıdaki örneklerin sektörünü veya kelimelerini kopyalama; yalnızca soru yapısını örnek al.
 - Aynı anlama gelen tekrar promptlar üretme.
 - Promptları markanın ülke ve dil bilgisine göre yaz.
 - Her prompt için intent, priority ve reason üret.
@@ -341,15 +355,16 @@ Kesin kurallar:
 - Sadece JSON üret. Açıklama metni yazma.
 
 İyi prompt örnekleri:
-- "İstanbul'da çalışmak için uygun kahve zincirleri hangileri?"
-- "Türkiye'de kaliteli kahve içmek için hangi markaları önerirsin?"
-- "Soğuk kahve çeşitleri güçlü olan kahve zincirleri hangileri?"
-- "Kahve Dünyası alternatifi olarak hangi kahve zincirleri tercih edilebilir?"
+- "Küçük işletmeler için müşteri takibini kolaylaştıran yazılımlar hangileri?"
+- "Diyarbakır'da implant tedavisi için klinik seçerken nelere bakılmalı?"
+- "Ev için robot süpürge alırken hangi özellikler karşılaştırılmalı?"
+- "Kapadokya'da çocuklu ailelere uygun konaklama seçenekleri hangileri?"
+- "İhracat yapan şirketler için mali müşavir seçerken hangi uzmanlıklar aranmalı?"
 
 Kötü prompt örnekleri:
-- "Starbucks nerede ve saat kaça kadar açık?"
-- "Starbucks neden tercih edilmeli?"
-- "Starbucks'ta en uygun fiyatlı kahve nedir?"
+- "Markanın adresi nedir ve saat kaça kadar açık?"
+- "Bu marka neden tercih edilmeli?"
+- "Bu markanın fiyatları nedir?"
 `;
 
   const userPrompt = `
@@ -357,6 +372,7 @@ Marka:
 - Ad: ${brand.name}
 - Website: ${brand.website_url ?? "-"}
 - Sektör: ${brand.industry ?? "-"}
+- İş modeli: ${businessArchetypeLabels[brandArchetype]}
 - Ülke: ${brand.country ?? "TR"}
 - Dil: ${brand.language ?? "tr"}
 - Açıklama: ${brand.description ?? "-"}
@@ -588,7 +604,14 @@ Cevap formatı:
     );
   }
 
-  const generatedPrompts = deduplicatePrompts(parsed.data.prompts);
+  const generatedPrompts = deduplicatePrompts(
+    parsed.data.prompts.map((prompt) => ({
+      ...prompt,
+      intent:
+        resolvePromptIntent(prompt.text, prompt.intent) ??
+        prompt.intent,
+    }))
+  );
   const filteredPrompts = limitBrandMentionedPrompts({
     prompts: generatedPrompts,
     brandTerms,

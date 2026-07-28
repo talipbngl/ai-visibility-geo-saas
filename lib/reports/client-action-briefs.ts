@@ -1,3 +1,9 @@
+import type { BrandStrategyContext } from "@/lib/strategy/business-archetypes";
+import { buildContentActionBlueprint } from "@/lib/strategy/content-action-blueprints";
+import { resolvePromptIntent } from "@/lib/strategy/prompt-intents";
+
+export { resolvePromptIntent as resolveReportIntent } from "@/lib/strategy/prompt-intents";
+
 export type ClientReportCompetitorMention = {
   name: string;
   mentioned: boolean;
@@ -56,167 +62,29 @@ export type ClientReportBriefs = {
   actionBriefs: ClientActionBrief[];
 };
 
-const reportIntents = [
-  "buying_intent",
-  "comparison",
-  "local_recommendation",
-  "problem_solution",
-  "alternative_search",
-  "budget_friendly",
-  "premium_choice",
-  "trust_reputation",
-] as const;
-
-type ReportIntent = (typeof reportIntents)[number];
-
-function includesAny(value: string, terms: string[]) {
-  return terms.some((term) => value.includes(term));
-}
-
-export function resolveReportIntent(
-  promptText: string,
-  storedIntent: string | null | undefined
-): string | null {
-  const normalizedPrompt = normalizeWhitespace(promptText)
-    .toLocaleLowerCase("tr-TR");
-
-  if (
-    includesAny(normalizedPrompt, [
-      "uygun fiyat",
-      "en ucuz",
-      "ekonomik",
-      "bütçe",
-      "fiyat performans",
-      "fiyat/performans",
-    ])
-  ) {
-    return "budget_friendly";
-  }
-
-  if (
-    includesAny(normalizedPrompt, [
-      "karşılaştır",
-      "karşılaştırma",
-      "arasındaki fark",
-      "farkı nedir",
-      "hangisi daha",
-      "hangisini seç",
-      "versus",
-      " vs ",
-    ])
-  ) {
-    return "comparison";
-  }
-
-  if (
-    includesAny(normalizedPrompt, [
-      "satın al",
-      "almak için",
-      "sipariş",
-      "paket kahve",
-      "kahve çekirdeği",
-      "ürün seç",
-      "hangi ürün",
-      "hangi paket",
-    ])
-  ) {
-    return "buying_intent";
-  }
-
-  if (
-    includesAny(normalizedPrompt, [
-      "istanbul",
-      "ankara",
-      "izmir",
-      "adana",
-      "bursa",
-      "antalya",
-      "diyarbakır",
-      "gaziantep",
-      "konya",
-      "yakınımda",
-      "yakınlarda",
-      "hangi semt",
-      "hangi şehir",
-      "hangi ilçe",
-      "mekan",
-      "mekân",
-      "şube",
-      "laptopla",
-      "çalışmak için",
-    ])
-  ) {
-    return "local_recommendation";
-  }
-
-  if (
-    includesAny(normalizedPrompt, [
-      "güvenilir",
-      "güvenli",
-      "itibar",
-      "yorumları",
-      "şikayet",
-      "sertifika",
-    ])
-  ) {
-    return "trust_reputation";
-  }
-
-  if (
-    includesAny(normalizedPrompt, [
-      "premium",
-      "üst segment",
-      "en kaliteli",
-      "özel üretim",
-    ])
-  ) {
-    return "premium_choice";
-  }
-
-  if (
-    includesAny(normalizedPrompt, [
-      "nasıl çöz",
-      "sorun",
-      "neden olmuyor",
-      "ne yapmalıyım",
-      "çözümü",
-    ])
-  ) {
-    return "problem_solution";
-  }
-
-  if (
-    includesAny(normalizedPrompt, [
-      "alternatif",
-      "hangi markalar",
-      "hangi zincirler",
-      "hangileridir",
-      "hangileri",
-      "önerir misin",
-      "önerirsin",
-      "önerileri",
-      "en iyi",
-    ])
-  ) {
-    return "alternative_search";
-  }
-
-  const normalizedStoredIntent =
-    storedIntent?.trim().toLocaleLowerCase("tr-TR") ?? "";
-
-  return reportIntents.includes(
-    normalizedStoredIntent as ReportIntent
-  )
-    ? normalizedStoredIntent
-    : null;
-}
-
 function toRecord(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return {};
   }
 
   return value as Record<string, unknown>;
+}
+
+function getFoundKeywordSignals(value: unknown) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map((rawSignal) => {
+      const signal = toRecord(rawSignal);
+      const keyword = String(signal.keyword ?? "").trim();
+      const found =
+        signal.found === true || Number(signal.count ?? 0) > 0;
+
+      return found && keyword ? keyword : null;
+    })
+    .filter((keyword): keyword is string => keyword !== null);
 }
 
 function toNullableNumber(value: unknown) {
@@ -314,19 +182,6 @@ function getAnswerExcerpt({
   }`;
 }
 
-function slugify(value: string) {
-  return value
-    .toLocaleLowerCase("tr-TR")
-    .replaceAll("ı", "i")
-    .replaceAll("ğ", "g")
-    .replaceAll("ü", "u")
-    .replaceAll("ş", "s")
-    .replaceAll("ö", "o")
-    .replaceAll("ç", "c")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-}
-
 function getEngineLabel(run: ClientReportRun) {
   const engine = run.engine?.trim() || "Gemini";
   const model = run.model?.trim();
@@ -396,7 +251,7 @@ function buildEvidenceItems({
     return {
       id: run.id,
       promptText: run.promptText,
-      promptIntent: resolveReportIntent(
+      promptIntent: resolvePromptIntent(
         run.promptText,
         run.promptIntent
       ),
@@ -412,169 +267,16 @@ function buildEvidenceItems({
   });
 }
 
-function getIntentBrief({
-  brandName,
-  run,
-}: {
-  brandName: string;
-  run: ClientReportRun;
-}) {
-  const brandSlug = slugify(brandName);
-  const strongestCompetitor = run.competitors
-    .filter((competitor) => competitor.mentioned)
-    .sort(
-      (first, second) =>
-        (first.rank ?? 999) - (second.rank ?? 999)
-    )[0];
-  const competitorSlug = strongestCompetitor
-    ? slugify(strongestCompetitor.name)
-    : "alternatifler";
-  const normalizedPrompt = run.promptText.toLocaleLowerCase("tr-TR");
-  const resolvedIntent = resolveReportIntent(
-    run.promptText,
-    run.promptIntent
-  );
-  const isCoffeeBeanPrompt = includesAny(normalizedPrompt, [
-    "paket kahve",
-    "kahve çekirdeği",
-    "çekirdek kahve",
-  ]);
-  const locationSlug = [
-    "istanbul",
-    "ankara",
-    "izmir",
-    "adana",
-    "bursa",
-    "antalya",
-    "diyarbakır",
-    "gaziantep",
-    "konya",
-  ].find((location) => normalizedPrompt.includes(location));
-
-  switch (resolvedIntent) {
-    case "comparison":
-      return {
-        deliverable: "Tarafsız karşılaştırma rehberi",
-        suggestedPath: `/rehber/${brandSlug}-${competitorSlug}-karsilastirmasi`,
-        requiredSections: [
-          "Karşılaştırmanın kapsamı ve güncelleme tarihi",
-          "Fiyat/değer, erişim, ürün çeşitliliği ve kullanım senaryosu tablosu",
-          `${brandName} için güçlü yönler ve uygun olmadığı durumlar`,
-          `${
-            strongestCompetitor?.name ?? "Alternatif markalar"
-          } ile temel farklar`,
-          "Doğrulanabilir veriler, kaynak bağlantıları ve kısa sonuç bölümü",
-        ],
-      };
-    case "local_recommendation":
-      return {
-        deliverable: "Şube bulma ve yerel hizmet sayfası",
-        suggestedPath: locationSlug
-          ? `/magazalar/${slugify(locationSlug)}/calismaya-uygun-subeler`
-          : "/magazalar/{sehir-veya-ilce}",
-        requiredSections: [
-          "Açık adres, harita bağlantısı ve güncel çalışma saatleri",
-          "Wi-Fi, priz, oturma alanı ve çalışma ortamı bilgisi",
-          "Sipariş, paket servis ve erişilebilirlik seçenekleri",
-          "Bölgeye özel sık sorulan sorular",
-          "LocalBusiness yapısal verisi ve son güncelleme tarihi",
-        ],
-      };
-    case "buying_intent":
-      if (isCoffeeBeanPrompt) {
-        return {
-          deliverable: "Kahve çekirdeği seçim rehberi",
-          suggestedPath: `/rehber/${brandSlug}-kahve-cekirdegi-secim-rehberi`,
-          requiredSections: [
-            "Satıştaki çekirdek ve paket kahvelerin adları, gramajları ve güncel fiyatları",
-            "Her ürün için kavrum derecesi, menşei ve tat notaları",
-            "Espresso, filtre, moka pot ve French press için ürün eşleştirmesi",
-            "100 gram başına fiyat ve hangi kullanıcıya uygun olduğu",
-            "Stok durumu, satın alma bağlantıları, tazelik bilgisi ve kısa SSS",
-          ],
-        };
-      }
-
-      return {
-        deliverable: "Satın alma ve ürün seçme rehberi",
-        suggestedPath: `/rehber/${brandSlug}-urun-secim-rehberi`,
-        requiredSections: [
-          "Kullanım amacına göre ürün veya hizmet seçenekleri",
-          "Fiyat aralığı ve toplam değer karşılaştırması",
-          "Kim için hangi seçeneğin uygun olduğu",
-          "Teslimat, iade, üyelik veya satın alma adımları",
-          "Kararı hızlandıran kısa karşılaştırma tablosu ve SSS",
-        ],
-      };
-    case "alternative_search":
-      return {
-        deliverable: "Marka seçim ve alternatifler rehberi",
-        suggestedPath: `/rehber/${slugify(run.promptText).slice(0, 54)}`,
-        requiredSections: [
-          "Kullanıcının karar vereceği 4-6 açık seçim kriteri",
-          "Markaların aynı ölçütlerle karşılaştırıldığı kısa tablo",
-          `${brandName} için uygun kullanıcı profili ve güçlü olduğu senaryolar`,
-          "Markanın uygun olmadığı durumların tarafsız açıklaması",
-          "Doğrulanabilir kaynaklar, güncelleme tarihi ve kısa sonuç",
-        ],
-      };
-    case "budget_friendly":
-      return {
-        deliverable: "Fiyat ve değer açıklama sayfası",
-        suggestedPath: "/fiyatlar-ve-paketler",
-        requiredSections: [
-          "Güncel başlangıç fiyatları ve paket içerikleri",
-          "Fiyata dahil olan ve ayrıca ücretlenen unsurlar",
-          "Bütçeye göre önerilen seçenekler",
-          "Kampanya koşulları ve geçerlilik tarihi",
-          "Rakiple fiyat iddiası yerine doğrulanabilir değer karşılaştırması",
-        ],
-      };
-    case "trust_reputation":
-      return {
-        deliverable: "Güven ve kalite kanıtları sayfası",
-        suggestedPath: "/hakkimizda/guven-ve-kalite",
-        requiredSections: [
-          "Şirketin açık unvanı, geçmişi ve faaliyet alanı",
-          "Kalite standartları, sertifikalar ve doğrulama bağlantıları",
-          "Müşteri destek kanalları ve yanıt süreleri",
-          "İade, gizlilik ve tüketici güvencesi politikaları",
-          "Tarihli müşteri kanıtları veya bağımsız değerlendirmeler",
-        ],
-      };
-    case "problem_solution":
-      return {
-        deliverable: "Sorun çözme rehberi ve SSS",
-        suggestedPath: `/rehber/${slugify(run.promptText).slice(0, 54)}`,
-        requiredSections: [
-          "Sorunun kısa ve doğrudan cevabı",
-          "Olası nedenler ve hangi durumda hangisinin geçerli olduğu",
-          "Adım adım çözüm seçenekleri",
-          `${brandName} çözümünün sınırları ve uygun kullanım durumu`,
-          "İlgili ürün/hizmet bağlantıları ve sık sorulan sorular",
-        ],
-      };
-    default:
-      return {
-        deliverable: "Soru odaklı kategori rehberi",
-        suggestedPath: `/rehber/${slugify(run.promptText).slice(0, 54)}`,
-        requiredSections: [
-          "Sorunun ilk paragrafta 40-60 kelimelik doğrudan cevabı",
-          "Seçim kriterleri ve kullanım senaryoları",
-          `${brandName} teklifinin somut ve doğrulanabilir farkları`,
-          "Alternatiflerin tarafsız biçimde karşılaştırılması",
-          "Kaynaklar, güncelleme tarihi ve ilgili sık sorulan sorular",
-        ],
-      };
-  }
-}
-
 function buildPromptActions({
   brandName,
+  brandContext,
   runs,
+  detectedServiceKeywords,
 }: {
   brandName: string;
+  brandContext: BrandStrategyContext;
   runs: ClientReportRun[];
+  detectedServiceKeywords: string[];
 }) {
   const invisibleRuns = runs
     .filter((run) => !run.brandMentioned)
@@ -604,9 +306,23 @@ function buildPromptActions({
 
   return targetRuns.map(
     (run, index): ClientActionBrief => {
-      const blueprint = getIntentBrief({
+      const strongestCompetitor = run.competitors
+        .filter((competitor) => competitor.mentioned)
+        .sort(
+          (first, second) =>
+            (first.rank ?? 999) - (second.rank ?? 999)
+        )[0];
+      const blueprint = buildContentActionBlueprint({
         brandName,
-        run,
+        brandContext,
+        promptText: run.promptText,
+        intent: resolvePromptIntent(
+          run.promptText,
+          run.promptIntent
+        ),
+        strongestCompetitorName:
+          strongestCompetitor?.name ?? null,
+        detectedServiceKeywords,
       });
       const mentionedCompetitors = run.competitors
         .filter((competitor) => competitor.mentioned)
@@ -755,16 +471,24 @@ function buildWebsiteAction({
 
 export function buildClientReportBriefs({
   brandName,
+  brandContext,
   runs,
+  serviceSignalsValue,
   technicalSignalsValue,
 }: {
   brandName: string;
+  brandContext: BrandStrategyContext;
   runs: ClientReportRun[];
+  serviceSignalsValue: unknown;
   technicalSignalsValue: unknown;
 }): ClientReportBriefs {
   const promptActions = buildPromptActions({
     brandName,
+    brandContext,
     runs,
+    detectedServiceKeywords: getFoundKeywordSignals(
+      serviceSignalsValue
+    ),
   });
   const websiteAction = buildWebsiteAction({
     technicalSignalsValue,

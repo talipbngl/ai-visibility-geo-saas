@@ -204,15 +204,15 @@
 
   .client-report .client-report-cover {
     box-sizing: border-box !important;
-    height: 277mm !important;
-    min-height: 277mm !important;
+    height: 258mm !important;
+    min-height: 258mm !important;
     break-after: page !important;
     page-break-after: always !important;
     margin-bottom: 0 !important;
   }
 
   .client-report .client-report-cover > div:last-child {
-    min-height: calc(277mm - 36px) !important;
+    min-height: calc(258mm - 36px) !important;
   }
 
   .client-report .report-page {
@@ -222,7 +222,7 @@
 
   .client-report .client-report-closing {
     box-sizing: border-box !important;
-    min-height: 277mm !important;
+    min-height: 258mm !important;
     display: flex !important;
     align-items: center !important;
     margin-bottom: 0 !important;

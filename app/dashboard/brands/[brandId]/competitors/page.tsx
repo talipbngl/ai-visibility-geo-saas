@@ -165,7 +165,7 @@ export default async function CompetitorsPage({
                 <Input
                   id="name"
                   name="name"
-                  placeholder="Kahve Dünyası"
+                  placeholder="Rakip marka veya işletme adı"
                   required
                 />
               </div>
@@ -175,7 +175,7 @@ export default async function CompetitorsPage({
                 <Input
                   id="websiteUrl"
                   name="websiteUrl"
-                  placeholder="https://www.kahvedunyasi.com"
+                  placeholder="https://www.rakipmarka.com"
                 />
               </div>
 
@@ -184,7 +184,7 @@ export default async function CompetitorsPage({
                 <Textarea
                   id="description"
                   name="description"
-                  placeholder="Türkiye'de bilinirliği yüksek kahve markası."
+                  placeholder="Rakibin sunduğu ürün, hizmet ve hedeflediği pazarı kısaca yazın."
                   rows={3}
                 />
               </div>
@@ -194,7 +194,9 @@ export default async function CompetitorsPage({
                 <Textarea
                   id="aliases"
                   name="aliases"
-                  placeholder={"Kahve Dünyası\nkahvedunyasi.com\nKahve Dunyasi"}
+                  placeholder={
+                    "Rakip Marka\nrakipmarka.com\nRakip Marka Türkiye"
+                  }
                   rows={4}
                 />
                 <p className="text-xs text-muted-foreground">
