@@ -37,6 +37,18 @@ const archetypeProfiles: Record<
   BusinessArchetype,
   ArchetypeProfile
 > = {
+    industrial_instrumentation: {
+  categoryLabel:
+    "endüstriyel test, ölçüm ve kalibrasyon cihazı",
+  decisionCriteria:
+    "ölçüm aralığı, doğruluk, kararlılık, homojenlik, çözünürlük, ölçüm belirsizliği, sensör ve prob uyumluluğu, ısıtma-soğutma süresi, izlenebilirlik, standart uygunluğu, kalibrasyon sertifikası, garanti, teknik servis, teslim süresi ve toplam sahip olma maliyeti",
+  proofRequirements:
+    "ürün modeline ait teknik veri sayfası, sıcaklık veya ölçüm aralığı, kararlılık ve homojenlik değerleri, belirsizlik bilgisi, desteklenen sensör ve problar, üretici veya distribütör rolü, kalibrasyon sertifikasının kapsamı, garanti süresi, teknik servis koşulları ve doğrulanabilir laboratuvar referansları",
+  conversionStep:
+    "ölçüm aralığı ve belirsizlik ihtiyacının belirlenmesi, uygun model ve aksesuarların seçilmesi, teknik uygunluk doğrulaması, yazılı teklif, teslimat, kullanıcı eğitimi, devreye alma ve periyodik kalibrasyon planı",
+  mainPath: "test-ve-kalibrasyon-cihazlari",
+  localPath: "teknik-servis",
+},
   industrial_b2b: {
     categoryLabel: "endüstriyel çözüm",
     decisionCriteria:

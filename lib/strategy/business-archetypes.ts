@@ -1,7 +1,8 @@
 import { normalizeStrategyText } from "@/lib/strategy/prompt-intents";
 
 export type BusinessArchetype =
-  | "industrial_b2b"
+  | "industrial_instrumentation"
+  | "industrial_b2b"    
   | "energy_environment"
   | "agriculture_food_production"
   | "logistics_transport"
@@ -157,6 +158,44 @@ const archetypeRules: ArchetypeRule[] = [
       "urun satisi",
     ],
   },
+  {
+  archetype: "industrial_instrumentation",
+  priority: 89,
+  strongTerms: [
+    "test ve kalibrasyon sistem*",
+    "test ve olcum sistem*",
+    "test ve olcum cihaz*",
+    "kalibrasyon cihaz*",
+    "kalibrasyon sistem*",
+    "kuru blok kalibrator",
+    "sicaklik kalibrasyon banyosu",
+    "siyah cisim kalibrator",
+    "elektriksel test cihaz*",
+    "endustriyel test cihaz*",
+    "olcum cihaz*",
+    "metroloji cihaz*",
+  ],
+  relatedTerms: [
+    "kalibrator",
+    "kalibrasyon",
+    "test cihazi",
+    "olcum cihazi",
+    "sicaklik",
+    "metroloji",
+    "laboratuvar",
+    "referans termometre",
+    "teknik destek",
+    "distributor",
+    "uretic*",
+  ],
+  excludedTerms: [
+    "kestirimci bakim",
+    "vibrasyon analiz*",
+    "yerinde balans",
+    "lazerli kaplin ayari",
+    "durum izleme",
+  ],
+},
   {
     archetype: "industrial_b2b",
     priority: 88,
@@ -596,6 +635,8 @@ export const businessArchetypeLabels: Record<
   BusinessArchetype,
   string
 > = {
+  industrial_instrumentation:
+  "Endüstriyel test, ölçüm ve kalibrasyon cihazları",
   industrial_b2b: "Endüstriyel B2B çözüm",
   energy_environment: "Enerji ve çevre",
   agriculture_food_production: "Tarım ve gıda üretimi",

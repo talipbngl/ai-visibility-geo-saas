@@ -394,7 +394,52 @@ const marketplacePreset: KeywordPreset = {
     "destek",
   ],
 };
-
+const industrialInstrumentationPreset: KeywordPreset = {
+  serviceKeywords: [
+    "kuru blok kalibratör",
+    "sıcaklık kalibrasyon banyosu",
+    "siyah cisim",
+    "infrared kalibrasyon",
+    "çok fonksiyonlu kalibratör",
+    "elektriksel test cihazı",
+    "basınç kalibratörü",
+    "referans termometre",
+    "termokupl",
+    "rtd",
+    "prt",
+    "sprt",
+    "kalibrasyon fırını",
+    "test kabini",
+    "sıcaklık aralığı",
+    "kararlılık",
+    "homojenlik",
+    "ölçüm belirsizliği",
+    "teknik özellik",
+    "aksesuar",
+    "teknik servis",
+  ],
+  trustKeywords: [
+    "üretici",
+    "yerli üretim",
+    "distribütör",
+    "yetkili distribütör",
+    "kalibrasyon sertifikası",
+    "izlenebilirlik",
+    "ölçüm belirsizliği",
+    "iso/iec 17025",
+    "türkak",
+    "akreditasyon",
+    "teknik veri sayfası",
+    "katalog",
+    "garanti",
+    "teknik servis",
+    "satış sonrası destek",
+    "kullanıcı eğitimi",
+    "referans",
+    "laboratuvar",
+    "servis merkezi",
+  ],
+};
 const industrialB2bPreset: KeywordPreset = {
   serviceKeywords: [
     "kestirimci bakım",
@@ -745,9 +790,11 @@ export function getWebsiteKeywordPreset(industry: string | null | undefined) {
   });
 
   const archetypePresets: Partial<
-    Record<BusinessArchetype, KeywordPreset>
-  > = {
-    industrial_b2b: industrialB2bPreset,
+  Record<BusinessArchetype, KeywordPreset>
+> = {
+  industrial_instrumentation:
+    industrialInstrumentationPreset,
+  industrial_b2b: industrialB2bPreset,
     energy_environment: energyEnvironmentPreset,
     agriculture_food_production: agricultureFoodPreset,
     logistics_transport: logisticsTransportPreset,
