@@ -9,6 +9,7 @@ const REQUEST_TIMEOUT_MS = 6_000;
 const CONCURRENCY = 3;
 const MAX_PAGE_TEXT_LENGTH = 20_000;
 export type ContentPageType =
+  | "product"
   | "service"
   | "about"
   | "contact"
@@ -459,6 +460,62 @@ function getPathSegments(url: URL) {
     .split("/")
     .filter(Boolean);
 }
+const localePathSegments = new Set([
+  "tr",
+  "en",
+  "de",
+  "fr",
+  "es",
+  "it",
+  "ar",
+  "ru",
+  "az",
+]);
+
+function getLocalePathSegment(url: string) {
+  try {
+    const firstSegment =
+      getPathSegments(new URL(url))[0];
+
+    if (
+      firstSegment &&
+      localePathSegments.has(firstSegment)
+    ) {
+      return firstSegment;
+    }
+
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function isLanguagePathCompatible({
+  candidateUrl,
+  homepageUrl,
+}: {
+  candidateUrl: string;
+  homepageUrl: string;
+}) {
+  const homepageLocale =
+    getLocalePathSegment(homepageUrl);
+  const candidateLocale =
+    getLocalePathSegment(candidateUrl);
+
+  /*
+   * Başlangıç adresi /tr/ gibi bir dil klasöründeyse başka
+   * dillerdeki sayfaları analize karıştırmayız. Dil klasörü
+   * bulunmayan ortak sayfalara izin vermeye devam ederiz.
+   */
+  if (homepageLocale) {
+    return (
+      candidateLocale === null ||
+      candidateLocale === homepageLocale
+    );
+  }
+
+  return true;
+}
 
 function isLowValuePage(url: URL) {
   const segments = getPathSegments(url);
@@ -513,32 +570,47 @@ export function getPageCategory(
   );
   const segments = getPathSegments(parsedUrl);
 
-  const serviceTerms = [
-    "hizmet",
-    "hizmetler",
-    "service",
-    "services",
-    "urun",
-    "urunler",
-    "product",
-    "products",
-    "menu",
-    "cozum",
-    "solution",
-    "tedavi",
-    "uygulama",
-    "kategori",
-    "category",
-    "collection",
-  ];
+  const productTerms = [
+  "urun",
+  "urunler",
+  "product",
+  "products",
+  "menu",
+  "kategori",
+  "category",
+  "collection",
+  "catalog",
+  "katalog",
+];
 
-  if (
-    serviceTerms.some((term) =>
-      pathname.includes(term)
-    )
-  ) {
-    return "service";
-  }
+if (
+  productTerms.some((term) =>
+    pathname.includes(term)
+  )
+) {
+  return "product";
+}
+
+const serviceTerms = [
+  "hizmet",
+  "hizmetler",
+  "service",
+  "services",
+  "cozum",
+  "cozumler",
+  "solution",
+  "solutions",
+  "tedavi",
+  "uygulama",
+];
+
+if (
+  serviceTerms.some((term) =>
+    pathname.includes(term)
+  )
+) {
+  return "service";
+}
 
   const aboutTerms = [
     "hakkimizda",
@@ -657,6 +729,7 @@ function getPagePriority(url: URL) {
 
   const categoryScores: Record<string, number> = {
     comparison: 55,
+    product: 52,
     faq: 50,
     pricing: 45,
     service: 45,
@@ -714,6 +787,7 @@ function selectDiverseCandidates(
   const selectedUrls = new Set<string>();
 
   const preferredCategories = [
+    "product",
     "service",
     "about",
     "contact",
@@ -798,17 +872,25 @@ function extractCandidateUrls(
       }
 
       if (
-        !isSameWebsite(
-          resolvedUrl.toString(),
-          homepageUrl
-        )
-      ) {
-        continue;
-      }
+           !isSameWebsite(
+            resolvedUrl.toString(),
+            homepageUrl
+          )
+        ) {
+          continue;
+        }
 
-      resolvedUrl.hash = "";
-      resolvedUrl.search = "";
+        if (
+          !isLanguagePathCompatible({
+            candidateUrl: resolvedUrl.toString(),
+            homepageUrl,
+          })
+        ) {
+          continue;
+        }
 
+        resolvedUrl.hash = "";
+        resolvedUrl.search = "";
       if (shouldSkipUrl(resolvedUrl)) {
         continue;
       }
@@ -1026,6 +1108,15 @@ for (const sitemapUrl of sitemap.urls) {
     const url = new URL(sitemapUrl);
 
     if (shouldSkipUrl(url)) continue;
+
+    if (
+      !isLanguagePathCompatible({
+        candidateUrl: url.toString(),
+        homepageUrl,
+      })
+    ) {
+      continue;
+    }
 
     const candidate = {
       url: sitemapUrl,

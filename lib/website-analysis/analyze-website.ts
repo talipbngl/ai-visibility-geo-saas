@@ -362,11 +362,17 @@ function extractLinkSignals(html: string, pageUrl: string) {
     }
 
     if (
-      normalizedHref.includes("hakkimizda") ||
-      normalizedHref.includes("about")
-    ) {
-      hasAboutLink = true;
-    }
+  normalizedHref.includes("hakkimizda") ||
+  normalizedHref.includes("about") ||
+  normalizedHref.includes("kurumsal") ||
+  normalizedHref.includes("sirketimiz") ||
+  normalizedHref.includes("tarihce") ||
+  normalizedHref.includes("ekibimiz") ||
+  normalizedHref.includes("company") ||
+  normalizedHref.includes("corporate")
+) {
+  hasAboutLink = true;
+}
 
     if (
       normalizedHref.includes("gizlilik") ||
@@ -611,9 +617,31 @@ function getAnalysisCoverageLevel(
 
 function getUrlPathDepth(value: string) {
   try {
-    return new URL(value).pathname
+    const segments = new URL(value).pathname
+      .toLocaleLowerCase("tr-TR")
       .split("/")
-      .filter(Boolean).length;
+      .filter(Boolean);
+
+    const localeSegments = new Set([
+      "tr",
+      "en",
+      "de",
+      "fr",
+      "es",
+      "it",
+      "ar",
+      "ru",
+      "az",
+    ]);
+
+    if (
+      segments[0] &&
+      localeSegments.has(segments[0])
+    ) {
+      return Math.max(0, segments.length - 1);
+    }
+
+    return segments.length;
   } catch {
     return 0;
   }
