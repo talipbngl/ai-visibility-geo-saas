@@ -250,11 +250,22 @@ const archetypeProfiles: Record<
 
 const topicStopWords = new Set([
   "acaba",
+  "arasindaki",
+  "cozum",
+  "cozumler",
+  "endustriyel",
+  "fark",
+  "farki",
+  "farklar",
+  "farklari",
   "icin",
   "hangi",
   "hangileri",
   "hangileridir",
   "hangisini",
+  "hizmet",
+  "hizmeti",
+  "ile",
   "almak",
   "alinir",
   "alirken",
@@ -271,12 +282,21 @@ const topicStopWords = new Set([
   "onerir",
   "onerirsin",
   "onerirsiniz",
+  "ozellik",
+  "ozellikler",
+  "ozelliklere",
+  "ozellikleri",
   "sec",
   "secerken",
   "secilmeli",
+  "sistemi",
+  "teknik",
+  "tesiste",
+  "tesisi",
   "tercih",
   "turkiye",
   "uygun",
+  "urun",
   "ve",
   "veya",
 ]);
@@ -314,37 +334,59 @@ function getTopicSlug({
   return offerSlug.slice(0, 60) || "karar-rehberi";
 }
 
-function getDetectedOfferLine({
-  detectedServiceKeywords,
-  primaryOffer,
+function getPromptTopicLabel(promptText: string) {
+  const normalizedPrompt = promptText
+    .replace(/\s+/g, " ")
+    .replace(/[?!.]+$/g, "")
+    .trim();
+  const comparisonMatch = normalizedPrompt.match(
+    /^(.+?)\s+arasındaki\s+farklar\b/i
+  );
+
+  if (comparisonMatch?.[1]?.trim()) {
+    return comparisonMatch[1].trim();
+  }
+
+  const selectionMatch = normalizedPrompt.match(
+    /^(.+?)\s+(?:seçerken|alırken|satın alırken)\b/i
+  );
+  const subjectCandidate =
+    selectionMatch?.[1]?.trim() || normalizedPrompt;
+  const subjectTokens = subjectCandidate
+    .split(/\s+/)
+    .filter((token) => {
+      const normalizedToken = normalizeStrategyText(token);
+
+      return (
+        normalizedToken.length > 2 &&
+        !topicStopWords.has(normalizedToken)
+      );
+    })
+    .slice(0, 7);
+
+  return subjectTokens.join(" ") || "bu karar";
+}
+
+function getPromptOfferLine({
+  brandName,
+  promptText,
 }: {
-  detectedServiceKeywords: string[];
-  primaryOffer?: string | null;
+  brandName: string;
+  promptText: string;
 }) {
-  const detectedServices = Array.from(
-    new Set(
-      detectedServiceKeywords
-        .map((keyword) => keyword.trim())
-        .filter(Boolean)
-    )
-  ).slice(0, 5);
+  const topicLabel = getPromptTopicLabel(promptText);
 
-  if (detectedServices.length > 0) {
-    return `Web sitesinde tespit edilen ${detectedServices.join(
-      ", "
-    )} tekliflerinin kapsamı ve birbirinden farkları`;
-  }
-
-  if (primaryOffer?.trim()) {
-    return `"${primaryOffer.trim()}" teklifinin kapsamı, seçenekleri ve sınırları`;
-  }
-
-  return "Markanın bu soruyla ilişkili ürün veya hizmet seçenekleri ve aralarındaki farklar";
+  return `${topicLabel} konusunda ${brandName} tarafından sunulan seçeneklerin kapsamı, ayırt edici özellikleri ve birbirinden farkları`;
 }
 
 function getAudienceLine(context: BrandStrategyContext) {
-  if (context.targetAudience?.trim()) {
-    return `${context.targetAudience.trim()} için hangi seçeneğin hangi durumda uygun olduğu`;
+  const targetAudience = context.targetAudience
+    ?.trim()
+    .replace(/[.!?;:,]+$/g, "")
+    .trim();
+
+  if (targetAudience) {
+    return `${targetAudience} için hangi seçeneğin hangi durumda uygun olduğu`;
   }
 
   return "Farklı ihtiyaçlara göre hangi seçeneğin kimler için uygun olduğu";
@@ -388,9 +430,9 @@ export function buildContentActionBlueprint({
     promptText,
     brandContext,
   });
-  const detectedOfferLine = getDetectedOfferLine({
-    detectedServiceKeywords,
-    primaryOffer: brandContext.primaryOffer,
+  const promptOfferLine = getPromptOfferLine({
+    brandName,
+    promptText,
   });
   const audienceLine = getAudienceLine(brandContext);
 
@@ -398,13 +440,15 @@ export function buildContentActionBlueprint({
     case "comparison":
       return {
         deliverable: `${profile.categoryLabel} karşılaştırma rehberi`,
-        suggestedPath: `/karsilastirma/${brandSlug}-${competitorSlug}`,
+        suggestedPath: strongestCompetitorName
+          ? `/karsilastirma/${brandSlug}-${competitorSlug}`
+          : `/karsilastirma/${topicSlug}`,
         requiredSections: [
           "Karşılaştırmanın kapsamı, veri tarihi ve kullanılan kaynaklar",
           `${brandName} ile ${
             strongestCompetitorName ?? "alternatiflerin"
           } aynı ölçütlerle karşılaştırıldığı tablo: ${profile.decisionCriteria}`,
-          detectedOfferLine,
+          promptOfferLine,
           `${brandName} için güçlü yönler, sınırlamalar ve uygun olmadığı durumlar`,
           `${profile.proofRequirements}; sonuç bölümünde ${profile.conversionStep}`,
         ],
@@ -421,7 +465,7 @@ export function buildContentActionBlueprint({
         requiredSections: [
           "Her konum için açık adres, harita, hizmet alanı, güncel çalışma veya erişim bilgisi",
           `${profile.decisionCriteria} için konuma özel ve doğrulanabilir bilgiler`,
-          detectedOfferLine,
+          promptOfferLine,
           `${profile.proofRequirements}`,
           `${profile.conversionStep}; LocalBusiness veya uygun alt türde yapısal veri ve son güncelleme tarihi`,
         ],
@@ -432,7 +476,7 @@ export function buildContentActionBlueprint({
         deliverable: `${profile.categoryLabel} seçim rehberi`,
         suggestedPath: `/${profile.mainPath}/${topicSlug}`,
         requiredSections: [
-          detectedOfferLine,
+          promptOfferLine,
           `Seçimi etkileyen ölçütler: ${profile.decisionCriteria}`,
           audienceLine,
           "Güncel fiyat veya fiyatı belirleyen unsurlar; dahil olanlar, ek maliyetler ve geçerlilik tarihi",
@@ -447,7 +491,7 @@ export function buildContentActionBlueprint({
         requiredSections: [
           "Güncel başlangıç fiyatları, paketler ve fiyatın geçerlilik tarihi",
           "Fiyata dahil olanlar, ek ücretler ve toplam maliyeti değiştiren koşullar",
-          detectedOfferLine,
+          promptOfferLine,
           `Düşük fiyat dışında karşılaştırılacak değer ölçütleri: ${profile.decisionCriteria}`,
           `${audienceLine}; ${profile.conversionStep}`,
         ],
@@ -474,9 +518,7 @@ export function buildContentActionBlueprint({
           "Sorunun ilk paragrafta verilen kısa ve doğrudan cevabı",
           "Olası nedenler, ön koşullar ve hangi durumda profesyonel destek gerektiği",
           "Kullanıcının uygulayabileceği adımlar ve seçeneklerin sınırları",
-          `${brandName} teklifinin sorunu hangi koşullarda çözebildiği; ${detectedOfferLine.toLocaleLowerCase(
-            "tr-TR"
-          )}`,
+          `${brandName} teklifinin sorunu hangi koşullarda çözebildiği, çözümün sınırları ve uygun olmadığı durumlar`,
           `${profile.proofRequirements}; ilgili ${profile.conversionStep}`,
         ],
       };
@@ -488,7 +530,7 @@ export function buildContentActionBlueprint({
         requiredSections: [
           "Premium iddiasını ölçen somut kriterler ve veri tarihi",
           `${profile.decisionCriteria}`,
-          detectedOfferLine,
+          promptOfferLine,
           "Daha yüksek fiyatın karşılığında alınan farklar ve gereksiz olacağı kullanım durumları",
           `${profile.proofRequirements}; ${profile.conversionStep}`,
         ],
@@ -502,7 +544,7 @@ export function buildContentActionBlueprint({
         requiredSections: [
           `Kullanıcının karar vereceği ölçütler: ${profile.decisionCriteria}`,
           "Tüm seçeneklerin aynı veri alanlarıyla karşılaştırıldığı kısa tablo",
-          detectedOfferLine,
+          promptOfferLine,
           `${brandName} için uygun kullanıcı profili, güçlü olduğu ve uygun olmadığı durumlar`,
           `${profile.proofRequirements}; kaynaklar, güncelleme tarihi ve ${profile.conversionStep}`,
         ],

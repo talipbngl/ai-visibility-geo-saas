@@ -269,6 +269,63 @@
     overflow-wrap: anywhere !important;
   }
 
+  /*
+   * Aksiyon kartları içerik açısından yoğun olabilir. Bu ayarlar yalnızca
+   * yazdırmada kartın okunabilirliğini koruyarak tek A4 sayfasına sığmasını
+   * sağlar; ekrandaki geniş ve rahat görünüm değişmez.
+   */
+  .client-report .action-brief-card .p-5 {
+    padding: 10px !important;
+  }
+
+  .client-report .action-brief-card .p-4 {
+    padding: 8px !important;
+  }
+
+  .client-report .action-brief-card .p-3 {
+    padding: 7px !important;
+  }
+
+  .client-report .action-brief-card .space-y-5 > :not([hidden]) ~ :not([hidden]) {
+    margin-top: 7px !important;
+  }
+
+  .client-report .action-brief-card .mt-4 {
+    margin-top: 8px !important;
+  }
+
+  .client-report .action-brief-card .mt-3 {
+    margin-top: 6px !important;
+  }
+
+  .client-report .action-brief-card .mt-2 {
+    margin-top: 5px !important;
+  }
+
+  .client-report .action-brief-card .gap-3 {
+    gap: 6px !important;
+  }
+
+  .client-report .action-brief-card .gap-2 {
+    gap: 5px !important;
+  }
+
+  .client-report .action-brief-card .text-xl {
+    font-size: 16px !important;
+    line-height: 1.35 !important;
+  }
+
+  .client-report .action-brief-card .text-sm {
+    font-size: 10.5px !important;
+    line-height: 1.4 !important;
+  }
+
+  .client-report .action-brief-card .leading-7,
+  .client-report .action-brief-card .leading-6,
+  .client-report .action-brief-card .leading-5 {
+    line-height: 1.4 !important;
+  }
+
   .client-report .space-y-8 > :not([hidden]) ~ :not([hidden]) {
     margin-top: 18px !important;
   }

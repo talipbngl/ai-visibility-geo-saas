@@ -208,13 +208,48 @@ function getAnswerExcerpt({
     firstIndex === undefined
       ? 0
       : Math.max(0, firstIndex - 90);
-  const excerpt = normalizedAnswer.slice(
-    start,
-    start + maximumLength
+  const wordSafeStart =
+    start > 0
+      ? Math.max(
+          0,
+          normalizedAnswer.lastIndexOf(" ", start) + 1
+        )
+      : 0;
+  const rawEnd = Math.min(
+    normalizedAnswer.length,
+    wordSafeStart + maximumLength
   );
+  const minimumNaturalEnd =
+    wordSafeStart + Math.floor(maximumLength * 0.65);
+  const excerptWindow = normalizedAnswer.slice(
+    wordSafeStart,
+    rawEnd
+  );
+  const sentenceEnd = Math.max(
+    excerptWindow.lastIndexOf(". "),
+    excerptWindow.lastIndexOf("? "),
+    excerptWindow.lastIndexOf("! ")
+  );
+  const sentenceSafeEnd =
+    sentenceEnd >= minimumNaturalEnd - wordSafeStart
+      ? wordSafeStart + sentenceEnd + 1
+      : null;
+  const lastWhitespace = normalizedAnswer.lastIndexOf(
+    " ",
+    rawEnd
+  );
+  const wordSafeEnd =
+    rawEnd < normalizedAnswer.length &&
+    lastWhitespace >= minimumNaturalEnd
+      ? lastWhitespace
+      : rawEnd;
+  const end = sentenceSafeEnd ?? wordSafeEnd;
+  const excerpt = normalizedAnswer
+    .slice(wordSafeStart, end)
+    .trim();
 
-  return `${start > 0 ? "…" : ""}${excerpt}${
-    start + maximumLength < normalizedAnswer.length ? "…" : ""
+  return `${wordSafeStart > 0 ? "…" : ""}${excerpt}${
+    end < normalizedAnswer.length ? "…" : ""
   }`;
 }
 
@@ -376,7 +411,7 @@ function buildPromptActions({
             ? `${brandName} cevapta görünmedi; ${mentionedCompetitors
                 .slice(0, 3)
                 .join(", ")} görünür durumda.`
-            : `${brandName} bu sorunun cevabında görünmedi. Konuya doğrudan cevap veren marka kaynağı tespit edilemedi.`,
+            : `${brandName} bu sorunun cevabında görünmedi. Taranan marka sayfalarında bu soruya doğrudan cevap veren bir içerik tespit edilemedi.`,
         targetPrompt: run.promptText,
         deliverable: blueprint.deliverable,
         suggestedPath: blueprint.suggestedPath,

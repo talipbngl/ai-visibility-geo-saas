@@ -76,7 +76,7 @@ function EvidenceCard({
 
       <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
         <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-          AI cevabından kısa kanıt
+          AI cevabından kısa alıntı
         </p>
         <p className="mt-2 text-sm leading-6 text-slate-700">
           “{item.answerExcerpt}”
@@ -240,12 +240,12 @@ export function ClientEvidenceActionPlan({
               03 - Kararı Destekleyen Kanıtlar
             </p>
             <h2 className="mt-1 text-2xl font-semibold tracking-tight text-slate-950">
-              AI cevaplarında tam olarak ne görüldü?
+              AI cevaplarında hangi kanıtlar görüldü?
             </h2>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-              Aşağıdaki kartlar yorum değil; ölçümde kullanılan gerçek
-              soruların cevaplarından alınan kısa kanıtları, marka konumunu
-              ve görünen rakipleri birlikte gösterir.
+              Aşağıdaki kartlar ölçümde kullanılan gerçek cevaplardan alınan
+              kısa alıntıları, marka konumunu ve görünen rakipleri birlikte
+              gösterir.
             </p>
           </div>
 
