@@ -401,25 +401,34 @@ function buildPromptActions({
         .map((competitor) => competitor.name);
 
       return {
-        id: `prompt-${run.id}`,
-        week: index + 1,
-        priority: "Yüksek",
-        title: `"${run.promptText}" sorusu için içerik yayınla`,
-        reason: run.brandMentioned
-          ? `${brandName} cevapta ${run.brandRank}. sırada yer aldı. İlk iki öneri arasına girmek için bu soruya doğrudan cevap veren daha güçlü bir kaynak sayfa gerekiyor.`
-          : mentionedCompetitors.length > 0
-            ? `${brandName} cevapta görünmedi; ${mentionedCompetitors
-                .slice(0, 3)
-                .join(", ")} görünür durumda.`
-            : `${brandName} bu sorunun cevabında görünmedi. Taranan marka sayfalarında bu soruya doğrudan cevap veren bir içerik tespit edilemedi.`,
-        targetPrompt: run.promptText,
-        deliverable: blueprint.deliverable,
-        suggestedPath: blueprint.suggestedPath,
-        requiredSections: blueprint.requiredSections,
-        successMetric: `Aynı soru setiyle yapılacak yeniden ölçümde ${brandName} adının cevapta görünmesi${
-          run.brandMentioned ? " ve ilk iki sıraya yükselmesi" : ""
-        }.`,
-      };
+          id: `prompt-${run.id}`,
+          week: index + 1,
+          priority: "Yüksek",
+          title: `"${run.promptText}" sorusu için ilgili sayfayı güçlendir`,
+          reason: run.brandMentioned
+            ? `${brandName}, bu sorunun cevabında ${
+                run.brandRank ?? "alt"
+              }. sırada yer aldı. İlgili mevcut sayfa; karar kriterleri, teknik kanıtlar ve doğrudan cevap bölümüyle güçlendirilmelidir.`
+            : mentionedCompetitors.length > 0
+              ? `${brandName} cevapta görünmezken ${mentionedCompetitors
+                  .slice(0, 3)
+                  .join(
+                    ", "
+                  )} görünür durumda. Önce bu soruyla ilişkili mevcut marka sayfası kontrol edilmeli; yeterli değilse güçlendirilmeli, ilgili sayfa bulunmuyorsa önerilen adreste yeni bir karar sayfası hazırlanmalıdır.`
+              : `${brandName} bu sorunun cevabında görünmedi. Önce mevcut ürün, hizmet ve rehber sayfalarının soruyu doğrudan karşılayıp karşılamadığı doğrulanmalı; uygun sayfa varsa güncellenmeli, yoksa önerilen yapıda yeni bir sayfa oluşturulmalıdır.`,
+          targetPrompt: run.promptText,
+          deliverable: blueprint.deliverable,
+          suggestedPath: blueprint.suggestedPath,
+          requiredSections: [
+            "Önce aynı konuya hizmet eden mevcut ürün, hizmet veya rehber sayfasını kontrol et",
+            ...blueprint.requiredSections,
+          ],
+          successMetric: `Aynı ölçüm koşullarıyla yapılacak yeniden testte ${brandName} adının cevapta görünmesi${
+            run.brandMentioned
+              ? " ve ilk iki öneri arasına yükselmesi"
+              : ""
+          }.`,
+        };
     }
   );
 }
@@ -459,32 +468,46 @@ function buildWebsiteAction({
     };
   }
 
-  const invalidHeadingPage = analyzedPages.find(
-    (page) =>
-      page.h1Count !== null && page.h1Count !== 1
-  );
+  const invalidHeadingPages = analyzedPages.filter(
+  (page) =>
+    page.h1Count !== null && page.h1Count !== 1
+);
 
-  if (invalidHeadingPage) {
-    return {
-      id: `website-heading-${invalidHeadingPage.url}`,
-      week: 1,
-      priority: "Yüksek",
-      title: `${invalidHeadingPage.title} sayfasındaki ${invalidHeadingPage.h1Count} H1 başlığını düzelt`,
-      reason: `${invalidHeadingPage.url} üzerinde ${invalidHeadingPage.h1Count} adet H1 tespit edildi. Sayfanın ana konusu tek bir H1 ile açık biçimde belirtilmeli.`,
-      targetPrompt: "Sayfa konusu ve içerik yapısı",
-      deliverable: "Başlık hiyerarşisi düzenlemesi",
-      suggestedPath: invalidHeadingPage.url,
-      requiredSections: [
-        "Sayfanın ana konusunu anlatan yalnızca bir H1 bırak",
-        "Diğer ana başlıkları H2 seviyesine taşı",
-        "H2 altındaki detayları H3 ile sırala",
-        "Başlık metinlerini görsel slogan yerine kullanıcı aramasını açıklayacak şekilde yaz",
-        "Düzenleme sonrasında sayfayı tekrar tara",
-      ],
-      successMetric:
-        "Yeniden analizde H1 sayısının 1 ve başlık sırasının geçerli görünmesi.",
-    };
-  }
+if (invalidHeadingPages.length > 0) {
+  const affectedPageLabels = invalidHeadingPages
+    .slice(0, 4)
+    .map(
+      (page) =>
+        `${page.title} (${page.h1Count} H1)`
+    )
+    .join(", ");
+
+  const affectedUrls = invalidHeadingPages
+    .slice(0, 3)
+    .map((page) => page.url);
+
+  return {
+    id: "website-heading-structure",
+    week: 1,
+    priority: "Yüksek",
+    title: `${invalidHeadingPages.length}/${analyzedPages.length} taranan sayfada H1 yapısını düzelt`,
+    reason: `Tek H1 kuralını karşılamayan sayfalar: ${affectedPageLabels}. Her sayfanın ana konusu kullanıcıya ve arama sistemlerine tek bir açıklayıcı H1 ile aktarılmalıdır.`,
+    targetPrompt: "Sayfa konusu ve içerik hiyerarşisi",
+    deliverable: `${invalidHeadingPages.length} sayfada başlık hiyerarşisi düzenlemesi`,
+    suggestedPath:
+      affectedUrls.length > 0
+        ? affectedUrls.join(", ")
+        : "Taranan sayfalar",
+    requiredSections: [
+      "Her sorunlu sayfada yalnızca bir açıklayıcı H1 kullan",
+      "Görsel sloganları veya tekrar eden başlıkları H2 ya da normal metin seviyesine taşı",
+      "H2 başlıklarını sayfanın ana bölümleri için kullan",
+      "H3 başlıklarını yalnızca ilgili H2 bölümünün alt detaylarında kullan",
+      "Düzeltme sonrasında tüm sorunlu URL’leri yeniden tara",
+    ],
+    successMetric: `Yeniden analizde ${invalidHeadingPages.length} sorunlu sayfanın tamamında H1 sayısının 1 görünmesi.`,
+  };
+}
 
   const missingDescriptionPage = analyzedPages.find(
     (page) => !page.metaDescription

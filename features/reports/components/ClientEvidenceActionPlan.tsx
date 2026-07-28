@@ -316,14 +316,24 @@ export function ClientEvidenceActionPlan({
             4. hafta · Yeniden ölçüm
           </p>
           <h3 className="mt-2 font-semibold text-emerald-950">
-            Aynı soru setini değiştirmeden yeniden çalıştırın
-          </h3>
-          <p className="mt-2 text-sm leading-6 text-emerald-800">
-            Yayınlanan sayfaların etkisini ölçmek için aynı sorular, aynı
-            rakip listesi ve aynı AI motoru kullanılmalıdır. Karşılaştırmada
-            görünürlük oranı, marka sırası, kaynak seçimi ve rakip farkı
-            birlikte değerlendirilmelidir.
-          </p>
+  Aynı ölçüm koşullarıyla yeniden test edin
+        </h3>
+
+        <p className="mt-2 text-sm leading-6 text-emerald-800">
+          Yapılan çalışmaların etkisini karşılaştırabilmek için aynı soru
+          metinleri, marka aliasları, rakip listesi, AI modeli ve web
+          kaynağı ayarı kullanılmalıdır. Model sürümü değişirse sonuç
+          karşılaştırmasına bu bilgi ayrıca not edilmelidir.
+        </p>
+
+        <ul className="mt-3 grid gap-2 text-sm leading-6 text-emerald-800 sm:grid-cols-2">
+          <li>• Test seti görünürlük değişimi</li>
+          <li>• Marka sırası değişimi</li>
+          <li>• Görünen rakiplerdeki değişim</li>
+          <li>• Web kaynağı kullanımındaki değişim</li>
+          <li>• Önceki ölçüme göre kazanılan sorular</li>
+          <li>• Önceki ölçüme göre kaybedilen sorular</li>
+        </ul>
         </div>
       </section>
     </>

@@ -684,10 +684,12 @@ const competitorWebsiteScores =
                         {citationCompetitors?.length ?? 0} tanımlı rakip
                       </span>
                       <span className="rounded-full bg-white/10 px-4 py-2 text-sm text-white ring-1 ring-white/20">
-                        Kaynak ölçümü:{" "}
-                        {hasCitationMeasurement ? "Açık" : "Kapalı"}
-                      </span>
-                    </div>
+                          Web kaynakları:{" "}
+                          {hasCitationMeasurement
+                            ? "Kullanıldı"
+                            : "Kullanılmadı"}
+                        </span>
+                                            </div>
                   </div>
 
                   <div className="rounded-[1.5rem] bg-white/10 p-6 ring-1 ring-white/20 backdrop-blur">
@@ -776,12 +778,19 @@ const competitorWebsiteScores =
               <p className="font-semibold text-slate-950">
                 Bu sonuç nasıl yorumlanmalı?
               </p>
+
               <p className="mt-2 text-sm leading-6 text-slate-600">
-                Yüzde değerleri genel pazar tahmini değildir. Bu raporda
-                kullanılan {completedPromptCount} soru,{" "}
-                {citationCompetitors?.length ?? 0} takip edilen rakip ve Gemini
-                cevaplarının ölçüm anındaki sonucudur. Kapsam dışındaki
-                sorular veya farklı AI motorları farklı sonuç verebilir.
+                Yüzde değerleri genel pazar payı veya tüm yapay zekâ
+                platformlarının ortak sonucu değildir. Bu rapor, ölçüm
+                tarihinde Gemini üzerinde çalıştırılan{" "}
+                {completedPromptCount} soru ve tanımlanmış{" "}
+                {citationCompetitors?.length ?? 0} rakip ile sınırlıdır.
+              </p>
+
+              <p className="mt-3 text-sm leading-6 text-slate-600">
+                {hasCitationMeasurement
+                  ? "Bazı cevaplarda web kaynakları kullanılmıştır. Kaynak kullanımı, markanın Google aramasındaki sıralamasını veya Google AI sonuçlarında kesin olarak gösterildiğini kanıtlamaz."
+                  : "Bu ölçümde Gemini web kaynakları kullanılmadan cevap üretmiştir. Bu nedenle sonuçlar modelin mevcut bilgi ve yanıt üretme davranışını gösterir; Google Arama veya Google AI Mode görünürlüğü olarak yorumlanmamalıdır."}
               </p>
             </div>
           </section>
@@ -1005,20 +1014,31 @@ const competitorWebsiteScores =
           />
 
           <section className="print-avoid rounded-3xl border border-slate-200 bg-slate-50 p-5">
-            <h2 className="font-semibold text-slate-950">
-              Ölçüm kapsamı ve sınırlar
-            </h2>
-            <p className="mt-2 text-sm leading-6 text-slate-600">
-              Rapor Gemini cevapları, {completedPromptCount} test sorusu,
-              takip edilen {citationCompetitors?.length ?? 0} rakip
-              {websiteSnapshot
-                ? " ve taranabilen marka web sayfaları"
-                : ""}
-              {" "}üzerinden hazırlanmıştır. Google yorumları, backlink verileri,
-              tüm web’in taranması, canlı harita sonuçları ve diğer AI
-              motorları bu ölçümün kapsamına dahil değildir.
-            </p>
-          </section>
+  <h2 className="font-semibold text-slate-950">
+    Ölçüm kapsamı ve sınırlar
+  </h2>
+
+  <p className="mt-2 text-sm leading-6 text-slate-600">
+    Rapor; Gemini üzerinde çalıştırılan {completedPromptCount} test
+    sorusu, takip edilen {citationCompetitors?.length ?? 0} rakip
+    {websiteSnapshot
+      ? " ve otomatik olarak taranabilen marka web sayfaları"
+      : ""}
+    {" "}kullanılarak hazırlanmıştır.
+  </p>
+
+  <p className="mt-3 text-sm leading-6 text-slate-600">
+    {hasCitationMeasurement
+      ? "Ölçüm sırasında bazı cevaplarda web kaynakları kullanılmıştır. Bununla birlikte sonuçlar Google Arama sıralaması, Google AI Mode görünürlüğü veya tüm yapay zekâ platformlarındaki görünürlük anlamına gelmez."
+      : "Ölçüm sırasında Gemini web kaynakları kullanılmadan cevap üretmiştir. Bu nedenle görünürlük sonuçları model yanıtlarıyla sınırlıdır ve güncel Google arama sonuçlarının doğrudan ölçümü değildir."}
+  </p>
+
+  <p className="mt-3 text-sm leading-6 text-slate-600">
+    Google yorumları, backlink profili, canlı harita sonuçları,
+    reklam görünürlüğü, tüm web’in taranması ve diğer yapay zekâ
+    motorları bu raporun kapsamına dahil değildir.
+  </p>
+</section>
           <section className="client-report-closing report-page">
   <div className="overflow-hidden rounded-[2rem] bg-gradient-to-br from-slate-950 via-indigo-950 to-blue-900 p-7 text-white">
     <div className="grid gap-6 lg:grid-cols-[1.4fr_0.6fr] lg:items-center">

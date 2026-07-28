@@ -134,6 +134,12 @@ export function ClientWebsiteScoreComparison({
         {analyzedCompetitors.length} rakibin teknik, yapısal, içerik ve güven
         puanlarını karşılaştırır.
       </p>
+      <p className="mt-2 text-xs leading-5 text-slate-500">
+        Karşılaştırmaya dahil edilen siteler:{" "}
+        {analyzedCompetitors
+          .map((competitor) => competitor.name)
+          .join(", ")}
+      </p>
 
       <div className="mt-6 grid gap-4 md:grid-cols-3">
         <div className="rounded-3xl border border-blue-200 bg-blue-50 p-5">
