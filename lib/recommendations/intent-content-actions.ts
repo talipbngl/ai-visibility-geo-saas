@@ -60,5 +60,18 @@ export function getIntentContentPlan(
 ): IntentContentPlan | null {
   if (!intent) return null;
 
-  return intentContentPlans[intent.toLowerCase()] ?? null;
+  const normalizedIntent = intent.trim().toLowerCase();
+
+  if (
+    !Object.prototype.hasOwnProperty.call(
+      intentContentPlans,
+      normalizedIntent
+    )
+  ) {
+    return null;
+  }
+
+  return {
+    ...intentContentPlans[normalizedIntent],
+  };
 }

@@ -1,9 +1,4 @@
 import { getIntentContentPlan } from "@/lib/recommendations/intent-content-actions";
-type Signal = {
-  keyword: string;
-  count: number;
-  found: boolean;
-};
 
 type ScoreInput = {
   visibility_score: number | null;
@@ -64,11 +59,6 @@ type BuildEvidenceBasedRecommendationsInput = {
   competitorWebsiteSnapshots: CompetitorWebsiteSnapshotInput[];
 };
 
-type CompetitorVisibility = {
-  name: string;
-  mentioned: boolean;
-  rank: number | null;
-};
 type ContentType =
   | "service"
   | "about"
@@ -81,6 +71,12 @@ type ContentType =
 type ContentCoverage = {
   checked: boolean;
   types: Set<ContentType>;
+};
+
+type SignalCoverage = {
+  checked: boolean;
+  found: Map<string, string>;
+  missing: Map<string, string>;
 };
 
 const contentTypes =
@@ -133,6 +129,28 @@ function toRecord(
   return value as Record<string, unknown>;
 }
 
+function normalizeText(value: string) {
+  return value.normalize("NFKC").replace(/\s+/gu, " ").trim();
+}
+
+function normalizeKey(value: string) {
+  return normalizeText(value).toLocaleLowerCase("tr-TR");
+}
+
+function toFiniteMetric(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value)
+    ? value
+    : null;
+}
+
+function toPercentageMetric(value: unknown) {
+  const metric = toFiniteMetric(value);
+
+  return metric !== null && metric >= 0 && metric <= 100
+    ? metric
+    : null;
+}
+
 function getContentCoverage(
   value: unknown
 ): ContentCoverage {
@@ -151,11 +169,12 @@ function getContentCoverage(
 
   const types = new Set(
     rawTypes.filter(
+      (item): item is string => typeof item === "string"
+    )
+    .map((item) => normalizeKey(item))
+    .filter(
       (item): item is ContentType =>
-        typeof item === "string" &&
-        contentTypes.has(
-          item as ContentType
-        )
+        contentTypes.has(item as ContentType)
     )
   );
 
@@ -176,34 +195,53 @@ function getContentCoverage(
     types,
   };
 }
-function toSignalArray(value: unknown): Signal[] {
-  if (!Array.isArray(value)) return [];
 
-  return value
-    .map((item) => {
-      if (!item || typeof item !== "object") return null;
+function getSignalCoverage(value: unknown): SignalCoverage {
+  if (!Array.isArray(value)) {
+    return {
+      checked: false,
+      found: new Map(),
+      missing: new Map(),
+    };
+  }
 
-      const signal = item as Partial<Signal>;
+  const found = new Map<string, string>();
+  const missing = new Map<string, string>();
 
-      return {
-        keyword: String(signal.keyword ?? ""),
-        count: Number(signal.count ?? 0),
-        found: Boolean(signal.found),
-      };
-    })
-    .filter((item): item is Signal => Boolean(item?.keyword));
-}
+  for (const rawSignal of value) {
+    const signal = toRecord(rawSignal);
+    const keyword = normalizeText(
+      typeof signal.keyword === "string"
+        ? signal.keyword
+        : ""
+    );
 
-function getFoundKeywords(value: unknown) {
-  return toSignalArray(value)
-    .filter((signal) => signal.found)
-    .map((signal) => signal.keyword);
-}
+    if (!keyword) continue;
 
-function getMissingKeywords(value: unknown) {
-  return toSignalArray(value)
-    .filter((signal) => !signal.found)
-    .map((signal) => signal.keyword);
+    const key = normalizeKey(keyword);
+    const count = toFiniteMetric(signal.count);
+    const isFound =
+      signal.found === true || (count !== null && count > 0);
+
+    if (isFound) {
+      if (!found.has(key)) {
+        found.set(key, keyword);
+      }
+
+      missing.delete(key);
+      continue;
+    }
+
+    if (!found.has(key) && !missing.has(key)) {
+      missing.set(key, keyword);
+    }
+  }
+
+  return {
+    checked: true,
+    found,
+    missing,
+  };
 }
 
 function getNestedRun(analysis: AnalysisInput) {
@@ -224,9 +262,14 @@ function getMostCommonValues(values: string[], limit = 5) {
   const countMap = new Map<string, number>();
 
   values.forEach((value) => {
-    if (!value) return;
+    const normalizedValue = normalizeKey(value);
 
-    countMap.set(value, (countMap.get(value) ?? 0) + 1);
+    if (!normalizedValue) return;
+
+    countMap.set(
+      normalizedValue,
+      (countMap.get(normalizedValue) ?? 0) + 1
+    );
   });
 
   return Array.from(countMap.entries())
@@ -236,26 +279,71 @@ function getMostCommonValues(values: string[], limit = 5) {
 }
 
 function getCompetitorMentionStats(analyses: AnalysisInput[]) {
-  const stats = new Map<string, number>();
+  const stats = new Map<
+    string,
+    {
+      name: string;
+      mentionCount: number;
+      firstSeenOrder: number;
+    }
+  >();
+  let firstSeenOrder = 0;
 
   analyses.forEach((analysis) => {
+    if (
+      analysis.brand_mentioned !== true &&
+      analysis.brand_mentioned !== false
+    ) {
+      return;
+    }
+
     const competitors = Array.isArray(analysis.competitors_json)
-      ? (analysis.competitors_json as CompetitorVisibility[])
+      ? analysis.competitors_json
       : [];
+    const seenInAnalysis = new Set<string>();
 
-    competitors.forEach((competitor) => {
-      if (!competitor.mentioned) return;
+    competitors.forEach((rawCompetitor) => {
+      const competitor = toRecord(rawCompetitor);
 
-      stats.set(competitor.name, (stats.get(competitor.name) ?? 0) + 1);
+      if (competitor.mentioned !== true) return;
+
+      const name = normalizeText(
+        typeof competitor.name === "string"
+          ? competitor.name
+          : ""
+      );
+
+      if (!name) return;
+
+      const key = normalizeKey(name);
+
+      if (seenInAnalysis.has(key)) return;
+
+      seenInAnalysis.add(key);
+
+      const existing = stats.get(key);
+
+      if (existing) {
+        existing.mentionCount += 1;
+        return;
+      }
+
+      stats.set(key, {
+        name,
+        mentionCount: 1,
+        firstSeenOrder,
+      });
+      firstSeenOrder += 1;
     });
   });
 
-  return Array.from(stats.entries())
-    .map(([name, mentionCount]) => ({
-      name,
-      mentionCount,
-    }))
-    .sort((a, b) => b.mentionCount - a.mentionCount);
+  return Array.from(stats.values()).sort((first, second) => {
+    if (second.mentionCount !== first.mentionCount) {
+      return second.mentionCount - first.mentionCount;
+    }
+
+    return first.firstSeenOrder - second.firstSeenOrder;
+  });
 }
 
 function pushUniqueRecommendation(
@@ -280,13 +368,19 @@ export function buildEvidenceBasedRecommendations({
 }: BuildEvidenceBasedRecommendationsInput) {
   const recommendations: EvidenceRecommendation[] = [];
 
-  const visibilityScore = Number(score?.visibility_score ?? 0);
-  const positiveSentimentRate = Number(score?.positive_sentiment_rate ?? 0);
-  const averageRank = Number(score?.average_rank ?? 0);
+  const visibilityScore = toPercentageMetric(
+    score?.visibility_score
+  );
+  const positiveSentimentRate = toPercentageMetric(
+    score?.positive_sentiment_rate
+  );
+  const averageRank = toFiniteMetric(score?.average_rank);
 
-  const visibleAnalyses = analyses.filter((analysis) => analysis.brand_mentioned);
+  const visibleAnalyses = analyses.filter(
+    (analysis) => analysis.brand_mentioned === true
+  );
   const invisibleAnalyses = analyses.filter(
-    (analysis) => !analysis.brand_mentioned
+    (analysis) => analysis.brand_mentioned === false
   );
 
   const invisibleIntents = getMostCommonValues(
@@ -303,51 +397,87 @@ export function buildEvidenceBasedRecommendations({
   const competitorStats = getCompetitorMentionStats(analyses);
   const strongestCompetitor = competitorStats[0] ?? null;
 
-  const brandWebsiteScore = Number(brandWebsiteSnapshot?.content_score ?? 0);
-
-  const brandFoundServiceKeywords = new Set(
-    getFoundKeywords(brandWebsiteSnapshot?.service_signals_json)
+  const brandWebsiteScore = toPercentageMetric(
+    brandWebsiteSnapshot?.content_score
   );
 
-  const brandFoundTrustKeywords = new Set(
-    getFoundKeywords(brandWebsiteSnapshot?.trust_signals_json)
-  );
-
-  const brandMissingServiceKeywords = getMissingKeywords(
+  const brandServiceCoverage = getSignalCoverage(
     brandWebsiteSnapshot?.service_signals_json
   );
 
-  const brandMissingTrustKeywords = getMissingKeywords(
+  const brandTrustCoverage = getSignalCoverage(
     brandWebsiteSnapshot?.trust_signals_json
   );
 
-  const competitorServiceKeywords = new Set(
-    competitorWebsiteSnapshots.flatMap((snapshot) =>
-      getFoundKeywords(snapshot.service_signals_json)
-    )
+  const brandMissingServiceKeywords = Array.from(
+    brandServiceCoverage.missing.values()
   );
 
-  const competitorTrustKeywords = new Set(
-    competitorWebsiteSnapshots.flatMap((snapshot) =>
-      getFoundKeywords(snapshot.trust_signals_json)
-    )
+  const brandMissingTrustKeywords = Array.from(
+    brandTrustCoverage.missing.values()
   );
+
+  const competitorServiceKeywords = new Map<string, string>();
+  const competitorTrustKeywords = new Map<string, string>();
+
+  for (const snapshot of competitorWebsiteSnapshots) {
+    const serviceCoverage = getSignalCoverage(
+      snapshot.service_signals_json
+    );
+    const trustCoverage = getSignalCoverage(
+      snapshot.trust_signals_json
+    );
+
+    for (const [key, keyword] of serviceCoverage.found) {
+      if (!competitorServiceKeywords.has(key)) {
+        competitorServiceKeywords.set(key, keyword);
+      }
+    }
+
+    for (const [key, keyword] of trustCoverage.found) {
+      if (!competitorTrustKeywords.has(key)) {
+        competitorTrustKeywords.set(key, keyword);
+      }
+    }
+  }
 
   const competitorOnlyServiceKeywords = Array.from(
-    competitorServiceKeywords
-  ).filter((keyword) => !brandFoundServiceKeywords.has(keyword));
+    competitorServiceKeywords.entries()
+  )
+    .filter(
+      ([key]) =>
+        brandServiceCoverage.checked &&
+        !brandServiceCoverage.found.has(key)
+    )
+    .map(([, keyword]) => keyword);
 
-  const competitorOnlyTrustKeywords = Array.from(competitorTrustKeywords).filter(
-    (keyword) => !brandFoundTrustKeywords.has(keyword)
-  );
+  const competitorOnlyTrustKeywords = Array.from(
+    competitorTrustKeywords.entries()
+  )
+    .filter(
+      ([key]) =>
+        brandTrustCoverage.checked &&
+        !brandTrustCoverage.found.has(key)
+    )
+    .map(([, keyword]) => keyword);
+
+  const validCompetitorWebsiteScores =
+    competitorWebsiteSnapshots
+      .map((snapshot) =>
+        toPercentageMetric(snapshot.content_score)
+      )
+      .filter(
+        (contentScore): contentScore is number =>
+          contentScore !== null
+      );
 
   const averageCompetitorWebsiteScore =
-    competitorWebsiteSnapshots.length > 0
+    validCompetitorWebsiteScores.length > 0
       ? Math.round(
-          competitorWebsiteSnapshots.reduce(
-            (sum, snapshot) => sum + Number(snapshot.content_score ?? 0),
+          validCompetitorWebsiteScores.reduce(
+            (sum, contentScore) => sum + contentScore,
             0
-          ) / competitorWebsiteSnapshots.length
+          ) / validCompetitorWebsiteScores.length
         )
       : null;
       const brandContentCoverage =
@@ -440,7 +570,11 @@ const competitorContentGaps =
     });
   }
 
-  if (brandWebsiteSnapshot && brandWebsiteScore < 50) {
+  if (
+    brandWebsiteSnapshot &&
+    brandWebsiteScore !== null &&
+    brandWebsiteScore < 50
+  ) {
     pushUniqueRecommendation(recommendations, {
       category: "website",
       title: "Ana sayfa içerik sinyallerini güçlendir",
@@ -455,6 +589,8 @@ const competitorContentGaps =
   }
 
   if (
+    brandWebsiteSnapshot &&
+    brandWebsiteScore !== null &&
     averageCompetitorWebsiteScore !== null &&
     brandWebsiteScore + 10 < averageCompetitorWebsiteScore
   ) {
@@ -525,7 +661,11 @@ if (competitorContentGaps.length > 0) {
     });
   }
 
-  if (brandMissingServiceKeywords.length > 0 && visibilityScore < 50) {
+  if (
+    brandMissingServiceKeywords.length > 0 &&
+    visibilityScore !== null &&
+    visibilityScore < 50
+  ) {
     pushUniqueRecommendation(recommendations, {
       category: "content",
       title: "Görünmediğin hizmet niyetleri için içerik üret",
@@ -541,7 +681,11 @@ if (competitorContentGaps.length > 0) {
     });
   }
 
-  if (brandMissingTrustKeywords.length > 0 && positiveSentimentRate < 70) {
+  if (
+    brandMissingTrustKeywords.length > 0 &&
+    positiveSentimentRate !== null &&
+    positiveSentimentRate < 70
+  ) {
     pushUniqueRecommendation(recommendations, {
       category: "trust",
       title: "Marka güven anlatımını güçlendir",
@@ -585,7 +729,10 @@ if (competitorContentGaps.length > 0) {
     });
   }
 
-  if (averageRank > 2) {
+  if (
+    averageRank !== null &&
+    averageRank > 2
+  ) {
     pushUniqueRecommendation(recommendations, {
       category: "content",
       title: "İlk öneri konumuna çıkmak için kategori otoritesini artır",
