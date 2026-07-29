@@ -9,6 +9,7 @@ import {
   normalizeMentionText,
   uniqueMentionTerms,
 } from "@/lib/analysis/mention-detection";
+import { buildAuditScoreCalculation } from "@/lib/reports/audit-score-calculation";
 type RouteContext = {
   params: Promise<{
     auditId: string;
@@ -34,6 +35,16 @@ type CompletedRunRecord = {
   id: string;
   raw_answer: string | null;
   citations_json: unknown;
+  created_at: string | null;
+  prompt_text_snapshot: string | null;
+  prompts?:
+    | {
+        text?: string | null;
+      }
+    | Array<{
+        text?: string | null;
+      }>
+    | null;
 };
 type MentionResult = {
   name: string;
@@ -47,6 +58,20 @@ function redirectTo(path: string, requestUrl: string) {
   return NextResponse.redirect(new URL(path, requestUrl), {
     status: 303,
   });
+}
+
+function getCompletedRunPromptText(
+  run: CompletedRunRecord | null | undefined
+) {
+  const snapshot = run?.prompt_text_snapshot?.trim();
+
+  if (snapshot) return snapshot;
+
+  const nestedPrompt = Array.isArray(run?.prompts)
+    ? run.prompts[0]
+    : run?.prompts;
+
+  return nestedPrompt?.text?.trim() ?? "";
 }
 
 function detectSentiment(answer: string, brandMentioned: boolean) {
@@ -308,9 +333,38 @@ export async function POST(request: Request, context: RouteContext) {
 
   const competitors = (competitorsData ?? []) as CompetitorRecord[];
 
+  const seededPromptTerms = uniqueMentionTerms([
+    ...buildCompetitorMentionTerms({
+      name: brand.name,
+      aliases: brandAliases,
+      websiteUrl: brand.website_url,
+    }),
+    ...competitors.flatMap((competitor) =>
+      buildCompetitorMentionTerms({
+        name: competitor.name,
+        aliases:
+          competitor.competitor_aliases?.map(
+            (item) => item.alias
+          ) ?? [],
+        websiteUrl: competitor.website_url,
+      })
+    ),
+  ]);
+
    const { data: runsData, error: runsError } = await supabase
     .from("audit_runs")
-    .select("id, raw_answer, citations_json")
+    .select(
+      `
+      id,
+      raw_answer,
+      citations_json,
+      created_at,
+      prompt_text_snapshot,
+      prompts (
+        text
+      )
+    `
+    )
     .eq("audit_id", audit.id)
     .eq("status", "completed");
 
@@ -368,67 +422,42 @@ const analyses = completedRuns.map((run) => {
     );
   }
 
-  const totalAnalyzed = analyses.length;
-  const brandMentionCount = analyses.filter(
-    (analysis) => analysis.brand_mentioned
-  ).length;
-
-  const brandRanks = analyses
-    .map((analysis) => analysis.brand_rank)
-    .filter((rank): rank is number => typeof rank === "number");
-
-  const positiveMentions = analyses.filter(
-    (analysis) => analysis.brand_sentiment === "positive"
-  ).length;
-
-  const competitorMentionCount = analyses.reduce((total, analysis) => {
-    const competitorsJson = analysis.competitors_json as MentionResult[];
-
-    return (
-      total +
-      competitorsJson.filter((competitor) => competitor.mentioned).length
-    );
-  }, 0);
-
-  const competitorOnlyOpportunityCount = analyses.filter((analysis) => {
-    const competitorsJson = analysis.competitors_json as MentionResult[];
-
-    return (
-      !analysis.brand_mentioned &&
-      competitorsJson.some((competitor) => competitor.mentioned)
-    );
-  }).length;
-
-  const visibilityScore = round((brandMentionCount / totalAnalyzed) * 100);
-
-  const shareOfVoice =
-    brandMentionCount + competitorMentionCount > 0
-      ? round(
-          (brandMentionCount /
-            (brandMentionCount + competitorMentionCount)) *
-            100
-        )
-      : 0;
-
-  const averageRank =
-    brandRanks.length > 0
-      ? round(
-          brandRanks.reduce((total, rank) => total + rank, 0) /
-            brandRanks.length
-        )
-      : null;
-
-  const positiveSentimentRate =
-    brandMentionCount > 0
-      ? round((positiveMentions / brandMentionCount) * 100)
-      : 0;
-
-  const competitorGapScore = round(
-    100 - (competitorOnlyOpportunityCount / totalAnalyzed) * 100
+  const completedRunById = new Map(
+    completedRuns.map((run) => [run.id, run])
   );
+  const auditScoreCalculation =
+    buildAuditScoreCalculation(
+      analyses.map((analysis) => {
+        const run = completedRunById.get(
+          analysis.audit_run_id
+        );
+        const promptText =
+          getCompletedRunPromptText(run);
 
-  const opportunityScore = round(
-    (competitorOnlyOpportunityCount / totalAnalyzed) * 100
+        return {
+          id: analysis.audit_run_id,
+          promptText,
+          runStatus: "completed",
+          runCreatedAt: run?.created_at ?? null,
+          isSeededPrompt:
+            findFirstMentionIndex(
+              promptText,
+              seededPromptTerms
+            ) !== null,
+          brandMentioned:
+            analysis.brand_mentioned,
+          brandRank: analysis.brand_rank,
+          brandSentiment:
+            analysis.brand_sentiment,
+          competitors:
+            analysis.competitors_json as MentionResult[],
+        };
+      })
+    );
+  const discoveryRunIds = new Set(
+    auditScoreCalculation.discoveryRuns.map(
+      (run) => run.id
+    )
   );
   function getCitationSources(value: unknown) {
     if (!value || typeof value !== "object") {
@@ -468,6 +497,7 @@ const analyses = completedRuns.map((run) => {
 
   const groundedRuns = completedRuns.filter(
     (run) =>
+      discoveryRunIds.has(run.id) &&
       hasGroundingEnabled(
         run.citations_json
       )
@@ -506,13 +536,19 @@ const analyses = completedRuns.map((run) => {
   const { error: scoreError } = await supabase.from("audit_scores").upsert(
     {
       audit_id: audit.id,
-      visibility_score: visibilityScore,
-      share_of_voice: shareOfVoice,
-      average_rank: averageRank,
-      positive_sentiment_rate: positiveSentimentRate,
+      visibility_score:
+        auditScoreCalculation.visibilityScore,
+      share_of_voice:
+        auditScoreCalculation.shareOfVoice,
+      average_rank:
+        auditScoreCalculation.averageRank,
+      positive_sentiment_rate:
+        auditScoreCalculation.positiveSentimentRate,
       citation_score: citationScore,
-      competitor_gap_score: competitorGapScore,
-      opportunity_score: opportunityScore,
+      competitor_gap_score:
+        auditScoreCalculation.competitorGapScore,
+      opportunity_score:
+        auditScoreCalculation.opportunityScore,
     },
     {
       onConflict: "audit_id",
@@ -554,7 +590,8 @@ const analyses = completedRuns.map((run) => {
     .from("audits")
     .update({
       status: remainingRuns && remainingRuns > 0 ? "running" : "completed",
-      completed_prompts: totalAnalyzed,
+      completed_prompts:
+        auditScoreCalculation.uniqueCompletedRunCount,
       completed_at:
         remainingRuns && remainingRuns > 0 ? null : new Date().toISOString(),
       error_message:

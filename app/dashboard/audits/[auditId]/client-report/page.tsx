@@ -381,12 +381,6 @@ const clientReportRuns = prepareCompletedUniqueRuns(
   })
 );
 
-const currentPromptResults = clientReportRuns.map((run) => ({
-  promptText: run.promptText,
-  mentioned: run.brandMentioned,
-  rank: run.brandRank,
-}));
-
 const citationRuns = clientReportRuns.map((run) => ({
   id: run.id,
   promptText: run.promptText,
@@ -398,6 +392,13 @@ const citationRuns = clientReportRuns.map((run) => ({
 const discoveryRuns = clientReportRuns.filter(
   (run) => !run.isSeededPrompt
 );
+
+const currentDiscoveryPromptResults =
+  discoveryRuns.map((run) => ({
+    promptText: run.promptText,
+    mentioned: run.brandMentioned,
+    rank: run.brandRank,
+  }));
 
 const seededRuns = clientReportRuns.filter(
   (run) => run.isSeededPrompt
@@ -433,6 +434,15 @@ const previousPromptResults = prepareCompletedUniqueRuns(
   mentioned: result.mentioned,
   rank: result.rank,
 }));
+
+const previousDiscoveryPromptResults =
+  previousPromptResults.filter(
+    (result) =>
+      findFirstMentionIndex(
+        result.promptText,
+        seededPromptTerms
+      ) === null
+  );
   const { data: websiteSnapshots } = await supabase
     .from("brand_website_snapshots")
     .select(
@@ -855,10 +865,10 @@ const executiveSummary =
                   previousPromptCount={
                     previousAudit?.total_prompts ?? null
                   }
-                  currentPromptTexts={currentPromptResults.map(
+                  currentPromptTexts={currentDiscoveryPromptResults.map(
                     (result) => result.promptText
                   )}
-                  previousPromptTexts={previousPromptResults.map(
+                  previousPromptTexts={previousDiscoveryPromptResults.map(
                     (result) => result.promptText
                   )}
                   previousDate={
@@ -867,8 +877,12 @@ const executiveSummary =
                 />
               ) : null}
                <PromptVisibilityChanges
-                    currentResults={currentPromptResults}
-                    previousResults={previousPromptResults}
+                    currentResults={
+                      currentDiscoveryPromptResults
+                    }
+                    previousResults={
+                      previousDiscoveryPromptResults
+                    }
                   />
               {hasIntentDifference ? (
               <section className="report-page">
