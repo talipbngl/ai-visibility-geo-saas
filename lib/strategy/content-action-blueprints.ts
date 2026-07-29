@@ -313,6 +313,21 @@ const topicStopWords = new Set([
   "veya",
 ]);
 
+const locationSuffixTokens = new Set([
+  "da",
+  "de",
+  "ta",
+  "te",
+  "dan",
+  "den",
+  "tan",
+  "ten",
+  "daki",
+  "deki",
+  "taki",
+  "teki",
+]);
+
 function slugify(value: string) {
   return normalizeStrategyText(value)
     .replace(/\s+/g, "-")
@@ -342,15 +357,21 @@ function getTopicSlug({
     cleanedPromptText
   );
 
-  const promptTokens = normalizeStrategyText(
+  const normalizedPromptTokens = normalizeStrategyText(
     cleanedPromptText
-  )
-    .split(" ")
+  ).split(" ");
+
+  const promptTokens = normalizedPromptTokens
     .filter(
-      (token) =>
+      (token, index) =>
         token.length > 2 &&
         !topicStopWords.has(token) &&
-        token !== location
+        token !== location &&
+        !(
+          location !== null &&
+          normalizedPromptTokens[index - 1] === location &&
+          locationSuffixTokens.has(token)
+        )
     )
     .slice(0, 7);
 
@@ -452,16 +473,20 @@ export function buildContentActionBlueprint({
       .join(" "),
   });
   const profile = archetypeProfiles[archetype];
-  const brandSlug = slugify(brandName) || "marka";
-  const competitorSlug = strongestCompetitorName
-    ? slugify(strongestCompetitorName)
-    : "alternatifler";
+  const normalizedBrandName = brandName.trim() || "Marka";
+  const normalizedCompetitorName =
+    strongestCompetitorName?.trim() || null;
+  const brandSlug =
+    slugify(normalizedBrandName) || "marka";
+  const competitorSlug =
+    slugify(normalizedCompetitorName ?? "") ||
+    "alternatifler";
   const topicSlug = getTopicSlug({
     promptText,
     brandContext,
   });
   const promptOfferLine = getPromptOfferLine({
-    brandName,
+    brandName: normalizedBrandName,
     promptText,
   });
   const audienceLine = getAudienceLine(brandContext);
@@ -470,16 +495,16 @@ export function buildContentActionBlueprint({
     case "comparison":
       return {
         deliverable: `${profile.categoryLabel} karşılaştırma rehberi`,
-        suggestedPath: strongestCompetitorName
+        suggestedPath: normalizedCompetitorName
           ? `/karsilastirma/${brandSlug}-${competitorSlug}`
           : `/karsilastirma/${topicSlug}`,
         requiredSections: [
           "Karşılaştırmanın kapsamı, veri tarihi ve kullanılan kaynaklar",
-          `${brandName} ile ${
-            strongestCompetitorName ?? "alternatiflerin"
+          `${normalizedBrandName} ile ${
+            normalizedCompetitorName ?? "alternatiflerin"
           } aynı ölçütlerle karşılaştırıldığı tablo: ${profile.decisionCriteria}`,
           promptOfferLine,
-          `${brandName} için güçlü yönler, sınırlamalar ve uygun olmadığı durumlar`,
+          `${normalizedBrandName} için güçlü yönler, sınırlamalar ve uygun olmadığı durumlar`,
           `${profile.proofRequirements}; sonuç bölümünde ${profile.conversionStep}`,
         ],
       };
@@ -548,7 +573,7 @@ export function buildContentActionBlueprint({
           "Sorunun ilk paragrafta verilen kısa ve doğrudan cevabı",
           "Olası nedenler, ön koşullar ve hangi durumda profesyonel destek gerektiği",
           "Kullanıcının uygulayabileceği adımlar ve seçeneklerin sınırları",
-          `${brandName} teklifinin sorunu hangi koşullarda çözebildiği, çözümün sınırları ve uygun olmadığı durumlar`,
+          `${normalizedBrandName} teklifinin sorunu hangi koşullarda çözebildiği, çözümün sınırları ve uygun olmadığı durumlar`,
           `${profile.proofRequirements}; ilgili ${profile.conversionStep}`,
         ],
       };
@@ -575,7 +600,7 @@ export function buildContentActionBlueprint({
           `Kullanıcının karar vereceği ölçütler: ${profile.decisionCriteria}`,
           "Tüm seçeneklerin aynı veri alanlarıyla karşılaştırıldığı kısa tablo",
           promptOfferLine,
-          `${brandName} için uygun kullanıcı profili, güçlü olduğu ve uygun olmadığı durumlar`,
+          `${normalizedBrandName} için uygun kullanıcı profili, güçlü olduğu ve uygun olmadığı durumlar`,
           `${profile.proofRequirements}; kaynaklar, güncelleme tarihi ve ${profile.conversionStep}`,
         ],
       };

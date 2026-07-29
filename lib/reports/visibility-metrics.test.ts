@@ -7,7 +7,7 @@ import {
 
 type TestRun = {
   id: string;
-  promptText: string;
+  promptText: string | null | undefined;
   runStatus: string | null | undefined;
   runCreatedAt: string | null | undefined;
   brandMentioned: boolean;
@@ -64,6 +64,17 @@ describe("prepareCompletedUniqueRuns", () => {
 
   it.each(["", "   ", "\n\t"])(
     "boş veya yalnızca boşluk içeren soru metnini atar: %j",
+    (promptText) => {
+      expect(
+        prepareCompletedUniqueRuns([
+          createRun({ promptText }),
+        ])
+      ).toEqual([]);
+    }
+  );
+
+  it.each([null, undefined])(
+    "null veya undefined soru metnini güvenle atar: %s",
     (promptText) => {
       expect(
         prepareCompletedUniqueRuns([
@@ -172,6 +183,94 @@ describe("prepareCompletedUniqueRuns", () => {
     const second = createRun({
       id: "second",
       runCreatedAt: "geçersiz",
+    });
+
+    expect(
+      prepareCompletedUniqueRuns([first, second])[0]?.id
+    ).toBe("first");
+  });
+
+  it.each([
+    "bozuk-1",
+    "bozuk-2",
+    "2",
+    "March 4, 2026",
+    "2026-02-30T10:00:00.000Z",
+    "2026-07-29T10:00:00",
+  ])(
+    "Date.parse tarafından gevşek yorumlanabilen geçersiz tarihi reddeder: %s",
+    (runCreatedAt) => {
+      const first = createRun({
+        id: "first",
+        runCreatedAt: null,
+      });
+      const invalidDuplicate = createRun({
+        id: "invalid-duplicate",
+        runCreatedAt,
+      });
+
+      expect(
+        prepareCompletedUniqueRuns([
+          first,
+          invalidDuplicate,
+        ])[0]?.id
+      ).toBe("first");
+    }
+  );
+
+  it("Supabase'in boşluklu ve saat dilimi kısa ISO tarihini kabul eder", () => {
+    const oldRun = createRun({
+      id: "old",
+      runCreatedAt: "2026-07-28 19:42:23.117412+00",
+    });
+    const newRun = createRun({
+      id: "new",
+      runCreatedAt: "2026-07-28 19:42:23.117413+00",
+    });
+
+    expect(
+      prepareCompletedUniqueRuns([oldRun, newRun])[0]?.id
+    ).toBe("new");
+  });
+
+  it("aynı milisaniyedeki mikrosaniye farkını kaybetmez", () => {
+    const oldRun = createRun({
+      id: "old",
+      runCreatedAt: "2026-07-29T10:00:00.123456Z",
+    });
+    const newRun = createRun({
+      id: "new",
+      runCreatedAt: "2026-07-29T10:00:00.123457Z",
+    });
+
+    expect(
+      prepareCompletedUniqueRuns([oldRun, newRun])[0]?.id
+    ).toBe("new");
+  });
+
+  it("iki farklı saat dilimindeki eşit anlarda ilk kaydı korur", () => {
+    const first = createRun({
+      id: "first",
+      runCreatedAt: "2026-07-29T10:00:00.000Z",
+    });
+    const sameInstant = createRun({
+      id: "same-instant",
+      runCreatedAt: "2026-07-29T13:00:00.000+03:00",
+    });
+
+    expect(
+      prepareCompletedUniqueRuns([first, sameInstant])[0]?.id
+    ).toBe("first");
+  });
+
+  it("iki eşit ISO zaman damgasında ilk kaydı deterministik biçimde korur", () => {
+    const first = createRun({
+      id: "first",
+      runCreatedAt: "2026-07-29T10:00:00.000Z",
+    });
+    const second = createRun({
+      id: "second",
+      runCreatedAt: "2026-07-29T10:00:00.000Z",
     });
 
     expect(
