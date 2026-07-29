@@ -323,6 +323,30 @@ export function resolvePromptIntent(
   ) {
     return "premium_choice";
   }
+    /*
+   * "Çözüm sağlayıcıları hangileridir?" gibi sorulardaki "çözüm"
+   * kelimesi bir problemin nasıl giderileceğini değil, seçenek veya
+   * tedarikçi listesini ifade eder. Bu kontrol problem_solution
+   * kontrolünden önce çalışarak sağlayıcı aramalarının yanlış
+   * sınıflandırılmasını önler.
+   */
+  if (
+    includesAny(normalizedPrompt, [
+      "cozum saglayici*",
+      "urun saglayici*",
+      "hizmet saglayici*",
+      "teknoloji saglayici*",
+      "hangi saglayici*",
+      "hangi tedarikci*",
+      "hangi firma*",
+      "hangi sirket*",
+      "hangi marka*",
+      "onerilen saglayici*",
+      "one cikan firma*",
+    ])
+  ) {
+    return "alternative_search";
+  }
 
   if (
     includesAny(normalizedPrompt, [
