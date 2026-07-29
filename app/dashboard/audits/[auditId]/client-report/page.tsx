@@ -675,13 +675,45 @@ const competitorWebsiteScores =
     audit.completed_prompts,
     analyses?.length ?? 0
   );
-  const primaryGap = discoveryRuns.find(
-  (run) => !run.brandMentioned
-);
+  const primaryPromptAction =
+  clientReportBriefs.actionBriefs.find(
+    (action) => action.id.startsWith("prompt-")
+  );
+
+const primaryGap = primaryPromptAction
+  ? discoveryRuns.find(
+      (run) =>
+        run.promptText ===
+        primaryPromptAction.targetPrompt
+    ) ??
+    discoveryRuns.find(
+      (run) => !run.brandMentioned
+    )
+  : discoveryRuns.find(
+      (run) => !run.brandMentioned
+    );
   const productName =
     process.env.NEXT_PUBLIC_PRODUCT_NAME?.trim() || "ASPEQO";
   const contactEmail =
     process.env.NEXT_PUBLIC_CONTACT_EMAIL?.trim() || "";
+    const contactName =
+  process.env.NEXT_PUBLIC_CONTACT_NAME?.trim() || "";
+
+const contactPhone =
+  process.env.NEXT_PUBLIC_CONTACT_PHONE?.trim() || "";
+
+const contactLinkedIn =
+  process.env.NEXT_PUBLIC_CONTACT_LINKEDIN?.trim() || "";
+
+const contactLinkedInUrl = contactLinkedIn
+  ? /^https?:\/\//i.test(contactLinkedIn)
+    ? contactLinkedIn
+    : `https://${contactLinkedIn}`
+  : "";
+
+const contactLinkedInLabel = contactLinkedIn
+  .replace(/^https?:\/\//i, "")
+  .replace(/\/$/, "");
   const reportYear = new Date(audit.created_at).getFullYear();
   const reportNumber = `ASP-${reportYear}-${audit.id
     .slice(0, 8)
@@ -844,11 +876,19 @@ const executiveSummary =
                 />
 
                 <MetricBox
-                  label="Yönlendirmesiz görünürlük payı"
-                  value={`${discoveryShareOfVoice}%`}
-                  helper="Tarafsız sorularda marka ve takip edilen rakiplerin toplam görünürlüğü içindeki pay"
-                  tone="purple"
-                />
+                    label="Yönlendirmesiz görünürlük payı"
+                    value={
+                      discoveryTotalMentions > 0
+                        ? `${discoveryShareOfVoice}%`
+                        : "-"
+                    }
+                    helper={
+                      discoveryTotalMentions > 0
+                        ? "Tarafsız sorularda marka ve takip edilen rakiplerin toplam görünürlüğü içindeki pay"
+                        : "Tarafsız cevaplarda ölçülen marka veya takip edilen rakip görünmediği için pay hesaplanamadı"
+                    }
+                    tone="purple"
+                  />
 
                 <MetricBox
                   label="Yönlendirmesiz ortalama sıra"
@@ -1080,13 +1120,40 @@ description={`${discoveryPromptCount} yönlendirmesiz soruda markanın ve cevapt
                 </table>
               </div>
 
-              <p className="mt-3 text-xs leading-5 text-slate-500">
-                Tanımlanan {citationCompetitors?.length ?? 0} rakip içinden
-                yalnızca AI cevaplarında en az bir kez görünen rakipler
+                            <p className="mt-3 text-xs leading-5 text-slate-500">
+                Tanımlanan{" "}
+                {citationCompetitors?.length ?? 0} rakip
+                içinden yalnızca yönlendirmesiz AI
+                cevaplarında en az bir kez görünen rakipler
                 listelenmiştir.
               </p>
             </section>
-          ) : null}
+          ) : (
+            <section>
+              <SectionTitle
+                eyebrow="02 - Rakip Görünürlüğü"
+                title="Yönlendirmesiz cevaplarda rakip görünürlüğü"
+                description={`${discoveryPromptCount} tarafsız soruda takip edilen rakiplerin doğal görünürlüğü incelendi.`}
+              />
+
+              <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
+                <p className="font-semibold text-slate-950">
+                  Takip edilen rakipler tarafsız cevaplarda görünmedi
+                </p>
+
+                <p className="mt-2 text-sm leading-6 text-slate-600">
+                  Marka veya rakip adı soru metninde
+                  geçmeyen cevaplarda takip edilen{" "}
+                  {citationCompetitors?.length ?? 0} rakibin
+                  hiçbiri tespit edilmedi. Bu sonuç,
+                  rakiplerin genel olarak görünmez olduğu
+                  anlamına gelmez; yalnızca bu ölçümdeki{" "}
+                  {discoveryPromptCount} yönlendirmesiz
+                  soruyu temsil eder.
+                </p>
+              </div>
+            </section>
+          )}
           {hasCitationMeasurement ? (
             <CitationSourceIntelligence
               brandName={brand.name}
@@ -1154,33 +1221,96 @@ description={`${discoveryPromptCount} yönlendirmesiz soruda markanın ve cevapt
 </section>
           <section className="client-report-closing report-page">
   <div className="overflow-hidden rounded-[2rem] bg-gradient-to-br from-slate-950 via-indigo-950 to-blue-900 p-7 text-white">
-    <div className="grid gap-6 lg:grid-cols-[1.4fr_0.6fr] lg:items-center">
-      <div>
-        <p className="text-sm font-semibold uppercase tracking-[0.18em] text-cyan-300">
-          Sonraki Adım
-        </p>
+    <div className="w-full">
+      <div className="grid gap-8 lg:grid-cols-[1.25fr_0.75fr] lg:items-start">
+        <div>
+          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-cyan-300">
+            Sonraki Adım
+          </p>
 
-        <h2 className="mt-2 text-3xl font-bold tracking-tight">
-          İlk teslimatı netleştirelim
-        </h2>
+          <h2 className="mt-2 text-3xl font-bold tracking-tight">
+            İlk teslimatı netleştirelim
+          </h2>
 
-        <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-300">
-          İlk görüşmede genel tavsiyeleri tekrar etmeyeceğiz. Birinci hafta
-          için önerilen teslimatın sayfa yapısını, sorumlusunu ve yayın
-          tarihini birlikte netleştireceğiz.
-        </p>
-      </div>
+          <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-300">
+            İlk görüşmede genel tavsiyeleri tekrar
+            etmeyeceğiz. Birinci hafta için önerilen
+            teslimatın hedef sayfasını, sorumlusunu,
+            kapsamını ve yayın tarihini birlikte
+            netleştireceğiz.
+          </p>
 
-      <div className="rounded-3xl bg-white/10 p-5 ring-1 ring-white/20">
-        <p className="text-sm text-slate-300">Önerilen görüşme</p>
-        <p className="mt-1 text-2xl font-bold">15 dakika</p>
-        <p className="mt-2 text-sm leading-6 text-slate-300">
-          Hedef soru, önerilen URL ve başarı ölçütü üzerinden ilk teslimatı
-          karara bağlamak için.
-        </p>
+          {contactName ||
+          contactEmail ||
+          contactPhone ||
+          contactLinkedIn ? (
+            <div className="mt-8 rounded-3xl border border-white/15 bg-white/5 p-5">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cyan-300">
+                Raporu hazırlayan
+              </p>
 
-        {contactEmail ? (
-          <>
+              {contactName ? (
+                <p className="mt-2 text-xl font-semibold text-white">
+                  {contactName}
+                </p>
+              ) : null}
+
+              <p className="mt-1 text-sm text-slate-300">
+                {productName} · AI Görünürlük Analizi
+              </p>
+
+              <div className="mt-4 grid gap-2 text-sm text-slate-300">
+                {contactEmail ? (
+                  <a
+                    href={`mailto:${contactEmail}`}
+                    className="w-fit transition-colors hover:text-cyan-200"
+                  >
+                    {contactEmail}
+                  </a>
+                ) : null}
+
+                {contactPhone ? (
+                  <a
+                    href={`tel:${contactPhone.replace(
+                      /[^\d+]/g,
+                      ""
+                    )}`}
+                    className="w-fit transition-colors hover:text-cyan-200"
+                  >
+                    {contactPhone}
+                  </a>
+                ) : null}
+
+                {contactLinkedInUrl ? (
+                  <a
+                    href={contactLinkedInUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="w-fit break-all transition-colors hover:text-cyan-200"
+                  >
+                    {contactLinkedInLabel}
+                  </a>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
+        </div>
+
+        <div className="rounded-3xl bg-white/10 p-5 ring-1 ring-white/20">
+          <p className="text-sm text-slate-300">
+            Önerilen görüşme
+          </p>
+
+          <p className="mt-1 text-2xl font-bold">
+            15 dakika
+          </p>
+
+          <p className="mt-2 text-sm leading-6 text-slate-300">
+            Hedef soru, önerilen URL ve başarı ölçütü
+            üzerinden ilk teslimatı karara bağlamak için.
+          </p>
+
+          {contactEmail ? (
             <a
               href={`mailto:${contactEmail}?subject=${encodeURIComponent(
                 `${brand.name} AI görünürlük raporu görüşmesi`
@@ -1189,8 +1319,46 @@ description={`${discoveryPromptCount} yönlendirmesiz soruda markanın ve cevapt
             >
               15 dakikalık görüşme talep et
             </a>
-          </>
-        ) : null}
+          ) : null}
+        </div>
+      </div>
+
+      <div className="mt-10 border-t border-white/15 pt-6">
+        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cyan-300">
+          Görüşmede netleştirilecekler
+        </p>
+
+        <div className="mt-4 grid gap-3 sm:grid-cols-3">
+          <div className="rounded-2xl bg-white/5 p-4 ring-1 ring-white/10">
+            <p className="text-sm font-semibold text-white">
+              1. Hedef sayfa
+            </p>
+            <p className="mt-1 text-xs leading-5 text-slate-300">
+              Mevcut sayfanın mı güçlendirileceği, yeni
+              sayfa mı hazırlanacağı.
+            </p>
+          </div>
+
+          <div className="rounded-2xl bg-white/5 p-4 ring-1 ring-white/10">
+            <p className="text-sm font-semibold text-white">
+              2. Teslimat kapsamı
+            </p>
+            <p className="mt-1 text-xs leading-5 text-slate-300">
+              İçerik, teknik kanıt, karşılaştırma ve
+              yapısal veri ihtiyaçları.
+            </p>
+          </div>
+
+          <div className="rounded-2xl bg-white/5 p-4 ring-1 ring-white/10">
+            <p className="text-sm font-semibold text-white">
+              3. Yeniden ölçüm
+            </p>
+            <p className="mt-1 text-xs leading-5 text-slate-300">
+              Yayın sonrası aynı sorularla kontrol tarihi
+              ve başarı ölçütü.
+            </p>
+          </div>
+        </div>
       </div>
     </div>
   </div>
