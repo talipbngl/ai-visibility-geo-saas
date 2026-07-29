@@ -12,8 +12,48 @@ export type IntentPerformanceItem = {
   averageRank: number | null;
 };
 
+const INTERNAL_INTENTS = new Set([
+  "buying_intent",
+  "comparison",
+  "local_recommendation",
+  "problem_solution",
+  "alternative_search",
+  "budget_friendly",
+  "premium_choice",
+  "trust_reputation",
+  "other",
+]);
+
+function normalizeIntent(value: string | null | undefined) {
+  if (typeof value !== "string") return "other";
+
+  const compactValue = value
+    .normalize("NFKC")
+    .trim()
+    .replace(/\s+/gu, " ");
+
+  if (!compactValue) return "other";
+
+  const internalIntent = compactValue.toLocaleLowerCase("en-US");
+
+  if (INTERNAL_INTENTS.has(internalIntent)) {
+    return internalIntent;
+  }
+
+  return compactValue.toLocaleLowerCase("tr-TR");
+}
+
+function getValidRank(value: number | null) {
+  return typeof value === "number" &&
+    Number.isFinite(value) &&
+    Number.isInteger(value) &&
+    value > 0
+    ? value
+    : null;
+}
+
 export function buildIntentPerformance(
-  analyses: IntentAnalysisInput[]
+  analyses: readonly IntentAnalysisInput[]
 ): IntentPerformanceItem[] {
   const performanceMap = new Map<
     string,
@@ -27,7 +67,7 @@ export function buildIntentPerformance(
   >();
 
   analyses.forEach((analysis) => {
-    const intent = analysis.intent ?? "other";
+    const intent = normalizeIntent(analysis.intent);
 
     const current = performanceMap.get(intent) ?? {
       intent,
@@ -39,14 +79,13 @@ export function buildIntentPerformance(
 
     current.total += 1;
 
-    if (analysis.brandMentioned) {
+    if (analysis.brandMentioned === true) {
       current.mentionCount += 1;
 
-      if (
-        typeof analysis.brandRank === "number" &&
-        analysis.brandRank > 0
-      ) {
-        current.rankSum += analysis.brandRank;
+      const validRank = getValidRank(analysis.brandRank);
+
+      if (validRank !== null) {
+        current.rankSum += validRank;
         current.rankCount += 1;
       }
     }
@@ -71,6 +110,7 @@ export function buildIntentPerformance(
     .sort(
       (first, second) =>
         second.total - first.total ||
-        second.visibilityRate - first.visibilityRate
+        second.visibilityRate - first.visibilityRate ||
+        first.intent.localeCompare(second.intent, "en-US")
     );
 }
