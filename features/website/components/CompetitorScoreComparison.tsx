@@ -24,34 +24,24 @@ type CompetitorScoreComparisonProps = {
 const scoreItems: Array<{
   key: ScoreKey;
   label: string;
-  action: string;
 }> = [
   {
     key: "technical",
     label: "Teknik",
-    action:
-      "İndekslenebilirlik, güvenli bağlantı, canonical ve yapısal veri eksiklerini düzeltin.",
   },
   {
     key: "structure",
     label: "Sayfa yapısı",
-    action:
-      "Başlık düzenini, sayfa açıklamalarını ve site içi bağlantıları güçlendirin.",
   },
   {
     key: "content",
     label: "İçerik",
-    action:
-      "Hizmet, ürün, rehber ve sık sorulan sorular içeriklerini geliştirin.",
   },
   {
     key: "trust",
     label: "Güven",
-    action:
-      "Hakkımızda, iletişim, referans ve marka güvenini destekleyen içerikleri görünür hâle getirin.",
   },
 ];
-
 function toRecord(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return {};
@@ -258,7 +248,7 @@ export function CompetitorScoreComparison({
 
         <div className="grid gap-4 lg:grid-cols-2">
           <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-4">
-            <p className="font-medium">Öncelikli geliştirme alanları</p>
+            <p className="font-medium">Rakibe göre gelişim alanları</p>
 
             {gaps.length > 0 ? (
               <div className="mt-3 space-y-3">
@@ -271,11 +261,18 @@ export function CompetitorScoreComparison({
                       </Badge>
                     </div>
 
-                    <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                      {gap.action}
-                    </p>
+                   <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                    {brandName},{" "}
+                    {gap.label.toLocaleLowerCase("tr-TR")} kategorisinde rakip
+                    ortalamasının {Math.abs(gap.difference)} puan gerisinde.
+                  </p>
                   </div>
                 ))}
+                <p className="mt-3 text-xs leading-5 text-muted-foreground">
+  Puan farkı tek başına belirli bir teknik eksikliği kanıtlamaz.
+  Doğrulanmış yapılacak işler marka raporundaki uygulama planında
+  gösterilir.
+</p>
               </div>
             ) : (
               <p className="mt-2 text-sm text-muted-foreground">

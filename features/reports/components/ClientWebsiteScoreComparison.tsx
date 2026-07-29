@@ -15,31 +15,22 @@ type ClientWebsiteScoreComparisonProps = {
 const scoreItems: Array<{
   key: ScoreKey;
   label: string;
-  action: string;
 }> = [
   {
     key: "technical",
     label: "Teknik",
-    action:
-      "Taramada sorun görülen URL’ler için robots/noindex, canonical ve JSON-LD kontrollerini ayrı ayrı tamamlayın; yeniden analizde teknik hata sayısını sıfıra indirin.",
   },
   {
     key: "structure",
     label: "Sayfa yapısı",
-    action:
-      "H1 sayısı 1 olmayan ve meta açıklaması bulunmayan taranmış URL’leri düzeltin; her sayfada tek H1, özgün başlık ve 140-160 karakterlik açıklama kullanın.",
   },
   {
     key: "content",
     label: "İçerik",
-    action:
-      "Raporda markanın görünmediği en yüksek öncelikli soru için tek bir karar sayfası yayınlayın; doğrudan cevap, karşılaştırma tablosu, kanıtlar ve SSS bölümlerini aynı URL’de toplayın.",
   },
   {
     key: "trust",
     label: "Güven",
-    action:
-      "`/hakkimizda/guven-ve-kalite` sayfasında şirket unvanı, doğrulanabilir iletişim kanalları, politika bağlantıları, sertifikalar ve tarihli müşteri kanıtlarını tek yerde yayınlayın.",
   },
 ];
 
@@ -221,7 +212,7 @@ export function ClientWebsiteScoreComparison({
 
       <div className="print-avoid mt-6 rounded-3xl border border-rose-200 bg-rose-50 p-5">
         <h3 className="font-semibold text-rose-900">
-          Öncelikli geliştirme alanları
+          Rakibe göre gelişim alanları
         </h3>
 
         {gaps.length > 0 ? (
@@ -242,17 +233,26 @@ export function ClientWebsiteScoreComparison({
                 </div>
 
                 <p className="mt-2 text-sm leading-6 text-slate-600">
-                  {gap.action}
+                  {brandName},{" "}
+                  {gap.label.toLocaleLowerCase("tr-TR")} kategorisinde rakip
+                  ortalamasının {Math.abs(gap.difference)} puan gerisinde.
                 </p>
               </div>
             ))}
           </div>
-        ) : (
+        ) :  (    
           <p className="mt-3 text-sm leading-6 text-slate-600">
             Marka analiz edilen kategorilerde rakip ortalamasının gerisinde
             görünmüyor.
           </p>
         )}
+        {gaps.length > 0 ? (
+  <p className="mt-4 text-xs leading-5 text-rose-800">
+    Kategori puanı farkı tek başına belirli bir hata türünü
+    kanıtlamaz. Gerçek tarama ve AI yanıtlarından doğrulanan
+    yapılacak işler, 04 - Uygulama Planı bölümünde gösterilir.
+  </p>
+) : null}
       </div>
     </section>
   );

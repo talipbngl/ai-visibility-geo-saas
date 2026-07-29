@@ -650,9 +650,6 @@ const competitorWebsiteScores =
     );
 
   const strongestCompetitor = competitorStats[0] ?? null;
-  const meaningfulIntentPerformance = intentPerformance.filter(
-    (item) => item.total >= 2
-  );
   const hasWebsiteComparison =
     brandWebsiteScore !== null &&
     competitorWebsiteScores.length > 0;
@@ -714,10 +711,6 @@ const contactLinkedInUrl = contactLinkedIn
 const contactLinkedInLabel = contactLinkedIn
   .replace(/^https?:\/\//i, "")
   .replace(/\/$/, "");
-  const reportYear = new Date(audit.created_at).getFullYear();
-  const reportNumber = `ASP-${reportYear}-${audit.id
-    .slice(0, 8)
-    .toUpperCase()}`;
   const seededTestNote =
   seededRuns.length > 0
     ? ` Marka veya takip edilen rakip adının soru metninde açıkça geçtiği ${seededRuns.length} kontrol sorusunun ${seededVisibleRuns.length} tanesinde marka görünmüştür. Bu sorular yönlendirmesiz keşif oranına dahil edilmemiştir.`
@@ -962,7 +955,7 @@ const executiveSummary =
                     currentResults={currentPromptResults}
                     previousResults={previousPromptResults}
                   />
-              {meaningfulIntentPerformance.length > 0 ? (
+              {hasIntentDifference ? (
               <section className="report-page">
               <SectionTitle
                 eyebrow="Ek analiz · Soru niyetleri"
@@ -971,7 +964,7 @@ const executiveSummary =
               />
 
               <div className="grid gap-4 md:grid-cols-2">
-                {meaningfulIntentPerformance.map((item) => {
+                {comparableIntents.map((item) => {
                   const isStrongest =
                     hasIntentDifference &&
                     strongestIntent?.intent === item.intent;
@@ -1044,9 +1037,9 @@ const executiveSummary =
               </div>
 
               <p className="mt-4 text-xs leading-5 text-slate-500">
-                Bu bölüm yalnızca marka veya takip edilen rakip adının soru
-                metninde geçmediği ve en az iki soruyla ölçülen kullanıcı
-                niyetlerini gösterir.
+                Bu bölüm, her biri en az iki yönlendirmesiz soruyla ölçülen ve
+                görünürlük oranları birbirinden farklı kullanıcı niyetlerini
+                karşılaştırır.
               </p>
             </section>
           ) : null}

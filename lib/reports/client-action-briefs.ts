@@ -54,7 +54,11 @@ type AnalyzedPage = {
   h1Count: number | null;
   indexable: boolean | null;
   metaDescription: string | null;
+  metaDescriptionChecked: boolean;
+  canonicalUrl: string | null;
+  canonicalChecked: boolean;
   schemaTypes: string[];
+  schemaChecked: boolean;
 };
 
 export type ClientReportBriefs = {
@@ -146,6 +150,34 @@ function getAnalyzedPages(value: unknown): AnalyzedPage[] {
 
       if (!url) return null;
 
+      const metaDescriptionChecked =
+        Object.prototype.hasOwnProperty.call(
+          page,
+          "metaDescription"
+        );
+
+      const canonicalChecked =
+        Object.prototype.hasOwnProperty.call(
+          page,
+          "canonicalUrl"
+        );
+
+      const schemaChecked =
+        Object.prototype.hasOwnProperty.call(
+          page,
+          "schemaTypes"
+        );
+
+      const schemaTypes = Array.isArray(page.schemaTypes)
+        ? page.schemaTypes
+            .filter(
+              (item): item is string =>
+                typeof item === "string"
+            )
+            .map((item) => item.trim())
+            .filter(Boolean)
+        : [];
+
       return {
         url,
         title: String(page.title ?? "").trim() || url,
@@ -159,15 +191,15 @@ function getAnalyzedPages(value: unknown): AnalyzedPage[] {
           page.metaDescription.trim()
             ? page.metaDescription.trim()
             : null,
-        schemaTypes: Array.isArray(page.schemaTypes)
-          ? page.schemaTypes
-              .filter(
-                (item): item is string =>
-                  typeof item === "string"
-              )
-              .map((item) => item.trim())
-              .filter(Boolean)
-          : [],
+        metaDescriptionChecked,
+        canonicalUrl:
+          typeof page.canonicalUrl === "string" &&
+          page.canonicalUrl.trim()
+            ? page.canonicalUrl.trim()
+            : null,
+        canonicalChecked,
+        schemaTypes,
+        schemaChecked,
       };
     })
     .filter(
@@ -510,8 +542,10 @@ if (invalidHeadingPages.length > 0) {
 }
 
   const missingDescriptionPage = analyzedPages.find(
-    (page) => !page.metaDescription
-  );
+  (page) =>
+    page.metaDescriptionChecked &&
+    !page.metaDescription
+);
 
   if (missingDescriptionPage) {
     return {
@@ -534,11 +568,45 @@ if (invalidHeadingPages.length > 0) {
         "Yeniden analizde sayfanın meta açıklamasının dolu ve benzersiz görünmesi.",
     };
   }
+const missingCanonicalPages = analyzedPages.filter(
+  (page) =>
+    page.canonicalChecked &&
+    !page.canonicalUrl
+);
 
-  const pageWithoutSchema = analyzedPages.find(
-    (page) => page.schemaTypes.length === 0
-  );
+const firstMissingCanonicalPage =
+  missingCanonicalPages[0];
 
+if (firstMissingCanonicalPage) {
+  const affectedPageLabels = missingCanonicalPages
+    .slice(0, 4)
+    .map((page) => page.title)
+    .join(", ");
+
+  return {
+    id: "website-canonical-coverage",
+    week: 3,
+    priority: "Orta",
+    title: `${missingCanonicalPages.length}/${analyzedPages.length} taranan sayfada canonical adresi tanımla`,
+    reason: `Canonical alanı ölçülen ancak değeri bulunmayan sayfalar: ${affectedPageLabels}. Her sayfa, tercih edilen tek ve nihai URL’sini açıkça belirtmelidir.`,
+    targetPrompt: "Tercih edilen sayfa adresi",
+    deliverable: `${missingCanonicalPages.length} sayfada canonical düzenlemesi`,
+    suggestedPath: firstMissingCanonicalPage.url,
+    requiredSections: [
+      "Her sayfanın head alanına kendisini gösteren canonical etiketi ekle",
+      "Canonical adreslerde nihai HTTPS URL’sini kullan",
+      "www, www olmayan ve yönlendirilmiş URL sürümlerini tek adreste birleştir",
+      "Parametreli veya yinelenen sayfalarda tercih edilen ana URL’yi belirt",
+      "Değişiklikten sonra etkilenen URL’leri yeniden analiz et",
+    ],
+    successMetric: `Yeniden analizde canonical alanı ölçülen ${missingCanonicalPages.length} sayfanın tamamında canonicalUrl değerinin dolu görünmesi.`,
+  };
+}
+ const pageWithoutSchema = analyzedPages.find(
+  (page) =>
+    page.schemaChecked &&
+    page.schemaTypes.length === 0
+);
   if (pageWithoutSchema) {
     return {
       id: `website-schema-${pageWithoutSchema.url}`,
