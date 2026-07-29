@@ -97,14 +97,21 @@ function getHostname(value: string | null | undefined) {
   }
 
   try {
+    const hasHttpProtocol =
+      /^https?:\/\//i.test(normalizedValue);
+
     const url = new URL(
-      normalizedValue.startsWith("http://") ||
-        normalizedValue.startsWith("https://")
+      hasHttpProtocol
         ? normalizedValue
         : `https://${normalizedValue}`
     );
 
-    return url.hostname.toLowerCase().replace(/^www\./, "");
+    const hostname = url.hostname
+      .toLowerCase()
+      .replace(/^www\./, "")
+      .replace(/\.+$/, "");
+
+    return hostname || null;
   } catch {
     return null;
   }
