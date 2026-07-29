@@ -730,9 +730,40 @@ export function getWebsiteKeywordPreset(industry: string | null | undefined) {
       matchesStrategyTerm(industry ?? "", term)
     );
 
+  const matchesIndustrialMaintenance = matchesAny([
+    "kestirimci bakim",
+    "vibrasyon analiz*",
+    "durum izleme",
+    "yerinde balans",
+    "lazerli kaplin ayari",
+  ]);
+  const matchesIndustrialInstrumentation = matchesAny([
+    "test ve kalibrasyon sistem*",
+    "test ve olcum sistem*",
+    "test olcum ve kalibrasyon sistem*",
+    "olcum ve kalibrasyon sistem*",
+    "test ve olcum cihaz*",
+    "kalibrasyon cihaz*",
+    "kalibrasyon sistem*",
+    "kuru blok kalibrator",
+    "sicaklik kalibrasyon banyosu",
+    "siyah cisim kalibrator",
+    "elektriksel test cihaz*",
+    "metroloji cihaz*",
+  ]);
+
+  if (
+    matchesIndustrialInstrumentation &&
+    !matchesIndustrialMaintenance
+  ) {
+    return mergePresets(
+      genericPreset,
+      industrialInstrumentationPreset
+    );
+  }
+
   if (
     matchesAny([
-      "dis",
       "dis hekim*",
       "dis klinigi",
       "agiz ve dis sagligi",
@@ -817,5 +848,5 @@ export function getWebsiteKeywordPreset(industry: string | null | undefined) {
 
   return archetypePreset
     ? mergePresets(genericPreset, archetypePreset)
-    : genericPreset;
+    : mergePresets(genericPreset);
 }
