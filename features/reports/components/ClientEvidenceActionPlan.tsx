@@ -242,7 +242,7 @@ export function ClientEvidenceActionPlan({
   return (
     <>
       {evidenceItems.length > 0 ? (
-        <section>
+        <section className="report-page">
           <div className="mb-5">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-indigo-600">
               03 - Kararı Destekleyen Kanıtlar

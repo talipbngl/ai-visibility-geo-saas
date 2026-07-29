@@ -218,7 +218,23 @@
   .client-report .report-page {
     break-before: page !important;
     page-break-before: always !important;
-  }
+  }.client-report > .report-page {
+  margin-top: 0 !important;
+  padding-top: 0 !important;
+}
+
+.client-report h1,
+.client-report h2,
+.client-report h3 {
+  break-after: avoid-page !important;
+  page-break-after: avoid !important;
+}
+
+.client-report p,
+.client-report li {
+  orphans: 3;
+  widows: 3;
+}
 
   .client-report .client-report-closing {
     box-sizing: border-box !important;
@@ -420,11 +436,19 @@
     display: table-header-group;
   }
 
-  .client-report tr,
   .client-report table {
-    break-inside: avoid;
-    page-break-inside: avoid;
-  }
+  break-inside: auto !important;
+  page-break-inside: auto !important;
+}
+
+.client-report thead {
+  display: table-header-group !important;
+}
+
+.client-report tr {
+  break-inside: avoid-page !important;
+  page-break-inside: avoid !important;
+}
 
   .client-report a {
     color: inherit !important;

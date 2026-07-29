@@ -766,10 +766,6 @@ const executiveSummary =
                       </p>
                     </div>
                   </div>
-
-                  <span className="rounded-full bg-white/10 px-4 py-2 text-xs text-slate-200 ring-1 ring-white/20">
-                    Müşteriye özel · {reportNumber}
-                  </span>
                 </div>
 
                 <div className="grid gap-10 lg:grid-cols-[1.2fr_0.8fr] lg:items-end">
@@ -967,7 +963,7 @@ const executiveSummary =
                     previousResults={previousPromptResults}
                   />
               {meaningfulIntentPerformance.length > 0 ? (
-            <section>
+              <section className="report-page">
               <SectionTitle
                 eyebrow="Ek analiz · Soru niyetleri"
                 title="Marka hangi kullanıcı ihtiyaçlarında görünür?"
@@ -987,7 +983,7 @@ const executiveSummary =
                   return (
                     <div
                       key={item.intent}
-                      className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm"
+                        className="print-avoid rounded-3xl border border-slate-200 bg-white p-5 shadow-sm"
                     >
                       <div className="flex items-start justify-between gap-4">
                         <div>

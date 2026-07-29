@@ -120,7 +120,7 @@ export function ClientWebsiteScoreComparison({
     .slice(0, 3);
 
   return (
-    <section className="website-score-comparison">
+    <section className="website-score-comparison report-page">
       <p className="text-xs font-semibold uppercase tracking-[0.18em] text-indigo-600">
         Ek analiz · Web sitesi kıyası
       </p>
@@ -141,7 +141,7 @@ export function ClientWebsiteScoreComparison({
           .join(", ")}
       </p>
 
-      <div className="mt-6 grid gap-4 md:grid-cols-3">
+      <div className="print-avoid mt-6 grid gap-4 md:grid-cols-3">
         <div className="rounded-3xl border border-blue-200 bg-blue-50 p-5">
           <p className="text-sm font-medium text-blue-700">
             Marka genel puanı
@@ -219,7 +219,7 @@ export function ClientWebsiteScoreComparison({
         </table>
       </div>
 
-      <div className="mt-6 rounded-3xl border border-rose-200 bg-rose-50 p-5">
+      <div className="print-avoid mt-6 rounded-3xl border border-rose-200 bg-rose-50 p-5">
         <h3 className="font-semibold text-rose-900">
           Öncelikli geliştirme alanları
         </h3>
