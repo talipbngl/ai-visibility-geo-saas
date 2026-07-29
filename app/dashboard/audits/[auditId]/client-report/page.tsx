@@ -13,6 +13,10 @@ import {
   resolveReportIntent,
 } from "@/lib/reports/client-action-briefs";
 import { buildIntentPerformance } from "@/lib/reports/intent-performance";
+import {
+  buildVisibilityMetrics,
+  prepareCompletedUniqueRuns,
+} from "@/lib/reports/visibility-metrics";
 import { getIntentLabel } from "@/lib/ui/labels";
 import {
   buildCompetitorMentionTerms,
@@ -42,6 +46,8 @@ type NestedPrompt = {
 
 type NestedRun = {
   id?: string | null;
+  status?: string | null;
+  created_at?: string | null;
   prompt_text_snapshot?: string | null;
   prompt_intent_snapshot?: string | null;
   prompt_priority_snapshot?: number | null;
@@ -289,6 +295,8 @@ const { data: analyses } = await supabase
     audit_runs!inner (
       id,
       audit_id,
+      status,
+      created_at,
       prompt_text_snapshot,
       prompt_intent_snapshot,
       prompt_priority_snapshot,
@@ -316,6 +324,8 @@ const previousAnalysesResult = previousAudit
         brand_rank,
         audit_runs!inner (
           audit_id,
+          status,
+          created_at,
           prompt_text_snapshot,
           prompts (
             text
@@ -329,64 +339,62 @@ const previousAnalysesResult = previousAudit
       )
   : { data: [] };
 
-const currentPromptResults = (analyses ?? []).map(
-  (analysis) => {
+const clientReportRuns = prepareCompletedUniqueRuns(
+  (analyses ?? []).map((analysis) => {
     const run = getNestedRun(analysis.audit_runs);
+    const promptText = getPromptText(run);
+
+    const competitors = Array.isArray(
+      analysis.competitors_json
+    )
+      ? (analysis.competitors_json as CompetitorVisibility[])
+      : [];
 
     return {
-      promptText: getPromptText(run),
-      mentioned: analysis.brand_mentioned,
-      rank: analysis.brand_rank,
-    };
-  }
-);
-const citationRuns = (analyses ?? []).map((analysis) => {
-  const run = getNestedRun(analysis.audit_runs);
-  const promptText = getPromptText(run);
-
-  return {
-    id: analysis.id,
-    promptText,
-    promptIntent: resolveReportIntent(
+      id: analysis.id,
       promptText,
-      getPromptIntent(run)
-    ),
-    brandMentioned: analysis.brand_mentioned,
-    citationsValue: run?.citations_json ?? null,
-  };
-});
-const clientReportRuns = (analyses ?? []).map((analysis) => {
-  const run = getNestedRun(analysis.audit_runs);
-  const promptText = getPromptText(run);
-  const competitors = Array.isArray(analysis.competitors_json)
-    ? (analysis.competitors_json as CompetitorVisibility[])
-    : [];
-
-  return {
-    id: analysis.id,
-    promptText,
-    promptIntent: resolveReportIntent(
-      promptText,
-      getPromptIntent(run)
-    ),
-    promptPriority:
-      run?.prompt_priority_snapshot ??
-      getNestedPrompt(run)?.priority ??
-      null,
-    brandMentioned: analysis.brand_mentioned,
-    brandRank: analysis.brand_rank,
-    brandSentiment: analysis.brand_sentiment,
-    rawAnswer: run?.raw_answer ?? "",
-        engine: run?.engine ?? null,
-    model: run?.model ?? null,
-    competitors,
-    isSeededPrompt:
-      findFirstMentionIndex(
+      runStatus: run?.status ?? null,
+      runCreatedAt: run?.created_at ?? null,
+      promptIntent: resolveReportIntent(
         promptText,
-        seededPromptTerms
-      ) !== null,
-  };
-});
+        getPromptIntent(run)
+      ),
+      promptPriority:
+        run?.prompt_priority_snapshot ??
+        getNestedPrompt(run)?.priority ??
+        null,
+      brandMentioned: analysis.brand_mentioned,
+      brandRank: analysis.brand_rank,
+      brandSentiment: analysis.brand_sentiment,
+      analysisSummary: analysis.summary ?? null,
+      rawAnswer: run?.raw_answer ?? "",
+      engine: run?.engine ?? null,
+      model: run?.model ?? null,
+      citationsValue: run?.citations_json ?? null,
+      competitors,
+      isSeededPrompt:
+        findFirstMentionIndex(
+          promptText,
+          seededPromptTerms
+        ) !== null,
+    };
+  })
+);
+
+const currentPromptResults = clientReportRuns.map((run) => ({
+  promptText: run.promptText,
+  mentioned: run.brandMentioned,
+  rank: run.brandRank,
+}));
+
+const citationRuns = clientReportRuns.map((run) => ({
+  id: run.id,
+  promptText: run.promptText,
+  promptIntent: run.promptIntent,
+  brandMentioned: run.brandMentioned,
+  citationsValue: run.citationsValue,
+}));
+
 const discoveryRuns = clientReportRuns.filter(
   (run) => !run.isSeededPrompt
 );
@@ -395,74 +403,36 @@ const seededRuns = clientReportRuns.filter(
   (run) => run.isSeededPrompt
 );
 
-const discoveryVisibleRuns = discoveryRuns.filter(
-  (run) => run.brandMentioned
-);
-
 const seededVisibleRuns = seededRuns.filter(
   (run) => run.brandMentioned
 );
 
-const discoveryPromptCount = discoveryRuns.length;
+const {
+  visibleRuns: discoveryVisibleRuns,
+  promptCount: discoveryPromptCount,
+  visibilityScore: discoveryVisibilityScore,
+  totalMentions: discoveryTotalMentions,
+  shareOfVoice: discoveryShareOfVoice,
+  averageRank: discoveryAverageRank,
+  competitorStats,
+} = buildVisibilityMetrics(discoveryRuns);
+const previousPromptResults = prepareCompletedUniqueRuns(
+  (previousAnalysesResult.data ?? []).map((analysis) => {
+    const run = getNestedRun(analysis.audit_runs);
 
-const discoveryVisibilityScore =
-  discoveryPromptCount > 0
-    ? Math.round(
-        (discoveryVisibleRuns.length /
-          discoveryPromptCount) *
-          100
-      )
-    : 0;
-
-const discoveryCompetitorMentionCount =
-  discoveryRuns.reduce(
-    (total, run) =>
-      total +
-      run.competitors.filter(
-        (competitor) => competitor.mentioned
-      ).length,
-    0
-  );
-
-const discoveryTotalMentions =
-  discoveryVisibleRuns.length +
-  discoveryCompetitorMentionCount;
-
-const discoveryShareOfVoice =
-  discoveryTotalMentions > 0
-    ? Math.round(
-        (discoveryVisibleRuns.length /
-          discoveryTotalMentions) *
-          100
-      )
-    : 0;
-
-const discoveryRanks = discoveryVisibleRuns
-  .map((run) => run.brandRank)
-  .filter((rank): rank is number => rank !== null);
-
-const discoveryAverageRank =
-  discoveryRanks.length > 0
-    ? Math.round(
-        (discoveryRanks.reduce(
-          (total, rank) => total + rank,
-          0
-        ) /
-          discoveryRanks.length) *
-          10
-      ) / 10
-    : null;
-const previousPromptResults = (
-  previousAnalysesResult.data ?? []
-).map((analysis) => {
-  const run = getNestedRun(analysis.audit_runs);
-
-  return {
-    promptText: getPromptText(run),
-    mentioned: analysis.brand_mentioned,
-    rank: analysis.brand_rank,
-  };
-});
+    return {
+      promptText: getPromptText(run),
+      runStatus: run?.status ?? null,
+      runCreatedAt: run?.created_at ?? null,
+      mentioned: analysis.brand_mentioned,
+      rank: analysis.brand_rank,
+    };
+  })
+).map((result) => ({
+  promptText: result.promptText,
+  mentioned: result.mentioned,
+  rank: result.rank,
+}));
   const { data: websiteSnapshots } = await supabase
     .from("brand_website_snapshots")
     .select(
@@ -584,53 +554,6 @@ created_at: snapshot.created_at,
     weakestIntent !== null &&
     strongestIntent.visibilityRate !== weakestIntent.visibilityRate;
 
-  const competitorStatsMap = new Map<
-    string,
-    {
-      name: string;
-      mentionCount: number;
-      rankSum: number;
-      rankCount: number;
-    }
-  >();
-
-  discoveryRuns.forEach((run) => {
-  run.competitors.forEach((competitor) => {
-    if (!competitor.mentioned) return;
-
-    const current = competitorStatsMap.get(
-      competitor.name
-    ) ?? {
-      name: competitor.name,
-      mentionCount: 0,
-      rankSum: 0,
-      rankCount: 0,
-    };
-
-    current.mentionCount += 1;
-
-    if (competitor.rank) {
-      current.rankSum += competitor.rank;
-      current.rankCount += 1;
-    }
-
-    competitorStatsMap.set(
-      competitor.name,
-      current
-    );
-  });
-});
-
-  const competitorStats = Array.from(competitorStatsMap.values())
-    .map((competitor) => ({
-      ...competitor,
-      averageRank:
-        competitor.rankCount > 0
-          ? Math.round((competitor.rankSum / competitor.rankCount) * 10) / 10
-          : null,
-    }))
-    .sort((a, b) => b.mentionCount - a.mentionCount);
-
 const brandWebsiteScore =
   websiteSnapshot &&
   hasCategoryScores(websiteSnapshot.category_scores_json)
@@ -668,10 +591,7 @@ const competitorWebsiteScores =
     technicalSignalsValue:
       websiteSnapshot?.technical_signals_json ?? null,
   });
-  const completedPromptCount = Math.max(
-    audit.completed_prompts,
-    analyses?.length ?? 0
-  );
+  const completedPromptCount = clientReportRuns.length;
   const primaryPromptAction =
   clientReportBriefs.actionBriefs.find(
     (action) => action.id.startsWith("prompt-")
@@ -1367,7 +1287,7 @@ description={`${discoveryPromptCount} yönlendirmesiz soruda markanın ve cevapt
 
       <div className="flex items-center gap-3">
         <span className="rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-600 ring-1 ring-slate-200">
-          {Math.min(analyses?.length ?? 0, 12)} soru
+          {Math.min(clientReportRuns.length, 12)} soru
         </span>
 
         <span className="rounded-full bg-indigo-600 px-4 py-2 text-sm font-semibold text-white group-open:hidden">
@@ -1382,58 +1302,53 @@ description={`${discoveryPromptCount} yönlendirmesiz soruda markanın ve cevapt
   </summary>
 
   <div className="border-t border-slate-200 bg-white p-5">
-    {analyses && analyses.length > 0 ? (
+    {clientReportRuns.length > 0 ? (
       <div className="grid gap-3 lg:grid-cols-2">
-        {analyses.slice(0, 12).map((analysis, index) => {
-          const run = getNestedRun(
-            analysis.audit_runs
-          );
+        {clientReportRuns.slice(0, 12).map((run, index) => (
+          <div
+            key={run.id}
+            className="rounded-2xl border border-slate-200 bg-white p-4 text-sm shadow-sm"
+          >
+            <div className="mb-2 flex flex-wrap gap-2">
+              <span
+                className={
+                  run.brandMentioned
+                    ? "rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700 ring-1 ring-emerald-200"
+                    : "rounded-full bg-rose-50 px-3 py-1 text-xs font-medium text-rose-700 ring-1 ring-rose-200"
+                }
+              >
+                {run.brandMentioned
+                  ? "Göründü"
+                  : "Görünmedi"}
+              </span>
 
-          return (
-            <div
-              key={analysis.id}
-              className="rounded-2xl border border-slate-200 bg-white p-4 text-sm shadow-sm"
-            >
-              <div className="mb-2 flex flex-wrap gap-2">
-                <span
-                  className={
-                    analysis.brand_mentioned
-                      ? "rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700 ring-1 ring-emerald-200"
-                      : "rounded-full bg-rose-50 px-3 py-1 text-xs font-medium text-rose-700 ring-1 ring-rose-200"
-                  }
-                >
-                  {analysis.brand_mentioned
-                    ? "Göründü"
-                    : "Görünmedi"}
+              {run.brandRank ? (
+                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
+                  Sıra: {run.brandRank}
                 </span>
-
-                {analysis.brand_rank ? (
-                  <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
-                    Sıra: {analysis.brand_rank}
-                  </span>
-                ) : null}
-              </div>
-
-              <p className="font-medium leading-6 text-slate-950">
-                {index + 1}. {getPromptText(run)}
-              </p>
-
-              {analysis.summary ? (
-                <p className="mt-2 leading-6 text-slate-600">
-                  {analysis.summary}
-                </p>
-              ) : (
-                <p className="mt-2 text-slate-500">
-                  Bu soru için kısa analiz özeti bulunmuyor.
-                </p>
-              )}
+              ) : null}
             </div>
-          );
-        })}
+
+            <p className="font-medium leading-6 text-slate-950">
+              {index + 1}. {run.promptText}
+            </p>
+
+            {run.analysisSummary ? (
+              <p className="mt-2 leading-6 text-slate-600">
+                {run.analysisSummary}
+              </p>
+            ) : (
+              <p className="mt-2 text-slate-500">
+                Bu soru için kısa analiz özeti bulunmuyor.
+              </p>
+            )}
+          </div>
+        ))}
       </div>
     ) : (
       <p className="text-sm text-slate-600">
-        Bu ölçüm için analiz edilmiş test sorusu bulunmuyor.
+        Bu ölçüm için tamamlanmış ve benzersiz bir test sorusu
+        bulunmuyor.
       </p>
     )}
   </div>
