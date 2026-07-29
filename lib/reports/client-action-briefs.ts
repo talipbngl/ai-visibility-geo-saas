@@ -127,12 +127,82 @@ function getFoundKeywordSignals(value: unknown) {
     : foundKeywords;
 }
 
-function toNullableNumber(value: unknown) {
-  if (value === null || value === undefined) return null;
+function toNullableNonNegativeInteger(value: unknown) {
+  if (
+    typeof value === "number" &&
+    Number.isFinite(value) &&
+    Number.isInteger(value) &&
+    value >= 0
+  ) {
+    return value;
+  }
 
-  const parsed = Number(value);
+  if (
+    typeof value === "string" &&
+    /^(?:0|[1-9]\d*)$/u.test(value.trim())
+  ) {
+    return Number(value.trim());
+  }
 
-  return Number.isFinite(parsed) ? parsed : null;
+  return null;
+}
+
+function getValidRank(value: number | null) {
+  return typeof value === "number" &&
+    Number.isFinite(value) &&
+    Number.isInteger(value) &&
+    value > 0
+    ? value
+    : null;
+}
+
+function normalizeEntityName(value: string) {
+  return value.normalize("NFKC").replace(/\s+/gu, " ").trim();
+}
+
+function getMentionedCompetitors(run: ClientReportRun) {
+  const competitorsByName = new Map<
+    string,
+    { name: string; rank: number | null }
+  >();
+
+  for (const competitor of run.competitors) {
+    if (!competitor.mentioned) continue;
+
+    const name = normalizeEntityName(competitor.name);
+
+    if (!name) continue;
+
+    const key = name.toLocaleLowerCase("tr-TR");
+    const rank = getValidRank(competitor.rank);
+    const existing = competitorsByName.get(key);
+
+    if (!existing) {
+      competitorsByName.set(key, { name, rank });
+      continue;
+    }
+
+    if (
+      rank !== null &&
+      (existing.rank === null || rank < existing.rank)
+    ) {
+      existing.rank = rank;
+    }
+  }
+
+  return [...competitorsByName.values()].sort(
+    (first, second) => {
+      const firstRank = first.rank ?? Number.POSITIVE_INFINITY;
+      const secondRank =
+        second.rank ?? Number.POSITIVE_INFINITY;
+
+      if (firstRank !== secondRank) {
+        return firstRank - secondRank;
+      }
+
+      return first.name.localeCompare(second.name, "tr");
+    }
+  );
 }
 
 function getAnalyzedPages(value: unknown): AnalyzedPage[] {
@@ -181,7 +251,7 @@ function getAnalyzedPages(value: unknown): AnalyzedPage[] {
       return {
         url,
         title: String(page.title ?? "").trim() || url,
-        h1Count: toNullableNumber(page.h1Count),
+        h1Count: toNullableNonNegativeInteger(page.h1Count),
         indexable:
           typeof page.indexable === "boolean"
             ? page.indexable
@@ -294,7 +364,9 @@ function getEngineLabel(run: ClientReportRun) {
 
 function getEvidenceStatus(run: ClientReportRun) {
   if (!run.brandMentioned) return "missing" as const;
-  if (run.brandRank !== null && run.brandRank > 2) {
+  const brandRank = getValidRank(run.brandRank);
+
+  if (brandRank !== null && brandRank > 2) {
     return "low_rank" as const;
   }
 
@@ -313,8 +385,8 @@ function buildEvidenceItems({
       return first.brandMentioned ? 1 : -1;
     }
 
-    const firstRank = first.brandRank ?? 999;
-    const secondRank = second.brandRank ?? 999;
+    const firstRank = getValidRank(first.brandRank) ?? 0;
+    const secondRank = getValidRank(second.brandRank) ?? 0;
 
     if (firstRank !== secondRank) {
       return secondRank - firstRank;
@@ -343,13 +415,9 @@ function buildEvidenceItems({
   }
 
   return selectedRuns.map((run): ClientEvidenceItem => {
-    const mentionedCompetitors = run.competitors
-      .filter((competitor) => competitor.mentioned)
-      .sort(
-        (first, second) =>
-          (first.rank ?? 999) - (second.rank ?? 999)
-      )
-      .map((competitor) => competitor.name);
+    const mentionedCompetitors = getMentionedCompetitors(
+      run
+    ).map((competitor) => competitor.name);
 
     return {
       id: run.id,
@@ -359,7 +427,7 @@ function buildEvidenceItems({
         run.promptIntent
       ),
       status: getEvidenceStatus(run),
-      brandRank: run.brandRank,
+      brandRank: getValidRank(run.brandRank),
       mentionedCompetitors,
       answerExcerpt: getAnswerExcerpt({
         answer: run.rawAnswer,
@@ -394,13 +462,12 @@ function buildPromptActions({
     .filter(
       (run) =>
         run.brandMentioned &&
-        run.brandRank !== null &&
-        run.brandRank > 2
+        (getValidRank(run.brandRank) ?? 0) > 2
     )
     .sort(
       (first, second) =>
-        (second.brandRank ?? 0) -
-        (first.brandRank ?? 0)
+        (getValidRank(second.brandRank) ?? 0) -
+        (getValidRank(first.brandRank) ?? 0)
     );
 
   const targetRuns =
@@ -410,12 +477,11 @@ function buildPromptActions({
 
   return targetRuns.map(
     (run, index): ClientActionBrief => {
-      const strongestCompetitor = run.competitors
-        .filter((competitor) => competitor.mentioned)
-        .sort(
-          (first, second) =>
-            (first.rank ?? 999) - (second.rank ?? 999)
-        )[0];
+      const mentionedCompetitors =
+        getMentionedCompetitors(run);
+      const strongestCompetitor =
+        mentionedCompetitors[0];
+      const brandRank = getValidRank(run.brandRank);
       const blueprint = buildContentActionBlueprint({
         brandName,
         brandContext,
@@ -428,9 +494,10 @@ function buildPromptActions({
           strongestCompetitor?.name ?? null,
         detectedServiceKeywords,
       });
-      const mentionedCompetitors = run.competitors
-        .filter((competitor) => competitor.mentioned)
-        .map((competitor) => competitor.name);
+      const mentionedCompetitorNames =
+        mentionedCompetitors.map(
+          (competitor) => competitor.name
+        );
 
       return {
           id: `prompt-${run.id}`,
@@ -439,10 +506,10 @@ function buildPromptActions({
           title: `"${run.promptText}" sorusu için ilgili sayfayı güçlendir`,
           reason: run.brandMentioned
             ? `${brandName}, bu sorunun cevabında ${
-                run.brandRank ?? "alt"
+                brandRank ?? "alt"
               }. sırada yer aldı. İlgili mevcut sayfa; karar kriterleri, teknik kanıtlar ve doğrudan cevap bölümüyle güçlendirilmelidir.`
-            : mentionedCompetitors.length > 0
-              ? `${brandName} cevapta görünmezken ${mentionedCompetitors
+            : mentionedCompetitorNames.length > 0
+              ? `${brandName} cevapta görünmezken ${mentionedCompetitorNames
                   .slice(0, 3)
                   .join(
                     ", "

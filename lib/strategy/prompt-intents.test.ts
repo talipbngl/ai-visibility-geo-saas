@@ -210,6 +210,20 @@ describe("resolvePromptIntent", () => {
   );
 
   it.each([
+    "CRM A ile CRM B arasındaki fark nedir?",
+    "CRM A ile CRM B arasındaki farkı açıklar mısın?",
+    "CRM A ile CRM B arasındaki farklar nelerdir?",
+    "CRM A ile CRM B arasındaki farkları listeler misin?",
+  ])(
+    "karşılaştırma sorusundaki çekimli fark ifadesini tanır: %s",
+    (prompt) => {
+      expect(resolvePromptIntent(prompt, null)).toBe(
+        "comparison"
+      );
+    }
+  );
+
+  it.each([
     "Fotosentez hakkında bilgi verir misin?",
     "Kalibrasyon sistemlerinin çalışma prensibi nedir?",
   ])(
