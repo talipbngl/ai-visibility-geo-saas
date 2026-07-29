@@ -159,7 +159,11 @@ export function citationSourceMatchesWebsite(
 }
 
 function getCitationData(value: unknown) {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
+  if (
+    !value ||
+    typeof value !== "object" ||
+    Array.isArray(value)
+  ) {
     return {
       groundingEnabled: false,
       sources: [] as CitationSource[],
@@ -174,32 +178,58 @@ function getCitationData(value: unknown) {
   const sources = Array.isArray(record.sources)
     ? record.sources
         .map((item) => {
-          if (!item || typeof item !== "object" || Array.isArray(item)) {
+          if (
+            !item ||
+            typeof item !== "object" ||
+            Array.isArray(item)
+          ) {
             return null;
           }
 
-          const source = item as {
+          const sourceRecord = item as {
             uri?: unknown;
             title?: unknown;
           };
 
-          const uri = String(source.uri ?? "").trim();
-          const title = String(source.title ?? "").trim();
+          const uri =
+            typeof sourceRecord.uri === "string"
+              ? sourceRecord.uri.trim()
+              : "";
+
+          const title =
+            typeof sourceRecord.title === "string"
+              ? sourceRecord.title.trim()
+              : "";
 
           if (!uri && !title) {
             return null;
           }
 
-          return {
+          const source: CitationSource = {
             uri,
             title,
           };
+
+          if (
+            getCitationSourceHostname(source) ===
+            null
+          ) {
+            return null;
+          }
+
+          return source;
         })
-        .filter((item): item is CitationSource => item !== null)
+        .filter(
+          (
+            source
+          ): source is CitationSource =>
+            source !== null
+        )
     : [];
 
   return {
-    groundingEnabled: record.groundingEnabled === true,
+    groundingEnabled:
+      record.groundingEnabled === true,
     sources,
   };
 }
