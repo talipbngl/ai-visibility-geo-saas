@@ -1,76 +1,43 @@
-type PromptVisibilityResult = {
-  promptText: string;
-  mentioned: boolean;
-  rank: number | null;
-};
+import {
+  buildPromptVisibilityComparison,
+  type PromptVisibilityInput,
+} from "@/lib/reports/prompt-comparison";
 
 type PromptVisibilityChangesProps = {
-  currentResults: PromptVisibilityResult[];
-  previousResults: PromptVisibilityResult[];
+  currentResults: PromptVisibilityInput[];
+  previousResults: PromptVisibilityInput[];
 };
-
-function normalizePromptText(value: string) {
-  return value
-    .trim()
-    .toLocaleLowerCase("tr-TR")
-    .replace(/\s+/g, " ");
-}
 
 export function PromptVisibilityChanges({
   currentResults,
   previousResults,
 }: PromptVisibilityChangesProps) {
+  const comparison = buildPromptVisibilityComparison(
+    currentResults,
+    previousResults
+  );
+
   if (
-    currentResults.length === 0 ||
-    previousResults.length === 0
+    comparison.currentUniqueCount === 0 ||
+    comparison.previousUniqueCount === 0
   ) {
     return null;
   }
 
-  const previousResultMap = new Map(
-    previousResults.map((result) => [
-      normalizePromptText(result.promptText),
-      result,
-    ])
-  );
+  const allGainedVisibility =
+    comparison.gainedVisibility;
+  const allLostVisibility =
+    comparison.lostVisibility;
+  const gainedVisibility =
+    allGainedVisibility.slice(0, 3);
+  const lostVisibility =
+    allLostVisibility.slice(0, 3);
 
-  const comparableResults = currentResults
-    .map((currentResult) => {
-      const previousResult = previousResultMap.get(
-        normalizePromptText(currentResult.promptText)
-      );
-
-      if (!previousResult) return null;
-
-      return {
-        promptText: currentResult.promptText,
-        currentMentioned: currentResult.mentioned,
-        previousMentioned: previousResult.mentioned,
-        currentRank: currentResult.rank,
-        previousRank: previousResult.rank,
-      };
-    })
-    .filter(
-      (
-        result
-      ): result is NonNullable<typeof result> =>
-        result !== null
-    );
-
-  const allGainedVisibility = comparableResults.filter(
-  (result) =>
-    !result.previousMentioned &&
-    result.currentMentioned
-);
-
-const allLostVisibility = comparableResults.filter(
-  (result) =>
-    result.previousMentioned &&
-    !result.currentMentioned
-);
-
-const gainedVisibility = allGainedVisibility.slice(0, 3);
-const lostVisibility = allLostVisibility.slice(0, 3);
+  const reliabilityClassName = {
+    high: "bg-emerald-50 text-emerald-700",
+    medium: "bg-amber-50 text-amber-700",
+    low: "bg-rose-50 text-rose-700",
+  }[comparison.reliability.level];
 
   return (
     <section className="space-y-4">
@@ -87,9 +54,24 @@ const lostVisibility = allLostVisibility.slice(0, 3);
           Güncel ve önceki ölçümde ortak kullanılan test
           sorularının sonuçları karşılaştırılmıştır.
         </p>
+
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <span
+            className={`rounded-full px-3 py-1 text-xs font-medium ${reliabilityClassName}`}
+          >
+            Karşılaştırma güveni:{" "}
+            {comparison.reliability.label}
+          </span>
+
+          <span className="rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-700">
+            Ortak soru: {comparison.comparablePromptCount}/
+            {comparison.largestPromptSetSize} · %
+            {comparison.coverageRate}
+          </span>
+        </div>
       </div>
 
-      {comparableResults.length === 0 ? (
+      {comparison.comparablePromptCount === 0 ? (
         <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-800">
           İki ölçüm arasında ortak test sorusu bulunamadığı
           için soru bazlı görünürlük değişimi hesaplanamadı.
@@ -102,7 +84,7 @@ const lostVisibility = allLostVisibility.slice(0, 3);
                 Karşılaştırılan soru
               </p>
               <p className="mt-2 text-2xl font-semibold">
-                {comparableResults.length}
+                {comparison.comparablePromptCount}
               </p>
             </div>
 
@@ -125,6 +107,14 @@ const lostVisibility = allLostVisibility.slice(0, 3);
             </div>
           </div>
 
+          {comparison.reliability.level === "low" ? (
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-800">
+              Ortak soru sayısı veya soru seti kapsamı düşük
+              olduğu için bu değişimler genel görünürlük
+              gelişimi olarak yorumlanmamalıdır.
+            </div>
+          ) : null}
+
           {gainedVisibility.length === 0 &&
           lostVisibility.length === 0 ? (
             <div className="rounded-2xl border bg-muted/20 p-4 text-sm leading-6 text-muted-foreground">
@@ -142,7 +132,7 @@ const lostVisibility = allLostVisibility.slice(0, 3);
                   <div className="mt-4 space-y-3">
                     {gainedVisibility.map((result) => (
                       <div
-                        key={result.promptText}
+                        key={result.promptKey}
                         className="rounded-xl border border-emerald-200 bg-white p-4"
                       >
                         <p className="text-sm font-medium leading-6 text-slate-950">
@@ -152,7 +142,7 @@ const lostVisibility = allLostVisibility.slice(0, 3);
                         <p className="mt-2 text-xs text-emerald-700">
                           Önceki ölçümde görünmüyordu, şimdi
                           görünüyor
-                          {result.currentRank
+                          {result.currentRank !== null
                             ? ` · Sıra: ${result.currentRank}`
                             : ""}
                         </p>
@@ -171,7 +161,7 @@ const lostVisibility = allLostVisibility.slice(0, 3);
                   <div className="mt-4 space-y-3">
                     {lostVisibility.map((result) => (
                       <div
-                        key={result.promptText}
+                        key={result.promptKey}
                         className="rounded-xl border border-rose-200 bg-white p-4"
                       >
                         <p className="text-sm font-medium leading-6 text-slate-950">
@@ -181,7 +171,7 @@ const lostVisibility = allLostVisibility.slice(0, 3);
                         <p className="mt-2 text-xs text-rose-700">
                           Önceki ölçümde görünüyordu, şimdi
                           görünmüyor
-                          {result.previousRank
+                          {result.previousRank !== null
                             ? ` · Önceki sıra: ${result.previousRank}`
                             : ""}
                         </p>
@@ -196,8 +186,8 @@ const lostVisibility = allLostVisibility.slice(0, 3);
       )}
 
       <p className="text-xs leading-5 text-muted-foreground">
-        Karşılaştırma yalnızca iki ölçümde de aynı metinle
-        bulunan test sorularına dayanır.
+        Karşılaştırma yalnızca iki ölçümde de bulunan
+        benzersiz test sorularına dayanır.
       </p>
     </section>
   );
