@@ -1,93 +1,225 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  findTurkishLocation,
   normalizeStrategyText,
+  promptIntents,
   resolvePromptIntent,
+  type PromptIntent,
 } from "@/lib/strategy/prompt-intents";
 
-describe("resolvePromptIntent", () => {
-  it("veritabanındaki geçerli niyeti korur", () => {
-    const result = resolvePromptIntent(
-      "Genel bir soru",
-      "problem_solution"
-    );
+type PromptIntentCase = {
+  sector: string;
+  prompt: string;
+  expected: PromptIntent;
+};
 
-    expect(result).toBe("problem_solution");
-  });
+const storedIntentAliases: Array<{
+  label: string;
+  expected: PromptIntent;
+}> = [
+  {
+    label: "Satın Alma Niyeti",
+    expected: "buying_intent",
+  },
+  {
+    label: "Karşılaştırma",
+    expected: "comparison",
+  },
+  {
+    label: "Yerel Öneri",
+    expected: "local_recommendation",
+  },
+  {
+    label: "Sorun ve Çözüm",
+    expected: "problem_solution",
+  },
+  {
+    label: "Alternatif Arama",
+    expected: "alternative_search",
+  },
+  {
+    label: "Bütçe Dostu",
+    expected: "budget_friendly",
+  },
+  {
+    label: "Premium Seçim",
+    expected: "premium_choice",
+  },
+  {
+    label: "Güven ve İtibar",
+    expected: "trust_reputation",
+  },
+];
 
-  it("Türkçe kayıtlı niyet adını çözümler", () => {
-    const result = resolvePromptIntent(
-      "Genel bir soru",
-      "Satın Alma Niyeti"
-    );
-
-    expect(result).toBe("buying_intent");
-  });
-
-  it("teknik ürün seçimi sorusunu satın alma niyeti olarak sınıflandırır", () => {
-    const result = resolvePromptIntent(
-      "Endüstriyel tesiste kablosuz titreşim sensörü seçerken hangi teknik özelliklere bakılmalı?",
-      null
-    );
-
-    expect(result).toBe("buying_intent");
-  });
-
-  it("şehir içeren soruyu yerel öneri olarak sınıflandırır", () => {
-    const result = resolvePromptIntent(
-      "İstanbul'da kalibrasyon hizmeti veren firmalar hangileri?",
-      null
-    );
-
-    expect(result).toBe(
-      "local_recommendation"
-    );
-  });
-
-  it("iki çözüm arasındaki farkı soran metni karşılaştırma olarak sınıflandırır", () => {
-    const result = resolvePromptIntent(
-      "Periyodik vibrasyon analizi ile sürekli izleme arasındaki fark nedir?",
-      null
-    );
-
-    expect(result).toBe("comparison");
-  });
-
-  it("plansız duruş sorusunu sorun ve çözüm olarak sınıflandırır", () => {
-    const result = resolvePromptIntent(
+const promptIntentCases: PromptIntentCase[] = [
+  {
+    sector: "E-ticaret",
+    prompt:
+      "Yeni bir dizüstü bilgisayar almak için hangi teknik özelliklere bakmalıyım?",
+    expected: "buying_intent",
+  },
+  {
+    sector: "SaaS",
+    prompt:
+      "CRM abonelik paketi seçerken hangi özelliklere bakmalıyım?",
+    expected: "buying_intent",
+  },
+  {
+    sector: "Finans",
+    prompt:
+      "Vadeli mevduat ile yatırım fonu arasındaki fark nedir?",
+    expected: "comparison",
+  },
+  {
+    sector: "Otomotiv",
+    prompt:
+      "Elektrikli araç ile hibrit araç arasındaki fark nedir?",
+    expected: "comparison",
+  },
+  {
+    sector: "Sağlık",
+    prompt:
+      "Ankara'da çocuk diş hekimi önerir misin?",
+    expected: "local_recommendation",
+  },
+  {
+    sector: "Yeme içme",
+    prompt:
+      "İzmir'de vegan restoran önerileri nelerdir?",
+    expected: "local_recommendation",
+  },
+  {
+    sector: "Endüstriyel bakım",
+    prompt:
       "Fabrikada plansız duruş nasıl önceden tespit edilir?",
-      null
-    );
-
-    expect(result).toBe("problem_solution");
-  });
-
-  it("sertifika ve güven sorusunu güven ve itibar olarak sınıflandırır", () => {
-    const result = resolvePromptIntent(
-      "ISO 17025 sertifikalı ve güvenilir kalibrasyon firmaları hangileridir?",
-      null
-    );
-
-    expect(result).toBe("trust_reputation");
-  });
-
-  it("sağlayıcı listesi sorusunu alternatif arama olarak sınıflandırır", () => {
-    const result = resolvePromptIntent(
+    expected: "problem_solution",
+  },
+  {
+    sector: "SaaS destek",
+    prompt:
+      "CRM entegrasyonu çalışmıyor, ne yapmalıyım?",
+    expected: "problem_solution",
+  },
+  {
+    sector: "E-ticaret ödeme",
+    prompt:
+      "İnternet mağazamda ödeme neden olmuyor?",
+    expected: "problem_solution",
+  },
+  {
+    sector: "Enerji",
+    prompt:
+      "Güneş enerjisi sistemindeki arıza nasıl giderilir?",
+    expected: "problem_solution",
+  },
+  {
+    sector: "Kalibrasyon",
+    prompt:
       "Türkiye'deki ilaç ve gıda üretim tesislerinde sıcaklık kalibrasyon sistemleri için öne çıkan teknik çözüm sağlayıcıları hangileridir?",
-      null
-    );
+    expected: "alternative_search",
+  },
+  {
+    sector: "Eğitim",
+    prompt:
+      "YKS hazırlığı için hangi online eğitim platformlarını önerirsin?",
+    expected: "alternative_search",
+  },
+  {
+    sector: "Muhasebe",
+    prompt:
+      "KOBİ'ler için hangi muhasebe yazılımlarını önerirsin?",
+    expected: "alternative_search",
+  },
+  {
+    sector: "Lojistik",
+    prompt:
+      "E-ticaret şirketleri için hangi kargo firmalarını önerirsin?",
+    expected: "alternative_search",
+  },
+  {
+    sector: "Konaklama",
+    prompt:
+      "Uygun fiyatlı aile oteli önerileri nelerdir?",
+    expected: "budget_friendly",
+  },
+  {
+    sector: "SaaS bütçesi",
+    prompt:
+      "Küçük ekipler için ekonomik CRM seçenekleri nelerdir?",
+    expected: "budget_friendly",
+  },
+  {
+    sector: "Tüketici elektroniği",
+    prompt:
+      "Profesyonel seviye fotoğraf makinesi önerir misin?",
+    expected: "premium_choice",
+  },
+  {
+    sector: "Eğitim kurumu",
+    prompt:
+      "En kaliteli özel okul seçenekleri hangileridir?",
+    expected: "premium_choice",
+  },
+  {
+    sector: "Finansal hizmet",
+    prompt:
+      "Lisanslı ve güvenilir yatırım kuruluşları hangileridir?",
+    expected: "trust_reputation",
+  },
+  {
+    sector: "Sağlık hizmeti",
+    prompt:
+      "Sertifikalı ve güvenilir estetik klinikleri hangileridir?",
+    expected: "trust_reputation",
+  },
+];
 
-    expect(result).toBe("alternative_search");
-  });
+describe("resolvePromptIntent", () => {
+  it.each(promptIntents)(
+    "veritabanındaki %s niyetini değiştirmeden korur",
+    (intent) => {
+      expect(
+        resolvePromptIntent(
+          "Metinden farklı bir niyet çıkarılabilir.",
+          intent
+        )
+      ).toBe(intent);
+    }
+  );
 
-  it("belirgin niyet taşımayan soruda null döndürür", () => {
-    const result = resolvePromptIntent(
-      "Kalibrasyon sistemlerinin çalışma prensibini açıklar mısın?",
-      null
-    );
+  it.each(storedIntentAliases)(
+    "$label Türkçe etiketini $expected değerine dönüştürür",
+    ({ label, expected }) => {
+      expect(
+        resolvePromptIntent(
+          "Genel bir test sorusu",
+          label
+        )
+      ).toBe(expected);
+    }
+  );
 
-    expect(result).toBeNull();
-  });
+  it.each(promptIntentCases)(
+    "$sector sektöründeki soruyu $expected olarak sınıflandırır",
+    ({ prompt, expected }) => {
+      expect(
+        resolvePromptIntent(prompt, null)
+      ).toBe(expected);
+    }
+  );
+
+  it.each([
+    "Fotosentez hakkında bilgi verir misin?",
+    "Kalibrasyon sistemlerinin çalışma prensibi nedir?",
+  ])(
+    "belirgin karar niyeti taşımayan soruda null döndürür: %s",
+    (prompt) => {
+      expect(
+        resolvePromptIntent(prompt, null)
+      ).toBeNull();
+    }
+  );
 
   it("Türkçe karakterleri tutarlı biçimde normalleştirir", () => {
     expect(
@@ -97,5 +229,15 @@ describe("resolvePromptIntent", () => {
     ).toBe(
       "olcum muhendisligi ve cozum"
     );
+  });
+
+  it("şehir adını daha uzun bir kelimenin içinden yanlışlıkla çıkarmaz", () => {
+    expect(
+      findTurkishLocation("Karşıyaka")
+    ).toBeNull();
+
+    expect(
+      findTurkishLocation("Kars")
+    ).toBe("kars");
   });
 });

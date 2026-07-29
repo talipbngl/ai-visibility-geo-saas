@@ -229,7 +229,7 @@ export function resolvePromptIntent(
 
   if (
     includesAny(normalizedPrompt, [
-      "uygun fiyat",
+      "uygun fiyat*",
       "en ucuz",
       "ekonomik",
       "butce",
