@@ -111,7 +111,7 @@ export function ClientWebsiteScoreComparison({
     .slice(0, 3);
 
   return (
-    <section className="website-score-comparison report-page">
+    <section className="website-score-comparison">
       <p className="text-xs font-semibold uppercase tracking-[0.18em] text-indigo-600">
         Ek analiz · Web sitesi kıyası
       </p>
@@ -210,13 +210,13 @@ export function ClientWebsiteScoreComparison({
         </table>
       </div>
 
-      <div className="print-avoid mt-6 rounded-3xl border border-rose-200 bg-rose-50 p-5">
+      <div className="website-gap-panel print-avoid mt-6 rounded-3xl border border-rose-200 bg-rose-50 p-5">
         <h3 className="font-semibold text-rose-900">
           Rakibe göre gelişim alanları
         </h3>
 
         {gaps.length > 0 ? (
-          <div className="mt-4 grid gap-3">
+          <div className="website-gap-grid mt-4 grid gap-3">
             {gaps.map((gap, index) => (
               <div
                 key={gap.key}

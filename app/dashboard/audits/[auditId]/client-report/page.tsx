@@ -711,21 +711,16 @@ const contactLinkedInUrl = contactLinkedIn
 const contactLinkedInLabel = contactLinkedIn
   .replace(/^https?:\/\//i, "")
   .replace(/\/$/, "");
-  const seededTestNote =
-  seededRuns.length > 0
-    ? ` Marka veya takip edilen rakip adının soru metninde açıkça geçtiği ${seededRuns.length} kontrol sorusunun ${seededVisibleRuns.length} tanesinde marka görünmüştür. Bu sorular yönlendirmesiz keşif oranına dahil edilmemiştir.`
-    : "";
-
 const executiveSummary =
   discoveryPromptCount === 0
-    ? `Bu ölçüm setinde marka veya takip edilen rakip adı geçmeyen yönlendirmesiz bir keşif sorusu bulunmuyor. Doğal görünürlüğü ölçebilmek için en az beş tarafsız kullanıcı sorusu eklenmelidir.${seededTestNote}`
+    ? "Bu ölçüm setinde marka veya takip edilen rakip adı geçmeyen yönlendirmesiz bir keşif sorusu bulunmuyor. Doğal görünürlüğü ölçebilmek için en az beş tarafsız kullanıcı sorusu eklenmelidir."
     : primaryGap
       ? `${brand.name}, marka veya takip edilen rakip adı geçmeyen ${discoveryPromptCount} yönlendirmesiz sorunun ${discoveryVisibleRuns.length} tanesinde görünürken “${primaryGap.promptText}” sorusunda görünmedi. ${
           strongestCompetitor
             ? `${strongestCompetitor.name}, yönlendirmesiz soruların ${strongestCompetitor.mentionCount}/${discoveryPromptCount} tanesinde görünerek en sık görülen takip edilen rakip oldu.`
             : "Yönlendirmesiz sorularda takip edilen rakiplerden belirgin bir görünürlük üstünlüğü tespit edilmedi."
-        } Öncelik, aşağıdaki kanıt kartında belirtilen kullanıcı ihtiyacını doğrudan karşılayan mevcut sayfayı güçlendirmek veya uygun sayfa bulunmuyorsa yeni bir karar sayfası hazırlamaktır.${seededTestNote}`
-      : `${brand.name}, marka veya takip edilen rakip adı geçmeyen ${discoveryPromptCount} yönlendirmesiz sorunun tamamında görünür durumda. Sonraki adım, bu konumu daha geniş bir tarafsız soru setinde doğrulamak ve ilk iki öneri arasındaki yerini korumaktır.${seededTestNote}`;
+        } Öncelik, aşağıdaki kanıt kartında belirtilen kullanıcı ihtiyacını doğrudan karşılayan mevcut sayfayı güçlendirmek veya uygun sayfa bulunmuyorsa yeni bir karar sayfası hazırlamaktır.`
+      : `${brand.name}, marka veya takip edilen rakip adı geçmeyen ${discoveryPromptCount} yönlendirmesiz sorunun tamamında görünür durumda. Sonraki adım, bu konumu daha geniş bir tarafsız soru setinde doğrulamak ve ilk iki öneri arasındaki yerini korumaktır.`;
   return (
     <main className="min-h-screen bg-slate-100 text-slate-950 print:bg-white">
       <div className="mx-auto max-w-6xl px-6 py-6 print:max-w-none print:px-0 print:py-0">
@@ -1118,7 +1113,7 @@ description={`${discoveryPromptCount} yönlendirmesiz soruda markanın ve cevapt
               </p>
             </section>
           ) : (
-            <section>
+              <section className="print-avoid">
               <SectionTitle
                 eyebrow="02 - Rakip Görünürlüğü"
                 title="Yönlendirmesiz cevaplarda rakip görünürlüğü"

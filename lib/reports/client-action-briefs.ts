@@ -578,17 +578,28 @@ const firstMissingCanonicalPage =
   missingCanonicalPages[0];
 
 if (firstMissingCanonicalPage) {
-  const affectedPageLabels = missingCanonicalPages
-    .slice(0, 4)
-    .map((page) => page.title)
-    .join(", ");
+  const visibleCanonicalPages =
+  missingCanonicalPages.slice(0, 4);
+
+const hiddenCanonicalPageCount =
+  missingCanonicalPages.length -
+  visibleCanonicalPages.length;
+
+const affectedPageLabels = visibleCanonicalPages
+  .map((page) => page.title)
+  .join(", ");
+
+const affectedPageSummary =
+  hiddenCanonicalPageCount > 0
+    ? `${affectedPageLabels} ve ${hiddenCanonicalPageCount} sayfa daha`
+    : affectedPageLabels;
 
   return {
     id: "website-canonical-coverage",
     week: 3,
     priority: "Orta",
     title: `${missingCanonicalPages.length}/${analyzedPages.length} taranan sayfada canonical adresi tanımla`,
-    reason: `Canonical alanı ölçülen ancak değeri bulunmayan sayfalar: ${affectedPageLabels}. Her sayfa, tercih edilen tek ve nihai URL’sini açıkça belirtmelidir.`,
+    reason: `Canonical alanı ölçülen ancak değeri bulunmayan sayfalar: ${affectedPageSummary}. Her sayfa, tercih edilen tek ve nihai URL’sini açıkça belirtmelidir.`,
     targetPrompt: "Tercih edilen sayfa adresi",
     deliverable: `${missingCanonicalPages.length} sayfada canonical düzenlemesi`,
     suggestedPath: firstMissingCanonicalPage.url,
